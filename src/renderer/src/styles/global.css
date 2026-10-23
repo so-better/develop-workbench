@@ -1,0 +1,86 @@
+:root {
+  color-scheme: light;
+  color: #172033;
+  background: #f5f7fb;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --app-bg: #f5f7fb;
+  --app-text: #172033;
+  --app-muted: #98a2b3;
+  --control-bg: rgba(255, 255, 255, 0.82);
+  --control-border: #e5e9f2;
+  --control-shadow: 0 10px 28px -20px rgba(15, 23, 42, 0.36);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #e5e7eb;
+  background: #0b0f19;
+  --app-bg: #0b0f19;
+  --app-text: #e5e7eb;
+  --app-muted: #7d8797;
+  --control-bg: rgba(20, 27, 45, 0.82);
+  --control-border: #263044;
+  --control-shadow: 0 10px 28px -20px rgba(0, 0, 0, 0.72);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root,
+.ant-app {
+  height: 100%;
+  min-height: 0;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  color: var(--app-text);
+  background: var(--app-bg);
+}
+
+.app-shell {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  background: var(--app-bg);
+  transition: background-color 0.2s ease;
+  place-items: center;
+}
+
+.app-shell .ant-empty-description {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.theme-switcher {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  padding: 4px;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  border-radius: 12px;
+  box-shadow: var(--control-shadow);
+  backdrop-filter: blur(12px);
+}
+
+.theme-switcher .ant-segmented {
+  background: transparent;
+}
+
+.theme-switcher .ant-segmented-item-label {
+  min-height: 24px;
+  padding-inline: 10px;
+  font-size: 11px;
+  line-height: 24px;
+}
