@@ -3,11 +3,11 @@ import { CopyOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Input, Modal, Spin } from 'antd'
 import type { AppInfo } from '../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../types/lark'
-
-type SettingsSection = 'ai' | 'lark-cli' | 'app-info'
+import type { SettingsSection } from '../../../types/settings'
 
 interface SettingsModalProps {
   open: boolean
+  initialSection?: SettingsSection
   appInfo: AppInfo | null
   onLarkCliUpdated: () => void
   onClose: () => void
@@ -31,6 +31,7 @@ const larkCliSourceNames: Record<LarkCliPathSource, string> = {
  */
 export default function SettingsModal({
   open,
+  initialSection = 'ai',
   appInfo,
   onLarkCliUpdated,
   onClose
@@ -52,7 +53,7 @@ export default function SettingsModal({
 
     let mounted = true
 
-    setActiveSection('ai')
+    setActiveSection(initialSection)
     setLoading(true)
     setError(null)
     setDraft('')
@@ -93,7 +94,7 @@ export default function SettingsModal({
     return () => {
       mounted = false
     }
-  }, [open])
+  }, [initialSection, open])
 
   /**
    * 自动检测 lark-cli，但暂不写入偏好。

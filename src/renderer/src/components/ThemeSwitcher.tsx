@@ -1,29 +1,49 @@
-import { Segmented } from 'antd'
+import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
+import { Button, Dropdown } from 'antd'
+import type { MenuProps } from 'antd'
 import type { ThemeMode } from '../../../types/theme'
 import { useTheme } from '../theme/ThemeProvider'
 
 // 主题切换控件提供的三种模式。
-const themeOptions: Array<{ label: string; value: ThemeMode }> = [
-  { label: '跟随系统', value: 'system' },
-  { label: '浅色', value: 'light' },
-  { label: '深色', value: 'dark' }
+const themeOptions: Array<{ label: string; value: ThemeMode; icon: JSX.Element }> = [
+  { label: '跟随系统', value: 'system', icon: <DesktopOutlined /> },
+  { label: '浅色', value: 'light', icon: <SunOutlined /> },
+  { label: '深色', value: 'dark', icon: <MoonOutlined /> }
 ]
+
+const themeMenuItems: MenuProps['items'] = themeOptions.map((option) => ({
+  key: option.value,
+  label: option.label,
+  icon: option.icon
+}))
 
 /**
  * 主题模式切换控件。
- * 只负责展示和触发切换，实际主题状态由 ThemeProvider 与主进程维护。
+ * 使用单一图标按钮和向上弹出的菜单，避免占用 Footer 横向空间。
  */
 export default function ThemeSwitcher(): JSX.Element {
   const { mode, setMode } = useTheme()
+  const activeOption = themeOptions.find((option) => option.value === mode) ?? themeOptions[0]
 
   return (
-    <div className="theme-switcher" role="group" aria-label="主题模式">
-      <Segmented
+    <Dropdown
+      placement="topRight"
+      trigger={['click']}
+      menu={{
+        items: themeMenuItems,
+        selectable: true,
+        selectedKeys: [mode],
+        onClick: ({ key }) => setMode(key as ThemeMode)
+      }}
+    >
+      <Button
+        type="text"
         size="small"
-        value={mode}
-        options={themeOptions}
-        onChange={(value) => setMode(value as ThemeMode)}
+        className="theme-trigger"
+        icon={activeOption.icon}
+        aria-label={`主题：${activeOption.label}`}
+        title={`主题：${activeOption.label}`}
       />
-    </div>
+    </Dropdown>
   )
 }

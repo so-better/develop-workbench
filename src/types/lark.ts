@@ -22,3 +22,19 @@ export interface LarkCliInfo {
   version: string | null
   available: boolean
 }
+
+/**
+ * 设备授权登录会话。
+ * 二维码以 data URL 返回，device code 不暴露给渲染进程。
+ */
+export interface LarkLoginSession {
+  qrCodeDataUrl: string
+  expiresAt: number
+}
+
+/**
+ * 主进程推送的登录结果。
+ */
+export type LarkLoginEvent =
+  | { status: 'success' }
+  | { status: 'error'; message: string }

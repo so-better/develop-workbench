@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
-import type { LarkCliInfo, LarkUser } from '../types/lark'
+import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
 import type { ThemeMode, ThemeState } from '../types/theme'
 
 const electronAPI = {
@@ -47,6 +47,36 @@ const electronAPI = {
    */
   selectLarkCliPath: (currentPath?: string | null): Promise<string | null> =>
     ipcRenderer.invoke('lark:select-cli-path', currentPath),
+
+  /**
+   * 发起飞书扫码登录，返回二维码 data URL。
+   */
+  startLarkLogin: (): Promise<LarkLoginSession> => ipcRenderer.invoke('lark:start-login'),
+
+  /**
+   * 取消当前扫码登录。
+   */
+  cancelLarkLogin: (): Promise<void> => ipcRenderer.invoke('lark:cancel-login'),
+
+  /**
+   * 退出 lark-cli 当前飞书登录态。
+   */
+  logoutLark: (): Promise<void> => ipcRenderer.invoke('lark:logout'),
+
+  /**
+   * 订阅扫码登录结果，返回取消订阅函数。
+   */
+  onLarkLoginEvent: (listener: (event: LarkLoginEvent) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, result: LarkLoginEvent): void => {
+      listener(result)
+    }
+
+    ipcRenderer.on('lark:login-event', handler)
+
+    return () => {
+      ipcRenderer.removeListener('lark:login-event', handler)
+    }
+  },
 
   /**
    * 读取 AI 配置文件内容。

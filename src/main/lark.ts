@@ -4,14 +4,21 @@
  */
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { OpenDialogOptions } from 'electron'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import type { ChildProcess } from 'node:child_process'
 import { constants } from 'node:fs'
-import { access, readdir } from 'node:fs/promises'
-import { homedir } from 'node:os'
+import { access, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { getPreferences, updatePreferences } from './preferences'
-import type { LarkCliInfo, LarkCliPathSource, LarkUser } from '../types/lark'
+import type {
+  LarkCliInfo,
+  LarkCliPathSource,
+  LarkLoginEvent,
+  LarkLoginSession,
+  LarkUser
+} from '../types/lark'
 
 /**
  * 路径解析结果。
@@ -48,6 +55,27 @@ interface UserInfoResponse {
   }
 }
 
+/**
+ * 设备授权初始化返回值。
+ * device code 只在主进程内使用，不传给渲染进程。
+ */
+interface DeviceFlowResponse {
+  ok?: boolean
+  device_code?: string
+  verification_url?: string
+  expires_in?: number
+  error?: {
+    message?: string
+  }
+}
+
+/**
+ * 正在等待用户扫码的登录会话。
+ */
+interface PendingLogin {
+  child: ChildProcess
+}
+
 const execFileAsync = promisify(execFile)
 
 // 单次 lark-cli 调用的超时时间。
@@ -59,6 +87,21 @@ const MAX_AVATAR_BYTES = 512 * 1024
 
 // 路径解析缓存；undefined 表示尚未解析，null 表示未找到。
 let cachedResolution: ResolvedLarkCli | null | undefined
+
+// 扫码登录所需的最小权限集合。
+const LOGIN_SCOPE = 'auth:user.id:read contact:user.basic_profile:readonly profile:user_profile:read'
+
+// 当前正在等待授权的登录会话。
+let pendingLogin: PendingLogin | null = null
+
+/**
+ * 向所有窗口广播扫码登录结果。
+ */
+const broadcastLoginEvent = (event: LarkLoginEvent): void => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send('lark:login-event', event)
+  }
+}
 
 /**
  * 清除路径解析缓存。
@@ -184,13 +227,19 @@ const resolveLarkCli = async (
 
 /**
  * 执行指定可执行文件。
+ * options.cwd 用于需要限定输出目录的命令，例如生成二维码。
  */
-const runExecutable = async (executablePath: string, args: string[]): Promise<string> => {
+const runExecutable = async (
+  executablePath: string,
+  args: string[],
+  options: { cwd?: string } = {}
+): Promise<string> => {
   const { stdout } = await execFileAsync(executablePath, args, {
     timeout: COMMAND_TIMEOUT_MS,
     maxBuffer: MAX_BUFFER_BYTES,
     encoding: 'utf8',
-    env: process.env
+    env: process.env,
+    cwd: options.cwd
   })
 
   return stdout
@@ -338,6 +387,148 @@ export const selectLarkCliPath = async (currentPath?: string | null): Promise<st
 }
 
 /**
+ * 使用 lark-cli 生成登录二维码。
+ * 二维码文件写入临时目录，读取后立即转换为 data URL 并清理。
+ */
+const createLoginQrDataUrl = async (
+  executablePath: string,
+  verificationUrl: string
+): Promise<string> => {
+  const directory = await mkdtemp(join(tmpdir(), 'develop-workbench-login-'))
+
+  try {
+    await runExecutable(
+      executablePath,
+      ['auth', 'qrcode', verificationUrl, '--output', 'login-qr.png', '--size', '320'],
+      { cwd: directory }
+    )
+
+    const data = await readFile(join(directory, 'login-qr.png'))
+    return `data:image/png;base64,${data.toString('base64')}`
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+}
+
+/**
+ * 发起飞书扫码登录。
+ * device code 保存在主进程中，渲染进程只拿到二维码。
+ * 授权完成后由主进程广播登录结果。
+ */
+export const startLarkLogin = async (): Promise<LarkLoginSession> => {
+  const resolved = await resolveLarkCli(true)
+
+  if (!resolved?.available) {
+    throw new Error('lark-cli not available')
+  }
+
+  // 新登录会替换掉上一次尚未完成的会话。
+  cancelLarkLogin()
+
+  const output = await runExecutable(resolved.path, [
+    'auth',
+    'login',
+    '--no-wait',
+    '--json',
+    '--recommend',
+    '--scope',
+    LOGIN_SCOPE
+  ])
+  const response = parseJson(output) as DeviceFlowResponse
+
+  // lark-cli 的 no-wait 成功响应不一定包含 ok 字段，以关键字段为准。
+  if (!response.device_code || !response.verification_url) {
+    throw new Error(response.error?.message ?? '无法发起飞书授权')
+  }
+
+  const qrCodeDataUrl = await createLoginQrDataUrl(
+    resolved.path,
+    response.verification_url
+  )
+
+  // 后台轮询授权状态，用户扫码完成后自动获取 token。
+  const child = spawn(
+    resolved.path,
+    ['auth', 'login', '--device-code', response.device_code, '--json'],
+    {
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe']
+    }
+  )
+  const pending: PendingLogin = { child }
+  pendingLogin = pending
+
+  let stdout = ''
+
+  child.stdout?.on('data', (chunk: Buffer) => {
+    stdout += chunk.toString('utf8')
+  })
+
+  child.on('error', (error) => {
+    if (pendingLogin !== pending) return
+
+    pendingLogin = null
+    broadcastLoginEvent({
+      status: 'error',
+      message: error.message
+    })
+  })
+
+  child.on('close', (code) => {
+    if (pendingLogin !== pending) return
+
+    pendingLogin = null
+
+    if (code === 0) {
+      invalidateLarkCliResolution()
+      broadcastLoginEvent({ status: 'success' })
+      return
+    }
+
+    let message = '飞书授权失败'
+
+    try {
+      const errorResponse = parseJson(stdout) as DeviceFlowResponse
+      message = errorResponse.error?.message ?? message
+    } catch {
+      // 命令失败且没有 JSON 输出时使用默认提示。
+    }
+
+    broadcastLoginEvent({
+      status: 'error',
+      message
+    })
+  })
+
+  return {
+    qrCodeDataUrl,
+    expiresAt: Date.now() + (response.expires_in ?? 600) * 1000
+  }
+}
+
+/**
+ * 取消当前扫码登录会话。
+ * 关闭弹窗或重新生成二维码时调用。
+ */
+export const cancelLarkLogin = (): void => {
+  const current = pendingLogin
+
+  if (!current) return
+
+  pendingLogin = null
+  current.child.kill()
+}
+
+/**
+ * 退出当前 lark-cli 飞书登录态。
+ * token 由 lark-cli 管理，应用不保存飞书凭据。
+ */
+export const logoutLark = async (): Promise<void> => {
+  await runLarkCli(['auth', 'logout', '--json'])
+  invalidateLarkCliResolution()
+}
+
+/**
  * 下载飞书头像并转换为 data URL。
  * 避免渲染进程直接访问外部图片地址。
  */
@@ -441,4 +632,13 @@ export const initializeLark = (): void => {
 
     return selectLarkCliPath(currentPath)
   })
+
+  // 发起扫码登录并返回二维码。
+  ipcMain.handle('lark:start-login', () => startLarkLogin())
+
+  // 取消当前扫码登录。
+  ipcMain.handle('lark:cancel-login', () => cancelLarkLogin())
+
+  // 退出 lark-cli 当前飞书登录态。
+  ipcMain.handle('lark:logout', () => logoutLark())
 }

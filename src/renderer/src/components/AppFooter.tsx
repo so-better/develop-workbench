@@ -1,5 +1,7 @@
-import { SettingOutlined } from '@ant-design/icons'
-import { Avatar } from 'antd'
+import { useState } from 'react'
+import { LogoutOutlined, SettingOutlined } from '@ant-design/icons'
+import { App, Avatar, Button, Popconfirm } from 'antd'
+import ThemeSwitcher from './ThemeSwitcher'
 import type { AppInfo } from '../../../types/app'
 import type { LarkUser } from '../../../types/lark'
 
@@ -7,13 +9,38 @@ interface AppFooterProps {
   user: LarkUser | null
   appInfo: AppInfo | null
   onOpenSettings: () => void
+  onLogout: () => Promise<void>
 }
 
 /**
  * 应用底部状态栏。
- * 左侧只展示已登录的飞书用户，右侧始终提供设置入口和版本号。
+ * 左侧展示已登录用户和退出入口，右侧始终提供设置入口和版本号。
  */
-export default function AppFooter({ user, appInfo, onOpenSettings }: AppFooterProps): JSX.Element {
+export default function AppFooter({
+  user,
+  appInfo,
+  onOpenSettings,
+  onLogout
+}: AppFooterProps): JSX.Element {
+  const { message } = App.useApp()
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  /**
+   * 确认退出 lark-cli 飞书登录态。
+   */
+  const handleLogout = async (): Promise<void> => {
+    setLoggingOut(true)
+
+    try {
+      await onLogout()
+      message.success('已退出飞书登录')
+    } catch {
+      message.error('退出飞书登录失败')
+    } finally {
+      setLoggingOut(false)
+    }
+  }
+
   return (
     <footer className="app-footer">
       <div className="footer-user">
@@ -23,6 +50,22 @@ export default function AppFooter({ user, appInfo, onOpenSettings }: AppFooterPr
               {user.name.slice(0, 1)}
             </Avatar>
             <span className="footer-user-name">{user.name}</span>
+            <Popconfirm
+              title="退出飞书登录？"
+              okText="退出"
+              cancelText="取消"
+              placement="top"
+              onConfirm={() => handleLogout()}
+            >
+              <Button
+                type="text"
+                size="small"
+                className="footer-logout"
+                icon={<LogoutOutlined />}
+                aria-label="退出飞书登录"
+                loading={loggingOut}
+              />
+            </Popconfirm>
           </>
         ) : null}
       </div>
@@ -33,6 +76,7 @@ export default function AppFooter({ user, appInfo, onOpenSettings }: AppFooterPr
           <SettingOutlined />
           <span>设置</span>
         </button>
+        <ThemeSwitcher />
       </div>
     </footer>
   )

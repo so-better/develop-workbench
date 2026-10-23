@@ -1,6 +1,6 @@
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
-import type { LarkCliInfo, LarkUser } from '../types/lark'
+import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
 import type { ThemeMode, ThemeState } from '../types/theme'
 
 export interface ElectronAPI {
@@ -19,6 +19,14 @@ export interface ElectronAPI {
   setLarkCliPath: (cliPath: string | null) => Promise<LarkCliInfo>
   /** 打开系统文件选择器选择 lark-cli，优先定位到当前路径所在目录。 */
   selectLarkCliPath: (currentPath?: string | null) => Promise<string | null>
+  /** 发起飞书扫码登录，返回二维码。 */
+  startLarkLogin: () => Promise<LarkLoginSession>
+  /** 取消当前扫码登录。 */
+  cancelLarkLogin: () => Promise<void>
+  /** 退出 lark-cli 当前飞书登录态。 */
+  logoutLark: () => Promise<void>
+  /** 订阅扫码登录结果，返回取消订阅函数。 */
+  onLarkLoginEvent: (listener: (event: LarkLoginEvent) => void) => () => void
   /** 读取 AI 配置文件。 */
   readAiConfig: () => Promise<AiConfigDocument>
   /** 校验并写入 AI 配置文件。 */
