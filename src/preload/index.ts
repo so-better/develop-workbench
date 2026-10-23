@@ -4,6 +4,13 @@ import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
+import type {
+  CloneRepositoryInput,
+  RepositoryCloneProgress,
+  RepositoryScanResult,
+  RepositoryState,
+  UpdateRepositoryInput
+} from '../types/repository'
 import type { ThemeMode, ThemeState } from '../types/theme'
 
 const electronAPI = {
@@ -131,6 +138,98 @@ const electronAPI = {
       ipcRenderer.removeListener('meegle:login-event', handler)
     }
   },
+
+  /**
+   * 读取代码仓库配置状态。
+   */
+  getRepositoryState: (): Promise<RepositoryState> =>
+    ipcRenderer.invoke('repositories:get-state'),
+
+  /**
+   * 刷新单个仓库的 Git 信息。
+   */
+  refreshRepository: (repositoryId: string): Promise<RepositoryState> =>
+    ipcRenderer.invoke('repositories:refresh-repository', repositoryId),
+
+  /**
+   * 重新扫描代码根目录，同步仓库增删和 Git 信息。
+   */
+  refreshRootRepositories: (): Promise<RepositoryScanResult> =>
+    ipcRenderer.invoke('repositories:refresh-root'),
+
+  /**
+   * 设置代码根目录。
+   */
+  setRepositoryRoot: (rootPath: string): Promise<RepositoryState> =>
+    ipcRenderer.invoke('repositories:set-root', rootPath),
+
+  /**
+   * 清除代码根目录，不删除本地文件。
+   */
+  clearRepositoryRoot: (): Promise<RepositoryState> =>
+    ipcRenderer.invoke('repositories:clear-root'),
+
+  /**
+   * 打开系统目录选择器。
+   */
+  selectDirectory: (title?: string, defaultPath?: string): Promise<string | null> =>
+    ipcRenderer.invoke('repositories:select-directory', title, defaultPath),
+
+  /**
+   * 取消当前正在执行的 Git 克隆。
+   */
+  cancelRepositoryClone: (): Promise<void> =>
+    ipcRenderer.invoke('repositories:cancel-clone'),
+
+  /**
+   * 从 Git 克隆仓库到指定根目录。
+   */
+  cloneRepository: (input: CloneRepositoryInput): Promise<RepositoryState> =>
+    ipcRenderer.invoke('repositories:clone', input),
+
+  /**
+   * 订阅 Git 克隆进度，返回取消订阅函数。
+   */
+  onRepositoryCloneProgress: (
+    listener: (progress: RepositoryCloneProgress) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, progress: RepositoryCloneProgress): void => {
+      listener(progress)
+    }
+
+    ipcRenderer.on('repositories:clone-progress', handler)
+
+    return () => {
+      ipcRenderer.removeListener('repositories:clone-progress', handler)
+    }
+  },
+
+  /**
+   * 订阅后台扫描产生的仓库状态变化。
+   */
+  onRepositoriesChanged: (listener: (state: RepositoryState) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, state: RepositoryState): void => {
+      listener(state)
+    }
+
+    ipcRenderer.on('repositories:changed', handler)
+
+    return () => {
+      ipcRenderer.removeListener('repositories:changed', handler)
+    }
+  },
+
+  /**
+   * 更新仓库名称或轻舟接入状态。
+   */
+  updateRepository: (repositoryId: string, patch: UpdateRepositoryInput): Promise<RepositoryState> =>
+    ipcRenderer.invoke('repositories:update', repositoryId, patch),
+
+  /**
+   * 移除仓库元数据，不删除本地代码。
+   */
+  removeRepository: (repositoryId: string): Promise<RepositoryState> =>
+    ipcRenderer.invoke('repositories:remove', repositoryId),
 
   /**
    * 读取 AI 配置文件内容。

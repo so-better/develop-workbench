@@ -271,11 +271,11 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
   return (
     <>
       <div className="settings-panel-header">
-        <h3>飞书项目</h3>
-        <p>连接 Meegle（飞书项目），用于读取项目、需求和工作项。</p>
+        <h3>Meegle Cli</h3>
+        <p>连接 Meegle，用于读取飞书项目、需求和工作项。</p>
       </div>
       <p className="settings-help meegle-auth-note">
-        飞书项目使用独立的 OAuth 客户端和权限体系，lark-cli 的飞书登录态无法直接复用，因此需要单独授权一次。
+        Meegle 使用独立的 OAuth 客户端和权限体系，lark-cli 的飞书登录态无法直接复用，因此需要单独授权一次。
       </p>
 
       <div className="meegle-section">
@@ -313,8 +313,10 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
             placeholder="选择或输入 Meegle CLI 路径"
             spellCheck={false}
           />
-          <Button onClick={() => chooseCliPath()}>选择文件</Button>
-          <Button loading={savingPath} onClick={() => detectCliPath()}>
+          <Button variant="filled" onClick={() => chooseCliPath()}>
+            选择文件
+          </Button>
+          <Button variant="filled" loading={savingPath} onClick={() => detectCliPath()}>
             自动检测
           </Button>
         </div>
@@ -350,8 +352,8 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
                       size="small"
                       className="meegle-logout"
                       icon={<LogoutOutlined />}
-                      aria-label="退出飞书项目登录"
-                      title="退出飞书项目登录"
+                      aria-label="退出 Meegle 登录"
+                      title="退出 Meegle 登录"
                       loading={loggingOut}
                     />
                   </Popconfirm>
@@ -390,7 +392,9 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
               <p className="settings-help">授权码：{loginSession.userCode}</p>
             ) : null}
             <div className="login-state-actions">
-              <Button onClick={() => startLogin()}>刷新二维码</Button>
+              <Button variant="filled" onClick={() => startLogin()}>
+                刷新二维码
+              </Button>
               <Button type="primary" loading={checking} onClick={() => checkLogin()}>
                 我已登录
               </Button>

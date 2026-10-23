@@ -11,6 +11,7 @@ export interface AppPreferences {
   theme: ThemeMode
   larkCliPath?: string
   meegleCliPath?: string
+  repositoryRoot?: string
 }
 
 const DEFAULT_PREFERENCES: AppPreferences = {
@@ -56,12 +57,14 @@ const readPreferences = (): AppPreferences => {
       theme?: unknown
       larkCliPath?: unknown
       meegleCliPath?: unknown
+      repositoryRoot?: unknown
     }
 
     cachedPreferences = {
       theme: isThemeMode(parsed.theme) ? parsed.theme : DEFAULT_PREFERENCES.theme,
       larkCliPath: normalizePath(parsed.larkCliPath),
-      meegleCliPath: normalizePath(parsed.meegleCliPath)
+      meegleCliPath: normalizePath(parsed.meegleCliPath),
+      repositoryRoot: normalizePath(parsed.repositoryRoot)
     }
   } catch {
     cachedPreferences = { ...DEFAULT_PREFERENCES }
@@ -87,6 +90,7 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
 
   next.larkCliPath = normalizePath(next.larkCliPath)
   next.meegleCliPath = normalizePath(next.meegleCliPath)
+  next.repositoryRoot = normalizePath(next.repositoryRoot)
   cachedPreferences = next
 
   try {

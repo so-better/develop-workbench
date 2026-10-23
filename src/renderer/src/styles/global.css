@@ -17,6 +17,8 @@
   --control-hover: rgba(15, 23, 42, 0.05);
   --control-shadow: 0 10px 28px -20px rgba(15, 23, 42, 0.36);
   --settings-active: rgba(22, 119, 255, 0.08);
+  --log-bg: #fbfcfe;
+  --log-border: #e8ecf4;
 }
 
 :root[data-theme="dark"] {
@@ -32,6 +34,8 @@
   --control-hover: rgba(255, 255, 255, 0.06);
   --control-shadow: 0 10px 28px -20px rgba(0, 0, 0, 0.72);
   --settings-active: rgba(22, 119, 255, 0.16);
+  --log-bg: rgba(255, 255, 255, 0.035);
+  --log-border: #263044;
 }
 
 * {
@@ -607,4 +611,172 @@ body {
   .settings-dialog {
     grid-template-columns: 140px minmax(0, 1fr);
   }
+}
+
+.repository-section {
+  margin-bottom: 16px;
+}
+
+.repository-field-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.repository-path-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.repository-path-row .ant-input {
+  flex: 1;
+  min-width: 0;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.repository-path-row .ant-btn {
+  height: 32px;
+}
+
+.repository-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.repository-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.repository-search {
+  width: 240px;
+}
+
+
+.repository-name-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+
+.repository-name-cell strong {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.repository-path-line {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.repository-path-text {
+  overflow: hidden;
+  color: var(--app-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-path-line .ant-tag {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 9px;
+  line-height: 17px;
+}
+
+.repository-clone-target {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  background: var(--control-hover);
+  border-radius: 6px;
+}
+
+.repository-branch-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.repository-branch-text {
+  overflow: hidden;
+  color: var(--app-text);
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-copy-button {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--app-muted) !important;
+  opacity: 0.7;
+}
+
+.repository-copy-button:hover {
+  color: var(--app-text) !important;
+  background: var(--control-hover) !important;
+  opacity: 1;
+}
+
+.repository-clone-progress {
+  margin-top: 16px;
+}
+
+.repository-clone-progress-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.repository-clone-progress-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.repository-clone-log {
+  max-height: 140px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  overflow-y: auto;
+  color: var(--app-text);
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+  line-height: 1.6;
+  background: var(--log-bg);
+  border: 1px solid var(--log-border);
+  border-radius: 6px;
+}
+
+.repository-clone-log > div {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.repository-clone-cancel {
+  height: 22px;
+  padding: 0 4px;
+  font-size: 11px;
 }

@@ -5,6 +5,7 @@ import type { AppInfo } from '../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../types/lark'
 import type { SettingsSection } from '../../../types/settings'
 import MeegleSettings from './MeegleSettings'
+import RepositorySettings from './RepositorySettings'
 
 interface SettingsModalProps {
   open: boolean
@@ -267,7 +268,7 @@ export default function SettingsModal({
   return (
     <Modal
       title="设置"
-      width={820}
+      width={1040}
       centered
       open={open}
       onCancel={onClose}
@@ -307,7 +308,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'lark-cli' ? 'page' : undefined}
             onClick={() => setActiveSection('lark-cli')}
           >
-            飞书登录
+            Lark Cli
           </button>
           <button
             type="button"
@@ -315,7 +316,15 @@ export default function SettingsModal({
             aria-current={activeSection === 'meegle' ? 'page' : undefined}
             onClick={() => setActiveSection('meegle')}
           >
-            飞书项目
+            Meegle Cli
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item${activeSection === 'repositories' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'repositories' ? 'page' : undefined}
+            onClick={() => setActiveSection('repositories')}
+          >
+            代码仓库
           </button>
           <button
             type="button"
@@ -354,7 +363,7 @@ export default function SettingsModal({
           ) : activeSection === 'lark-cli' ? (
             <>
               <div className="settings-panel-header">
-                <h3>飞书登录</h3>
+                <h3>Lark Cli</h3>
                 <p>应用通过 lark-cli 获取飞书登录状态。可以手动指定可执行文件，也可以使用自动检测结果。</p>
               </div>
 
@@ -414,8 +423,10 @@ export default function SettingsModal({
                         placeholder="输入路径或选择文件"
                         spellCheck={false}
                       />
-                      <Button onClick={() => handleChooseLarkCli()}>选择文件</Button>
-                      <Button onClick={() => handleAutoDetect()} disabled={saving}>
+                      <Button variant="filled" onClick={() => handleChooseLarkCli()}>
+                        选择文件
+                      </Button>
+                      <Button variant="filled" onClick={() => handleAutoDetect()} disabled={saving}>
                         自动检测
                       </Button>
                     </div>
@@ -425,6 +436,8 @@ export default function SettingsModal({
               )}
             </>
           ) : null}
+
+          {activeSection === 'repositories' ? <RepositorySettings /> : null}
 
           {activeSection === 'meegle' ? (
             <MeegleSettings onSaveReady={handleMeegleSaveReady} />

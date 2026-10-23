@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { initializeAiConfig } from './ai-config'
 import { initializeLark } from './lark'
 import { initializeMeegle } from './meegle'
+import { initializeRepositories } from './repositories'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
 import { createMainWindow, focusMainWindow, getMainWindow } from './window'
@@ -38,6 +39,7 @@ if (!hasSingleInstanceLock) {
     initializeSystem()
     initializeLark()
     initializeMeegle()
+    initializeRepositories()
     initializeAiConfig()
     createMainWindow()
 

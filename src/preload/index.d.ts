@@ -2,6 +2,13 @@ import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
+import type {
+  CloneRepositoryInput,
+  RepositoryCloneProgress,
+  RepositoryScanResult,
+  RepositoryState,
+  UpdateRepositoryInput
+} from '../types/repository'
 import type { ThemeMode, ThemeState } from '../types/theme'
 
 export interface ElectronAPI {
@@ -44,6 +51,30 @@ export interface ElectronAPI {
   logoutMeegle: () => Promise<MeegleState>
   /** 订阅 Meegle 扫码登录结果，返回取消订阅函数。 */
   onMeegleLoginEvent: (listener: (event: MeegleLoginEvent) => void) => () => void
+  /** 读取代码仓库配置状态。 */
+  getRepositoryState: () => Promise<RepositoryState>
+  /** 刷新单个仓库的 Git 信息。 */
+  refreshRepository: (repositoryId: string) => Promise<RepositoryState>
+  /** 重新扫描代码根目录。 */
+  refreshRootRepositories: () => Promise<RepositoryScanResult>
+  /** 设置代码根目录。 */
+  setRepositoryRoot: (rootPath: string) => Promise<RepositoryState>
+  /** 清除代码根目录。 */
+  clearRepositoryRoot: () => Promise<RepositoryState>
+  /** 打开系统目录选择器。 */
+  selectDirectory: (title?: string, defaultPath?: string) => Promise<string | null>
+  /** 取消当前 Git 克隆。 */
+  cancelRepositoryClone: () => Promise<void>
+  /** 从 Git 克隆仓库。 */
+  cloneRepository: (input: CloneRepositoryInput) => Promise<RepositoryState>
+  /** 订阅 Git 克隆进度，返回取消订阅函数。 */
+  onRepositoryCloneProgress: (listener: (progress: RepositoryCloneProgress) => void) => () => void
+  /** 订阅后台扫描产生的仓库状态变化。 */
+  onRepositoriesChanged: (listener: (state: RepositoryState) => void) => () => void
+  /** 更新仓库信息。 */
+  updateRepository: (repositoryId: string, patch: UpdateRepositoryInput) => Promise<RepositoryState>
+  /** 移除仓库元数据。 */
+  removeRepository: (repositoryId: string) => Promise<RepositoryState>
   /** 读取 AI 配置文件。 */
   readAiConfig: () => Promise<AiConfigDocument>
   /** 校验并写入 AI 配置文件。 */
