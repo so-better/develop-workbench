@@ -1,24 +1,68 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
+import dayjs from 'dayjs'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
+  CheckCircleFilled,
+  ClockCircleFilled,
   DownOutlined,
+  EditOutlined,
   ExportOutlined,
+  LinkOutlined,
+  MinusCircleOutlined,
   NodeCollapseOutlined,
   NodeExpandOutlined,
   ReloadOutlined,
+  RollbackOutlined,
   SearchOutlined
 } from '@ant-design/icons'
-import { Alert, Button, Empty, Input, Select, Skeleton, Tag, Tooltip } from 'antd'
+import {
+  Alert,
+  App,
+  Avatar,
+  Button,
+  DatePicker,
+  Empty,
+  Input,
+  InputNumber,
+  Modal,
+  Select,
+  Skeleton,
+  Tabs,
+  Tag,
+  Tooltip,
+  Typography
+} from 'antd'
 import type { InputRef } from 'antd'
+import type { Dayjs } from 'dayjs'
 import type {
   MeegleMyRequirements,
   MeegleRequirement,
-  MeegleRequirementGroup
+  MeegleRequirementActivity,
+  MeegleRequirementCollaborator,
+  MeegleRequirementComment,
+  MeegleRequirementGroup,
+  MeegleRequirementOwner
 } from '../../../types/requirements'
 import type { SettingsSection } from '../../../types/settings'
+import RequirementFlowchart from './RequirementFlowchart'
 
 interface RequirementWorkbenchProps {
   /** 打开设置弹窗，并定位到指定分类。 */
   onOpenSettings: (section: SettingsSection) => void
+}
+
+interface BasicInfoField {
+  label: string
+  value: ReactNode
+  wide?: boolean
+  hideLabel?: boolean
+}
+
+interface BasicInfoGroup {
+  title: string
+  fields: BasicInfoField[]
 }
 
 /** 记住上次选择需求的 localStorage key。 */
@@ -97,18 +141,183 @@ const getPriorityTone = (priority: string | null): string => {
 }
 
 /**
+ * 流程节点状态文案。
+ */
+const getNodeStatusLabel = (status: string): string => {
+  if (status === 'doing') return '进行中'
+  if (status === 'finished' || status === 'done') return '已完成'
+  if (status === 'not_started') return '未开始'
+
+  return status || '未知状态'
+}
+
+/**
+ * 将飞书节点状态映射为视觉分组。
+ */
+const getNodeTone = (status: string): string => {
+  if (status === 'doing') return 'doing'
+  if (status === 'finished' || status === 'done') return 'done'
+
+  return 'idle'
+}
+
+/**
+ * 格式化节点总排期，例如 10-16 ~ 10-16。
+ */
+const formatNodeRange = (start: string | null, end: string | null): string => {
+  if (!start && !end) return '未设置'
+
+  const startText = start ? dayjs(start).format('MM-DD') : '未设置'
+  const endText = end ? dayjs(end).format('MM-DD') : '未设置'
+
+  return `${startText} ~ ${endText}`
+}
+
+/**
+ * 格式化工时，统一使用“人天”。
+ */
+const formatWorkTime = (value: number | null): string =>
+  value !== null ? `${value} 人天` : '未设置'
+
+/**
+ * 去掉评论里的隐藏提及信息，保留可读正文。
+ */
+const formatCommentContent = (content: string): string =>
+  content.replace(/<!--[\s\S]*?-->/g, '').trim() || '（空白评论）'
+
+/**
+ * 构造引用回复内容。
+ * 飞书评论没有父评论字段，这里使用引用 + @作者 + 通知作者的方式模拟回复。
+ */
+const buildReplyContent = (
+  comment: MeegleRequirementComment,
+  replyText: string
+): string => {
+  const quoted = formatCommentContent(comment.content)
+    .split('\n')
+    .map((line) => `> ${line}`)
+    .join('\n')
+  const creator = comment.creator
+  const text = replyText.trim()
+
+  if (!creator) return `${quoted}\n\n${text}`
+
+  return `${quoted}\n> —— ${creator.name}\n\n@${creator.name} ${text}`
+}
+
+/**
+ * 展示人员头像和昵称。
+ */
+const renderPersonChip = (person: MeegleRequirementOwner, key: string): JSX.Element => (
+  <span className="requirement-info-person" key={key}>
+    <Avatar size={20} src={person.avatarUrl ?? undefined}>
+      {person.name.slice(0, 1)}
+    </Avatar>
+    <span>{person.name}</span>
+  </span>
+)
+
+/**
+ * 展示一组人员。
+ */
+const renderPeople = (people: MeegleRequirementOwner[]): ReactNode => {
+  if (people.length === 0) return '未填写'
+
+  return (
+    <span className="requirement-info-people">
+      {people.map((person, index) =>
+        renderPersonChip(person, `${person.email ?? person.name}-${index}`)
+      )}
+    </span>
+  )
+}
+
+/**
+ * 按角色展示参与人员。
+ */
+const renderCollaborators = (
+  collaborators: MeegleRequirementCollaborator[]
+): ReactNode => {
+  if (collaborators.length === 0) return '未填写'
+
+  return (
+    <div className="requirement-info-collaborators">
+      {collaborators.map((collaborator) => (
+        <div className="requirement-info-collaborator" key={collaborator.role}>
+          <span className="requirement-info-collaborator-role">{collaborator.role}</span>
+          <span className="requirement-info-collaborator-members">
+            {renderPeople(collaborator.members)}
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * 展示一组标签。
+ */
+const renderInfoTags = (values: string[], tone = 'gray'): ReactNode => {
+  if (values.length === 0) return '未填写'
+
+  return (
+    <span className="requirement-info-value-tags">
+      {values.map((value) => (
+        <Tag
+          key={value}
+          bordered={false}
+          className={`requirement-info-tag is-${tone}`}
+        >
+          {value}
+        </Tag>
+      ))}
+    </span>
+  )
+}
+
+/**
+ * 根据“是/否”选择标签颜色。
+ */
+const getBooleanTagTone = (value: string): string => {
+  if (value === '是') return 'orange'
+  if (value === '否') return 'green'
+
+  return 'gray'
+}
+
+/**
+ * 格式化节点实际时间。
+ */
+const formatNodeActualTime = (
+  start: string | null,
+  end: string | null,
+  status: string
+): string => {
+  if (start && end) {
+    return `${dayjs(start).format('MM-DD HH:mm')} - ${dayjs(end).format('MM-DD HH:mm')}`
+  }
+
+  if (start) return `${dayjs(start).format('MM-DD HH:mm')} 开始`
+  if (status === 'doing') return '进行中'
+  if (status === 'finished' || status === 'done') return '未记录'
+
+  return '未开始'
+}
+
+/**
  * 需求工作台。
  * 左侧展示当前用户的需求，右侧暂时只保留需求头部信息。
  */
 export default function RequirementWorkbench({
   onOpenSettings
 }: RequirementWorkbenchProps): JSX.Element {
+  const { message } = App.useApp()
   const [data, setData] = useState<MeegleMyRequirements | null>(null)
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [requirementFilter, setRequirementFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [statusFilters, setStatusFilters] = useState<string[]>([])
 
   // 默认全部展开，只记录被用户主动收起的迭代。
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(() => new Set())
@@ -132,6 +341,42 @@ export default function RequirementWorkbench({
       group.requirements.some((requirement) => requirement.id === selectedRequirementId)
     ) ?? null
 
+  // 流程节点单独加载，避免拖慢左侧需求列表。
+  const [activity, setActivity] = useState<MeegleRequirementActivity | null>(null)
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [activityError, setActivityError] = useState<string | null>(null)
+  const [activityVersion, setActivityVersion] = useState(0)
+  const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(null)
+
+  /** 当前选中的流程节点。 */
+  const selectedNode = activity?.nodes.find((node) => node.key === selectedNodeKey) ?? null
+
+  /** 当前节点剩余工时 = 估分 - 实际工时。 */
+  const nodeRemainingWorkTime =
+    selectedNode?.points !== null &&
+    selectedNode?.points !== undefined &&
+    selectedNode.actualWorkTime !== null
+      ? Math.max(0, selectedNode.points - selectedNode.actualWorkTime)
+      : null
+
+  // 节点估分、排期和实际工时编辑弹窗。
+  const [nodeEditing, setNodeEditing] = useState(false)
+  const [nodeEditRange, setNodeEditRange] = useState<[Dayjs, Dayjs] | null>(null)
+  const [nodeEditPoints, setNodeEditPoints] = useState<number | null>(null)
+  const [nodeEditActualWorkTime, setNodeEditActualWorkTime] = useState<number | null>(null)
+  const [nodeEditSubmitting, setNodeEditSubmitting] = useState(false)
+
+  // 回滚弹窗。
+  const [rollbackOpen, setRollbackOpen] = useState(false)
+  const [rollbackReason, setRollbackReason] = useState('')
+  const [rollbackSubmitting, setRollbackSubmitting] = useState(false)
+
+  // 评论输入。
+  const [commentDraft, setCommentDraft] = useState('')
+  const [commentSubmitting, setCommentSubmitting] = useState(false)
+
+  const [replyToComment, setReplyToComment] = useState<MeegleRequirementComment | null>(null)
+
   /** 飞书需求详情页地址。 */
   const requirementUrl =
     selectedRequirement && data
@@ -139,6 +384,202 @@ export default function RequirementWorkbench({
           data.project.key
         )}/story/detail/${encodeURIComponent(selectedRequirement.id)}`
       : null
+
+  /** 基本信息 Tab 的分组字段。 */
+  const basicInfoGroups: BasicInfoGroup[] = selectedRequirement
+    ? [
+        {
+          title: '基础信息',
+          fields: [
+            {
+              label: '当前状态',
+              value: selectedRequirement.status ? (
+                <Tag
+                  bordered={false}
+                  className={`requirement-header-tag is-${getStatusTone(
+                    selectedRequirement.status
+                  )}`}
+                >
+                  {selectedRequirement.status}
+                </Tag>
+              ) : (
+                '未填写'
+              )
+            },
+            {
+              label: '优先级',
+              value: selectedRequirement.priority ? (
+                <Tag
+                  bordered={false}
+                  className={`requirement-header-tag is-${getPriorityTone(
+                    selectedRequirement.priority
+                  )}`}
+                >
+                  {selectedRequirement.priority}
+                </Tag>
+              ) : (
+                '未填写'
+              )
+            },
+            {
+              label: '需求类型',
+              value: renderInfoTags(
+                [formatRequirementType(selectedRequirement.requirementType) ?? ''].filter(Boolean),
+                'blue'
+              )
+            },
+            {
+              label: '产品线',
+              value: renderInfoTags(
+                selectedRequirement.productLines.length > 0
+                  ? [selectedRequirement.productLines.join(' / ')]
+                  : [],
+                'teal'
+              )
+            },
+            {
+              label: '所属迭代',
+              value: renderInfoTags([selectedGroup?.iterationName ?? '未规划迭代'], 'blue')
+            },
+            {
+              label: '需求文档',
+              value: selectedRequirement.documentUrl ? (
+                <a
+                  className="requirement-info-doc-link"
+                  href={selectedRequirement.documentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <LinkOutlined />
+                  查看文档
+                </a>
+              ) : (
+                '未填写'
+              )
+            },
+            {
+              label: '创建人',
+              value: renderPeople(
+                selectedRequirement.createdBy ? [selectedRequirement.createdBy] : []
+              )
+            }
+          ]
+        },
+        {
+          title: '参与人员',
+          fields: [
+            {
+              label: '参与人员',
+              wide: true,
+              hideLabel: true,
+              value: renderCollaborators(selectedRequirement.collaborators)
+            }
+          ]
+        },
+        {
+          title: '时间与版本',
+          fields: [
+            { label: '提出时间', value: selectedRequirement.proposedAt ?? '未填写' },
+            {
+              label: '预计上线时间',
+              value: selectedRequirement.expectedReleaseAt ?? '未填写'
+            },
+            { label: '完成日期', value: selectedRequirement.completedAt ?? '未填写' },
+            {
+              label: '规划版本',
+              value: renderInfoTags(selectedRequirement.planningVersions, 'purple')
+            },
+            {
+              label: '实际上车版本',
+              value: renderInfoTags(selectedRequirement.actualReleaseVersions, 'cyan')
+            }
+          ]
+        },
+        {
+          title: '研发属性',
+          fields: [
+            {
+              label: '需求等级',
+              value: renderInfoTags(
+                selectedRequirement.requirementLevel ? [selectedRequirement.requirementLevel] : [],
+                'orange'
+              )
+            },
+            {
+              label: '需求性质',
+              value: renderInfoTags(
+                selectedRequirement.requirementNature ? [selectedRequirement.requirementNature] : [],
+                'pink'
+              )
+            },
+            {
+              label: '需求复杂度',
+              value: renderInfoTags(
+                selectedRequirement.complexity !== null
+                  ? [String(selectedRequirement.complexity)]
+                  : [],
+                'gray'
+              )
+            },
+            {
+              label: '研发难度估分',
+              value: renderInfoTags(
+                selectedRequirement.developmentDifficulty !== null
+                  ? [String(selectedRequirement.developmentDifficulty)]
+                  : [],
+                'gray'
+              )
+            },
+            {
+              label: '预估开发量',
+              value: renderInfoTags(
+                selectedRequirement.estimatedWorkload ? [selectedRequirement.estimatedWorkload] : [],
+                'gray'
+              )
+            },
+            {
+              label: '技术方案',
+              value: selectedRequirement.technicalSolution ?? '未填写'
+            },
+            {
+              label: '应用',
+              value: renderInfoTags(
+                selectedRequirement.application ? [selectedRequirement.application] : [],
+                'teal'
+              )
+            },
+            { label: '标签', value: renderInfoTags(selectedRequirement.tags, 'green') },
+            {
+              label: '是否涉及权限',
+              value: selectedRequirement.permissionsInvolved
+                ? renderInfoTags(
+                    [selectedRequirement.permissionsInvolved],
+                    getBooleanTagTone(selectedRequirement.permissionsInvolved)
+                  )
+                : '未填写'
+            },
+            {
+              label: '是否涉及历史数据',
+              value: selectedRequirement.historicalDataInvolved
+                ? renderInfoTags(
+                    [selectedRequirement.historicalDataInvolved],
+                    getBooleanTagTone(selectedRequirement.historicalDataInvolved)
+                  )
+                : '未填写'
+            },
+            {
+              label: '是否涉及性能测试',
+              value: selectedRequirement.performanceTestInvolved
+                ? renderInfoTags(
+                    [selectedRequirement.performanceTestInvolved],
+                    getBooleanTagTone(selectedRequirement.performanceTestInvolved)
+                  )
+                : '未填写'
+            }
+          ]
+        }
+      ]
+    : []
 
   /**
    * 读取当前用户负责的需求，并尽量保留已有选择。
@@ -174,6 +615,221 @@ export default function RequirementWorkbench({
   }, [loadRequirements])
 
   /**
+   * 刷新需求和流程节点。
+   */
+  const refreshWorkbench = useCallback(async (): Promise<void> => {
+    setActivityVersion((value) => value + 1)
+    await loadRequirements()
+  }, [loadRequirements])
+
+  /**
+   * 切换需求时清空节点选择；同一需求刷新时保留当前选中的节点。
+   */
+  useEffect(() => {
+    setSelectedNodeKey(null)
+  }, [selectedRequirementId])
+
+  /**
+   * 选中需求后读取流程节点。
+   */
+  useEffect(() => {
+    if (!selectedRequirementId) {
+      setActivity(null)
+      setSelectedNodeKey(null)
+      setActivityError(null)
+      return
+    }
+
+    let cancelled = false
+    setActivity(null)
+    setActivityLoading(true)
+    setActivityError(null)
+
+    window.electron
+      .getRequirementActivity(selectedRequirementId)
+      .then((result) => {
+        if (cancelled) return
+
+        setActivity(result)
+        setSelectedNodeKey((currentKey) => {
+          if (currentKey && result.nodes.some((node) => node.key === currentKey)) {
+            return currentKey
+          }
+
+          return (
+            result.nodes.find((node) => node.status === 'doing')?.key ??
+            result.nodes[0]?.key ??
+            null
+          )
+        })
+      })
+      .catch((loadError) => {
+        if (!cancelled) setActivityError(getErrorMessage(loadError))
+      })
+      .finally(() => {
+        if (!cancelled) setActivityLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activityVersion, selectedRequirementId])
+
+  /**
+   * 切换需求或节点时退出内联编辑，避免把上一个节点的值带到新节点。
+   */
+  useEffect(() => {
+    setNodeEditing(false)
+    setRollbackOpen(false)
+  }, [selectedNodeKey, selectedRequirementId])
+
+  useEffect(() => {
+    setCommentDraft('')
+    setReplyToComment(null)
+  }, [selectedRequirementId])
+
+  /**
+   * 打开节点内联编辑，并带入现有排期、估分和实际工时。
+   */
+  const openNodeEditor = (): void => {
+    if (!selectedNode) return
+
+    const start = selectedNode.scheduleStart ? dayjs(selectedNode.scheduleStart) : null
+    const end = selectedNode.scheduleEnd ? dayjs(selectedNode.scheduleEnd) : null
+
+    setNodeEditRange(start?.isValid() && end?.isValid() ? [start, end] : null)
+    setNodeEditPoints(selectedNode.points)
+    setNodeEditActualWorkTime(selectedNode.actualWorkTime)
+    setNodeEditing(true)
+  }
+
+  /**
+   * 保存节点排期、估分和实际工时。
+   */
+  const handleSaveNodeInfo = async (): Promise<void> => {
+    if (!selectedRequirementId || !selectedNode) return
+
+    const pointsChanged = nodeEditPoints !== selectedNode.points
+
+    if (!nodeEditRange && pointsChanged) {
+      message.warning('修改估分前请先设置总排期')
+      return
+    }
+
+    setNodeEditSubmitting(true)
+
+    try {
+      const originalStart = selectedNode.scheduleStart
+        ? dayjs(selectedNode.scheduleStart)
+        : null
+      const originalEnd = selectedNode.scheduleEnd ? dayjs(selectedNode.scheduleEnd) : null
+      const startAt = nodeEditRange
+        ? originalStart?.isSame(nodeEditRange[0], 'day')
+          ? originalStart.valueOf()
+          : nodeEditRange[0].startOf('day').valueOf()
+        : undefined
+      const endAt = nodeEditRange
+        ? originalEnd?.isSame(nodeEditRange[1], 'day')
+          ? originalEnd.valueOf()
+          : nodeEditRange[1].endOf('day').valueOf()
+        : undefined
+
+      await window.electron.updateRequirementNode(selectedRequirementId, selectedNode.key, {
+        startAt,
+        endAt,
+        points: nodeEditRange ? (nodeEditPoints ?? undefined) : undefined,
+        actualWorkTime: nodeEditActualWorkTime
+      })
+      message.success('节点信息已更新')
+      setNodeEditing(false)
+      setActivityVersion((value) => value + 1)
+    } catch (saveError) {
+      message.error(getErrorMessage(saveError))
+    } finally {
+      setNodeEditSubmitting(false)
+    }
+  }
+
+  /**
+   * 回滚当前节点，必须填写回滚原因。
+   */
+  const handleRollbackNode = async (): Promise<void> => {
+    if (!selectedRequirementId || !selectedNode || !rollbackReason.trim()) return
+
+    setRollbackSubmitting(true)
+
+    try {
+      await window.electron.transitionRequirementNode(
+        selectedRequirementId,
+        selectedNode.key,
+        'rollback',
+        rollbackReason.trim()
+      )
+      message.success(`节点「${selectedNode.name}」已回滚`)
+      setRollbackOpen(false)
+      setRollbackReason('')
+      setNodeEditing(false)
+      await refreshWorkbench()
+    } catch (rollbackError) {
+      message.error(getErrorMessage(rollbackError))
+    } finally {
+      setRollbackSubmitting(false)
+    }
+  }
+
+  /**
+   * 开始引用回复。
+   */
+  const handleStartReply = (comment: MeegleRequirementComment): void => {
+    setReplyToComment(comment)
+  }
+
+  /**
+   * 取消引用回复。
+   */
+  const handleCancelReply = (): void => {
+    setReplyToComment(null)
+  }
+
+  /**
+   * 发表评论并刷新评论列表。
+   */
+  const handleAddComment = async (): Promise<void> => {
+    if (!selectedRequirementId) return
+
+    if (!commentDraft.trim()) {
+      message.warning('请输入评论内容')
+      return
+    }
+
+    setCommentSubmitting(true)
+
+    try {
+      const notifyUserKeys = replyToComment?.creator?.userKey
+        ? [replyToComment.creator.userKey]
+        : undefined
+
+      const content = replyToComment
+        ? buildReplyContent(replyToComment, commentDraft)
+        : commentDraft
+
+      await window.electron.addRequirementComment(
+        selectedRequirementId,
+        content,
+        notifyUserKeys
+      )
+      setCommentDraft('')
+      setReplyToComment(null)
+      message.success(replyToComment ? '回复已发表' : '评论已发表')
+      setActivityVersion((value) => value + 1)
+    } catch (commentError) {
+      message.error(getErrorMessage(commentError))
+    } finally {
+      setCommentSubmitting(false)
+    }
+  }
+
+  /**
    * 记住用户选择的需求，下次打开时继续展示。
    */
   useEffect(() => {
@@ -194,21 +850,18 @@ export default function RequirementWorkbench({
       counts.set(status, (counts.get(status) ?? 0) + 1)
     }
 
-    return [
-      { value: '', label: `全部状态（${allRequirements.length}）` },
-      ...Array.from(counts.entries())
-        .sort((left, right) => {
-          const countCompare = right[1] - left[1]
+    return Array.from(counts.entries())
+      .sort((left, right) => {
+        const countCompare = right[1] - left[1]
 
-          return countCompare !== 0
-            ? countCompare
-            : left[0].localeCompare(right[0], 'zh-CN')
-        })
-        .map(([status, count]) => ({
-          value: status,
-          label: `${status}（${count}）`
-        }))
-    ]
+        return countCompare !== 0
+          ? countCompare
+          : left[0].localeCompare(right[0], 'zh-CN')
+      })
+      .map(([status, count]) => ({
+        value: status,
+        label: `${status}（${count}）`
+      }))
   }, [allRequirements])
 
   /**
@@ -218,12 +871,15 @@ export default function RequirementWorkbench({
   const filteredGroups = useMemo(() => {
     const keyword = requirementFilter.trim().toLocaleLowerCase()
 
+    const selectedStatuses = new Set(statusFilters)
+
     return (data?.groups ?? []).flatMap((group) => {
-      const statusFiltered = statusFilter
-        ? group.requirements.filter(
-            (requirement) => (requirement.status ?? '状态未知') === statusFilter
-          )
-        : group.requirements
+      const statusFiltered =
+        selectedStatuses.size > 0
+          ? group.requirements.filter((requirement) =>
+              selectedStatuses.has(requirement.status ?? '状态未知')
+            )
+          : group.requirements
 
       if (statusFiltered.length === 0) return []
 
@@ -245,11 +901,11 @@ export default function RequirementWorkbench({
 
       return requirements.length > 0 ? [{ ...group, requirements }] : []
     })
-  }, [data, requirementFilter, statusFilter])
+  }, [data, requirementFilter, statusFilters])
 
   /** 是否存在有效搜索词或状态筛选。 */
   const hasSearch = requirementFilter.trim().length > 0
-  const hasActiveFilter = hasSearch || Boolean(statusFilter)
+  const hasActiveFilter = hasSearch || statusFilters.length > 0
 
   /** 所有分组是否都已收起，用于切换按钮的文案和图标。 */
   const allGroupsCollapsed =
@@ -360,7 +1016,9 @@ export default function RequirementWorkbench({
       onClick={() => setSelectedRequirementId(requirement.id)}
     >
       <span className="workbench-requirement-item-title-row">
-        {requirement.priority === 'P0' || requirement.priority === 'P1' ? (
+        {requirement.priority === 'P0' ||
+        requirement.priority === 'P1' ||
+        requirement.priority === 'P2' ? (
           <span className={`requirement-priority is-${getPriorityTone(requirement.priority)}`}>
             {requirement.priority}
           </span>
@@ -399,6 +1057,13 @@ export default function RequirementWorkbench({
                 .join('、')}`}
             >
               <span className="workbench-requirement-item-owner">
+                <Avatar
+                  size={20}
+                  src={productContact.members[0].avatarUrl ?? undefined}
+                  className="workbench-requirement-contact-avatar"
+                >
+                  {productContact.members[0].name.slice(0, 1)}
+                </Avatar>
                 <span className="workbench-requirement-item-owner-text">
                   {productContact.label} · {productContact.members[0].name}
                   {productContact.members.length > 1
@@ -476,7 +1141,7 @@ export default function RequirementWorkbench({
         </div>
 
         <div className="workbench-sidebar-heading">
-          <span>我的待办需求</span>
+          <span>我负责的需求</span>
           <span className="workbench-sidebar-heading-actions">
             <span className="workbench-sidebar-count">{data?.total ?? 0}</span>
             <Tooltip title="刷新数据">
@@ -485,9 +1150,9 @@ export default function RequirementWorkbench({
                 size="small"
                 className="workbench-sidebar-refresh"
                 icon={<ReloadOutlined />}
-                loading={loading}
+                loading={loading || activityLoading}
                 aria-label="刷新数据"
-                onClick={() => loadRequirements()}
+                onClick={() => refreshWorkbench()}
               />
             </Tooltip>
             {showToggleAll ? (
@@ -523,12 +1188,17 @@ export default function RequirementWorkbench({
           />
 
           <Select
+            mode="multiple"
+            allowClear
+            maxTagCount="responsive"
+            maxTagPlaceholder={(omitted) => `+${omitted.length}`}
             className="workbench-status-filter"
-            value={statusFilter ?? ''}
+            value={statusFilters}
             options={statusOptions}
+            placeholder={`全部状态（${allRequirements.length}）`}
             aria-label="按状态筛选"
             disabled={loading || !data || allRequirements.length === 0}
-            onChange={(value: string) => setStatusFilter(value || null)}
+            onChange={(values: string[]) => setStatusFilters(values)}
           />
         </div>
 
@@ -551,7 +1221,7 @@ export default function RequirementWorkbench({
         </div>
 
         <p className="workbench-sidebar-footnote">
-          数据来自 Meegle 我的待办
+          数据来自 Meegle 我负责的需求
           {data ? ` · 同步于 ${formatFetchedAt(data.fetchedAt)}` : ''}
         </p>
       </aside>
@@ -590,7 +1260,7 @@ export default function RequirementWorkbench({
             <header className="workbench-header">
               <div className="workbench-heading">
                 <span className="workbench-eyebrow">
-                  {projectName} / {selectedGroup?.iterationName ?? '我的待办需求'}
+                  {projectName} / {selectedGroup?.iterationName ?? '我负责的需求'}
                 </span>
                 <div className="workbench-title-row">
                   <Tooltip title="刷新数据">
@@ -599,9 +1269,9 @@ export default function RequirementWorkbench({
                       size="small"
                       className="workbench-refresh-icon"
                       icon={<ReloadOutlined />}
-                      loading={loading}
+                      loading={loading || activityLoading}
                       aria-label="刷新数据"
-                      onClick={() => loadRequirements()}
+                      onClick={() => refreshWorkbench()}
                     />
                   </Tooltip>
                   <h1>{selectedRequirement.name}</h1>
@@ -649,8 +1319,8 @@ export default function RequirementWorkbench({
               ) : null}
             </header>
 
-            {error ? (
-              <div className="workbench-content">
+            <div className="workbench-content">
+              {error ? (
                 <Alert
                   className="workbench-inline-alert"
                   type="warning"
@@ -660,8 +1330,437 @@ export default function RequirementWorkbench({
                   description={error}
                   onClose={() => setError(null)}
                 />
-              </div>
-            ) : null}
+              ) : null}
+
+              <section className="requirement-flow-section">
+                {activityError ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="流程节点加载失败"
+                    description={activityError}
+                    action={
+                      <Button
+                        size="small"
+                        onClick={() => setActivityVersion((value) => value + 1)}
+                      >
+                        重试
+                      </Button>
+                    }
+                  />
+                ) : activityLoading && !activity ? (
+                  <Skeleton active paragraph={{ rows: 4 }} />
+                ) : activity && activity.nodes.length > 0 ? (
+                  <>
+                    <RequirementFlowchart
+                      nodes={activity.nodes}
+                      selectedNodeKey={selectedNodeKey}
+                      onSelectNode={setSelectedNodeKey}
+                    />
+
+                    {selectedNode ? (
+                      <div className="requirement-node-detail">
+                        <div className="requirement-node-detail-head">
+                          <span className="requirement-node-detail-title">
+                            <span
+                              className={`requirement-node-detail-dot is-${getNodeTone(
+                                selectedNode.status
+                              )}`}
+                            />
+                            <strong>{selectedNode.name}</strong>
+                            <span
+                              className={`requirement-node-status-tag is-${getNodeTone(
+                                selectedNode.status
+                              )}`}
+                            >
+                              {getNodeStatusLabel(selectedNode.status)}
+                            </span>
+                          </span>
+                          {nodeEditing ? (
+                            <span className="requirement-node-edit-actions">
+                              <Button
+                                size="small"
+                                onClick={() => setNodeEditing(false)}
+                              >
+                                取消
+                              </Button>
+                              <Button
+                                type="primary"
+                                size="small"
+                                loading={nodeEditSubmitting}
+                                onClick={() => handleSaveNodeInfo()}
+                              >
+                                保存
+                              </Button>
+                            </span>
+                          ) : (
+                            <span className="requirement-node-head-actions">
+                              {selectedNode.status === 'doing' ? (
+                                <Button
+                                  type="text"
+                                  danger
+                                  size="small"
+                                  className="requirement-node-rollback-button"
+                                  icon={<RollbackOutlined />}
+                                  onClick={() => {
+                                    setRollbackReason('')
+                                    setRollbackOpen(true)
+                                  }}
+                                >
+                                  回滚
+                                </Button>
+                              ) : null}
+                              <Button
+                                type="text"
+                                size="small"
+                                className="requirement-node-edit-button"
+                                icon={<EditOutlined />}
+                                onClick={openNodeEditor}
+                              >
+                                编辑
+                              </Button>
+                            </span>
+                          )}
+                        </div>
+
+                        <div className={`requirement-node-summary-card${nodeEditing ? ' is-editing' : ''}`}>
+                          <div className="requirement-node-summary-block is-owner">
+                            <span className="requirement-node-summary-label">
+                              负责人 <em>*</em>
+                            </span>
+                            <div className="requirement-node-owner-list">
+                              {selectedNode.owners.length > 0 ? (
+                                selectedNode.owners.map((owner, index) => (
+                                  <span
+                                    className="requirement-node-owner"
+                                    key={`${owner.email ?? owner.name}-${index}`}
+                                  >
+                                    <Avatar
+                                      size={20}
+                                      src={owner.avatarUrl ?? undefined}
+                                    >
+                                      {owner.name.slice(0, 1)}
+                                    </Avatar>
+                                    {owner.name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="requirement-node-summary-empty">未分配</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="requirement-node-summary-block">
+                            <span className="requirement-node-summary-label">
+                              总估分 <em>*</em>
+                            </span>
+                            {nodeEditing ? (
+                              <InputNumber
+                                size="small"
+                                min={0}
+                                step={0.1}
+                                className="requirement-node-inline-input"
+                                value={nodeEditPoints}
+                                placeholder="未设置"
+                                onChange={(value) =>
+                                  setNodeEditPoints(typeof value === 'number' ? value : null)
+                                }
+                              />
+                            ) : (
+                              <strong>{formatWorkTime(selectedNode.points)}</strong>
+                            )}
+                          </div>
+
+                          <div className="requirement-node-summary-block">
+                            <span className="requirement-node-summary-label">
+                              总排期 <em>*</em>
+                            </span>
+                            {nodeEditing ? (
+                              <DatePicker.RangePicker
+                                size="small"
+                                format="MM-DD"
+                                className="requirement-node-inline-range"
+                                value={nodeEditRange}
+                                onChange={(value) =>
+                                  setNodeEditRange(value as [Dayjs, Dayjs] | null)
+                                }
+                              />
+                            ) : (
+                              <strong>
+                                {formatNodeRange(
+                                  selectedNode.scheduleStart,
+                                  selectedNode.scheduleEnd
+                                )}
+                              </strong>
+                            )}
+                          </div>
+
+                          {nodeEditing ? null : (
+                            <div
+                              className={`requirement-node-summary-status is-${getNodeTone(
+                                selectedNode.status
+                              )}`}
+                            >
+                              {selectedNode.status === 'finished' ||
+                              selectedNode.status === 'done' ? (
+                                <CheckCircleFilled />
+                              ) : selectedNode.status === 'doing' ? (
+                                <ClockCircleFilled />
+                              ) : (
+                                <MinusCircleOutlined />
+                              )}
+                              <span>{getNodeStatusLabel(selectedNode.status)}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        <details className="requirement-node-section" open>
+                          <summary>工时</summary>
+                          <div className="requirement-node-workhour">
+                            <div className="requirement-node-workhour-row">
+                              <span>
+                                总实际工时 <em>*</em>
+                              </span>
+                              {nodeEditing ? (
+                                <InputNumber
+                                  size="small"
+                                  min={0}
+                                  step={0.1}
+                                  className="requirement-node-inline-input"
+                                  value={nodeEditActualWorkTime}
+                                  placeholder="未记录"
+                                  onChange={(value) =>
+                                    setNodeEditActualWorkTime(
+                                      typeof value === 'number' ? value : null
+                                    )
+                                  }
+                                />
+                              ) : (
+                                <strong>
+                                  {formatWorkTime(selectedNode.actualWorkTime)}
+                                </strong>
+                              )}
+                            </div>
+                            <div className="requirement-node-workhour-summary">
+                              <span>总估分：{formatWorkTime(selectedNode.points)}</span>
+                              <span>总剩余工时：{formatWorkTime(nodeRemainingWorkTime)}</span>
+                            </div>
+                            <div className="requirement-node-workhour-actual">
+                              实际时间：
+                              {formatNodeActualTime(
+                                selectedNode.actualStart,
+                                selectedNode.actualEnd,
+                                selectedNode.status
+                              )}
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    ) : null}
+                  </>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="暂无流程节点信息"
+                  />
+                )}
+              </section>
+
+              <section className="requirement-info-section">
+                <Tabs
+                  className="requirement-info-tabs"
+                  defaultActiveKey="basic"
+                  items={[
+                    {
+                      key: 'basic',
+                      label: '基本信息',
+                      children: (
+                        <div className="requirement-info-tab">
+                          <div className="requirement-info-description">
+                            <div className="requirement-info-description-head">
+                              <h3>需求描述</h3>
+                            </div>
+                            <Typography.Paragraph
+                              className="requirement-description-text"
+                              ellipsis={{
+                                rows: 6,
+                                expandable: true,
+                                symbol: '展开'
+                              }}
+                            >
+                              {selectedRequirement.description || '暂无需求描述'}
+                            </Typography.Paragraph>
+                          </div>
+
+                          <div className="requirement-info-groups">
+                            {basicInfoGroups.map((group) => (
+                              <section className="requirement-info-group" key={group.title}>
+                                <h4>{group.title}</h4>
+                                <dl className="requirement-info-grid">
+                                  {group.fields.map((field) => (
+                                    <div
+                                      key={field.label}
+                                      className={field.wide ? 'is-wide' : undefined}
+                                    >
+                                      {field.hideLabel ? null : <dt>{field.label}</dt>}
+                                      <dd>{field.value}</dd>
+                                    </div>
+                                  ))}
+                                </dl>
+                              </section>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    },
+                    {
+                      key: 'comments',
+                      label: '评论/备注',
+                      children: (
+                        <div className="requirement-info-tab">
+                          {selectedRequirement.remark ? (
+                            <div className="requirement-remark-block">
+                              <h3>备注</h3>
+                              <p>{selectedRequirement.remark}</p>
+                            </div>
+                          ) : null}
+
+                          <div className="requirement-comments-heading">
+                            <h3>评论</h3>
+                            {activity ? (
+                              <span>{activity.commentsTotal} 条</span>
+                            ) : null}
+                          </div>
+
+                          {activityError ? (
+                            <Alert
+                              type="error"
+                              showIcon
+                              message="评论加载失败"
+                              description={activityError}
+                              action={
+                                <Button
+                                  size="small"
+                                  onClick={() => setActivityVersion((value) => value + 1)}
+                                >
+                                  重试
+                                </Button>
+                              }
+                            />
+                          ) : activityLoading && !activity ? (
+                            <Skeleton active paragraph={{ rows: 3 }} />
+                          ) : activity ? (
+                            <>
+                              <div className="requirement-comment-list">
+                                {activity.comments.length > 0 ? (
+                                  activity.comments.map((comment) => (
+                                    <article className="requirement-comment" key={comment.id}>
+                                      <Avatar
+                                        size={24}
+                                        src={comment.creator?.avatarUrl ?? undefined}
+                                      >
+                                        {comment.creator?.name.slice(0, 1) ?? '?'}
+                                      </Avatar>
+                                      <div className="requirement-comment-body">
+                                        <div className="requirement-comment-head">
+                                          <strong>
+                                            {comment.creator?.name ?? '未知成员'}
+                                          </strong>
+                                          <div className="requirement-comment-meta">
+                                            <span>{comment.createdAt ?? ''}</span>
+                                            <Button
+                                              type="text"
+                                              size="small"
+                                              className="requirement-comment-reply-button"
+                                              onClick={() => handleStartReply(comment)}
+                                            >
+                                              回复
+                                            </Button>
+                                          </div>
+                                        </div>
+                                        <div className="requirement-comment-markdown">
+                                          <ReactMarkdown
+                                            remarkPlugins={[remarkGfm]}
+                                            components={{
+                                              a: ({ href, children }) => (
+                                                <a
+                                                  href={href}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                >
+                                                  {children}
+                                                </a>
+                                              )
+                                            }}
+                                          >
+                                            {formatCommentContent(comment.content)}
+                                          </ReactMarkdown>
+                                        </div>
+                                      </div>
+                                    </article>
+                                  ))
+                                ) : (
+                                  <Empty
+                                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                    description="暂无评论"
+                                  />
+                                )}
+                              </div>
+
+                              {activity.commentsTotal > activity.comments.length ? (
+                                <p className="requirement-comment-note">
+                                  仅展示最新 {activity.comments.length} 条评论，共{' '}
+                                  {activity.commentsTotal} 条。
+                                </p>
+                              ) : null}
+
+                              <div className="requirement-comment-editor">
+                                {replyToComment ? (
+                                  <div className="requirement-comment-reply-banner">
+                                    <span>
+                                      正在回复 {replyToComment.creator?.name ?? '未知成员'}
+                                    </span>
+                                    <Button
+                                      type="text"
+                                      size="small"
+                                      onClick={handleCancelReply}
+                                    >
+                                      取消
+                                    </Button>
+                                  </div>
+                                ) : null}
+                                <Input.TextArea
+                                  rows={3}
+                                  value={commentDraft}
+                                  placeholder={
+                                    replyToComment
+                                      ? `回复 ${replyToComment.creator?.name ?? '未知成员'}`
+                                      : '写下评论，支持 Markdown'
+                                  }
+                                  disabled={commentSubmitting}
+                                  onChange={(event) => setCommentDraft(event.target.value)}
+                                />
+                                <div className="requirement-comment-editor-footer">
+                                  <span>评论会直接同步到飞书项目</span>
+                                  <Button
+                                    type="primary"
+                                    size="small"
+                                    loading={commentSubmitting}
+                                    onClick={() => handleAddComment()}
+                                  >
+                                    {replyToComment ? '发表回复' : '发表评论'}
+                                  </Button>
+                                </div>
+                              </div>
+                            </>
+                          ) : null}
+                        </div>
+                      )
+                    }
+                  ]}
+                />
+              </section>
+            </div>
           </>
         ) : (
           <div className="workbench-state">
@@ -680,6 +1779,34 @@ export default function RequirementWorkbench({
           </div>
         )}
       </section>
+
+      <Modal
+        title="回滚节点"
+        open={rollbackOpen}
+        okText="回滚"
+        cancelText="取消"
+        okButtonProps={{ danger: true, disabled: !rollbackReason.trim() }}
+        confirmLoading={rollbackSubmitting}
+        destroyOnHidden
+        onOk={() => handleRollbackNode()}
+        onCancel={() => {
+          setRollbackOpen(false)
+          setRollbackReason('')
+        }}
+      >
+        <div className="requirement-rollback-form">
+          <p>
+            将节点「{selectedNode?.name ?? ''}」回滚到上一节点。操作会直接写入飞书项目。
+          </p>
+          <label>回滚原因 *</label>
+          <Input.TextArea
+            rows={3}
+            value={rollbackReason}
+            placeholder="填写回滚原因"
+            onChange={(event) => setRollbackReason(event.target.value)}
+          />
+        </div>
+      </Modal>
     </div>
   )
 }

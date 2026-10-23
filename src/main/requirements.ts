@@ -1,11 +1,12 @@
 /**
  * Meegle 需求工作台数据模块。
- * 读取当前登录用户的待办需求，并按所属迭代分组后注册 IPC。
+ * 读取当前登录用户负责的未结束需求，并按所属迭代分组后注册 IPC。
  */
 import { ipcMain } from 'electron'
 import { runMeegle } from './meegle'
 import type {
   MeegleMyRequirements,
+  MeegleNodeFormItem,
   MeegleProject,
   MeegleRequirement,
   MeegleRequirementActivity,
@@ -14,7 +15,7 @@ import type {
   MeegleRequirementGroup,
   MeegleRequirementOwner,
   MeegleWorkflowNode,
-  UpdateNodeScheduleInput
+  UpdateNodeInfoInput
 } from '../types/requirements'
 
 /** Meegle CLI 进程输出。 */
@@ -38,21 +39,6 @@ interface ProjectSearchResponse {
   error?: CliError
 }
 
-interface MyWorkItem {
-  project_key?: string
-  work_item_info?: {
-    work_item_id?: number | string
-    work_item_type_key?: string
-  }
-}
-
-/** meegle mywork todo 的响应结构。 */
-interface MyWorkResponse {
-  list?: MyWorkItem[] | null
-  total?: number
-  error?: CliError
-}
-
 /** MQL 返回值，按 value_type 使用不同字段。 */
 interface MoqlValue {
   string_value?: string
@@ -66,11 +52,13 @@ interface MoqlValue {
     label?: string
   }>
   user_value?: {
+    user_key?: string
     name_cn?: string
     name_en?: string
     email?: string
   }
   user_value_list?: Array<{
+    user_key?: string
     name_cn?: string
     name_en?: string
     email?: string
@@ -102,6 +90,21 @@ interface MoqlRow {
 /** MQL 查询响应，data 按分组 ID 组织行数据。 */
 interface MoqlResponse {
   data?: Record<string, MoqlRow[] | null> | null
+  list?: Array<{
+    count?: number
+    group_infos?: Array<{
+      group_id?: string
+    }>
+  }> | null
+  session_id?: string
+  error?: CliError
+}
+
+/** 工作项角色配置。 */
+interface RoleMetaResponse {
+  list?: Array<{
+    role_name?: string
+  }> | null
   error?: CliError
 }
 
@@ -123,12 +126,19 @@ interface WorkflowRawNode {
   schedule?: {
     estimate_start_time?: number | string | null
     estimate_finish_time?: number | string | null
+    actual_begin_time?: number | string | null
+    actual_finish_time?: number | string | null
+    actual_work_time?: number | null
     points?: number | null
   }
   form_items?: Array<{
+    field_key?: string
     field_name?: string
+    field_type?: string
+    form_item_type?: string
     is_required?: boolean
     value?: unknown
+    value_label?: string
   }>
 }
 
@@ -160,6 +170,7 @@ interface UserSearchUser {
   name_cn?: string
   name_en?: string
   email?: string
+  avatar_url?: string
 }
 
 /** 需求查询可能比登录状态查询慢，使用更宽松的超时时间。 */
@@ -168,18 +179,21 @@ const MEEGLE_QUERY_TIMEOUT_MS = 30_000
 /** Meegle 空间信息缓存时长，避免每次刷新都重复查询。 */
 const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000
 
-/** Meegle 待办接口每页固定 50 条，最多读取 20 页，避免异常分页导致死循环。 */
-const MY_WORK_PAGE_SIZE = 50
-const MAX_MY_WORK_PAGES = 20
-
-/** MQL 单次最多返回 50 条，按 ID 分批查询。 */
-const REQUIREMENT_BATCH_SIZE = 50
+/** MQL 单页固定 50 条，最多读取 20 页，避免异常分页导致死循环。 */
+const MQL_PAGE_SIZE = 50
+const MAX_MQL_PAGES = 20
 
 /** 最近访问的 Meegle 空间缓存。 */
 let cachedProject: { value: MeegleProject; expiresAt: number } | null = null
 
+/** 工作项角色配置缓存，按空间隔离。 */
+const roleCache = new Map<string, string[]>()
+
 /** 用户信息缓存，避免节点和评论反复解析同一批 user_key。 */
 const userCache = new Map<string, MeegleRequirementOwner>()
+
+/** 按邮箱缓存用户信息，用于补齐 MQL 人员字段的头像。 */
+const emailUserCache = new Map<string, MeegleRequirementOwner>()
 
 /**
  * 解析 CLI JSON 输出，并把服务端错误转为可读异常。
@@ -341,10 +355,12 @@ const readUsersFromValue = (value: MoqlValue | null | undefined): MeegleRequirem
 
   return users
     .map((user) => ({
-      name: user.name_cn?.trim() || user.name_en?.trim() || user.email?.trim() || '未知成员',
-      email: user.email?.trim() || null
+      name: user.name_cn?.trim() || user.name_en?.trim() || user.email?.trim() || '',
+      email: user.email?.trim() || null,
+      avatarUrl: null,
+      userKey: user.user_key?.trim() || null
     }))
-    .filter((user) => user.name)
+    .filter((user) => Boolean(user.name))
 }
 
 /**
@@ -357,7 +373,14 @@ const readUserFromValue = (value: MoqlValue | null | undefined): MeegleRequireme
 
   const name = user.name_cn?.trim() || user.name_en?.trim() || user.email?.trim()
 
-  return name ? { name, email: user.email?.trim() || null } : null
+  return name
+    ? {
+        name,
+        email: user.email?.trim() || null,
+        avatarUrl: null,
+        userKey: user.user_key?.trim() || null
+      }
+    : null
 }
 
 /**
@@ -436,19 +459,28 @@ const readRoleMembers = (row: MoqlRow, role: string): MeegleRequirementOwner[] =
 const readCollaborators = (
   row: MoqlRow,
   productManagers: MeegleRequirementOwner[],
-  productOwners: MeegleRequirementOwner[],
-  currentOwners: MeegleRequirementOwner[]
+  productOwners: MeegleRequirementOwner[]
 ): MeegleRequirementCollaborator[] => {
   const collaborators: MeegleRequirementCollaborator[] = [
     { role: '产品经理', members: productManagers },
     { role: '产品负责人', members: productOwners },
     { role: '研发负责人', members: readRoleMembers(row, '__研发负责人') },
-    { role: 'QA', members: readRoleMembers(row, '__QA') },
     { role: '前端负责人', members: readRoleMembers(row, '__前端负责人') },
     { role: '前端开发', members: readRoleMembers(row, '__前端开发') },
+    { role: '前端APP负责人', members: readRoleMembers(row, '__前端APP负责人') },
+    { role: '前端APP开发', members: readRoleMembers(row, '__前端APP开发') },
     { role: '后端负责人', members: readRoleMembers(row, '__后端负责人') },
     { role: '后端开发', members: readRoleMembers(row, '__后端开发') },
-    { role: '当前节点负责人', members: currentOwners }
+    { role: '数仓开发', members: readRoleMembers(row, '__数仓开发') },
+    { role: '测试', members: readRoleMembers(row, '__QA') },
+    { role: '测试负责人', members: readRoleMembers(row, '__QA负责人') },
+    { role: '测试owner', members: readRoleMembers(row, '__测试owner') },
+    { role: '测试组长', members: readRoleMembers(row, '__测试组长') },
+    { role: '性能测试负责人', members: readRoleMembers(row, '__性能测试负责人') },
+    { role: 'UI/UX', members: readRoleMembers(row, '__UI&UX') },
+    { role: 'PMO', members: readRoleMembers(row, '__PMO项目经理') },
+    { role: '技术专家', members: readRoleMembers(row, '__技术专家') },
+    { role: '研发总监', members: readRoleMembers(row, '__研发总监') }
   ]
 
   return collaborators.filter((collaborator) => collaborator.members.length > 0)
@@ -507,54 +539,89 @@ const chunk = <T>(items: T[], size: number): T[][] => {
 }
 
 /**
- * 读取当前用户的待办需求 ID。
- * mywork 会按流程节点重复返回同一个工作项，需要先去重，再过滤掉缺陷等非需求类型。
+ * 读取需求工作项的角色配置。
  */
-const fetchMyWorkRequirementIds = async (project: MeegleProject): Promise<string[]> => {
-  const ids = new Set<string>()
-  let page = 1
-  let total = 0
+const fetchStoryRoleNames = async (project: MeegleProject): Promise<string[]> => {
+  const cached = roleCache.get(project.projectKey)
 
-  do {
-    const result = await runMeegle(
+  if (cached) return cached
+
+  const result = await runMeegle(
+    [
+      'workitem',
+      'meta-roles',
+      '--project-key',
+      project.key,
+      '--work-item-type',
+      'story',
+      '--format',
+      'json'
+    ],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+  const response = parseCommandJson<RoleMetaResponse>(result, '读取需求角色配置')
+  const names = Array.from(
+    new Set(
+      (response.list ?? [])
+        .map((role) => role.role_name?.trim())
+        .filter((name): name is string => Boolean(name))
+    )
+  )
+
+  roleCache.set(project.projectKey, names)
+
+  return names
+}
+
+/**
+ * 构造“当前用户参与任意角色”的 MQL 条件。
+ */
+const buildCurrentUserRoleCondition = (roleNames: string[]): string =>
+  roleNames
+    .map((role) => `\`__${role.replace(/`/g, '')}\` = current_login_user()`)
+    .join(' OR ')
+
+/**
+ * 执行 MQL 查询并读取全部分页。
+ */
+const fetchMqlRows = async (project: MeegleProject, mql: string): Promise<MoqlRow[]> => {
+  const result = await runMeegle(
+    ['workitem', 'query', '--project-key', project.key, '--mql', mql, '--format', 'json'],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+  const response = parseCommandJson<MoqlResponse>(result, '读取需求列表')
+  const rows = [...getRows(response)]
+  const total = response.list?.[0]?.count ?? rows.length
+  const sessionId = response.session_id
+  const groupId = response.list?.[0]?.group_infos?.[0]?.group_id ?? '1'
+  const totalPages = Math.min(Math.ceil(total / MQL_PAGE_SIZE), MAX_MQL_PAGES)
+
+  if (!sessionId || totalPages <= 1) return rows
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const pageResult = await runMeegle(
       [
-        'mywork',
-        'todo',
-        '--action',
-        'todo',
-        '--todo-scope',
-        'all',
-        '--page-num',
-        String(page),
+        'workitem',
+        'query',
+        '--project-key',
+        project.key,
+        '--session-id',
+        sessionId,
+        '--group-pagination-list',
+        JSON.stringify({ group_id: groupId, page_num: page }),
         '--format',
         'json'
       ],
       MEEGLE_QUERY_TIMEOUT_MS
     )
-    const response = parseCommandJson<MyWorkResponse>(result, '读取当前用户需求')
-    const items = response.list ?? []
-    const fetchedBefore = (page - 1) * MY_WORK_PAGE_SIZE
+    const pageResponse = parseCommandJson<MoqlResponse>(pageResult, '读取需求列表')
 
-    total = typeof response.total === 'number' ? response.total : fetchedBefore + items.length
+    rows.push(...getRows(pageResponse))
 
-    for (const item of items) {
-      const info = item.work_item_info
+    if (rows.length >= total) break
+  }
 
-      if (info?.work_item_type_key !== 'story') continue
-      // mywork 是跨空间接口，只保留当前空间，避免后续按 ID 查询时静默丢失。
-      if (item.project_key && item.project_key !== project.projectKey) continue
-
-      const id = String(info.work_item_id ?? '').trim()
-
-      if (id) ids.add(id)
-    }
-
-    if (items.length === 0) break
-
-    page += 1
-  } while (page <= MAX_MY_WORK_PAGES && (page - 1) * MY_WORK_PAGE_SIZE < total)
-
-  return Array.from(ids)
+  return rows
 }
 
 /**
@@ -591,7 +658,7 @@ const parseRequirement = (row: MoqlRow): MeegleRequirement | null => {
     expectedReleaseAt: readString(fields, 'exp_time'),
     productLines: readCascadePath(readFieldByName(row, '产品线')),
     planningVersions: readLabelList(fields, 'planning_version'),
-    collaborators: readCollaborators(row, productManagers, productOwners, owners),
+    collaborators: readCollaborators(row, productManagers, productOwners),
     requirementLevel: readFieldString(row, '需求等级'),
     requirementNature: readFieldString(row, '需求性质'),
     complexity: readFieldNumber(row, '需求复杂度'),
@@ -611,40 +678,6 @@ const parseRequirement = (row: MoqlRow): MeegleRequirement | null => {
     iterationDate: iteration.name ? parseReleaseDate(iteration.name) : null,
     updatedAt: readString(fields, 'updated_at')
   }
-}
-
-/**
- * 按 ID 批量读取需求详情。
- */
-const fetchRequirementsByIds = async (
-  project: MeegleProject,
-  ids: string[]
-): Promise<MeegleRequirement[]> => {
-  const requirements: MeegleRequirement[] = []
-
-  for (const batch of chunk(ids, REQUIREMENT_BATCH_SIZE)) {
-    if (batch.length === 0) continue
-
-    const mql = [
-      'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `提出时间`, `预计上线时间`, `完成日期`, `规划版本`, `实际上车版本`, `产品线`, `需求等级`, `需求性质`, `需求复杂度`, `研发难度估分`, `预估开发量`, `技术方案`, `应用`, `标签`, `是否涉及权限`, `是否涉及历史数据`, `是否涉及性能测试`, `备注`, risk_label(), `__产品经理`, `__产品负责人`, `__研发负责人`, `__QA`, `__前端负责人`, `__前端开发`, `__后端负责人`, `__后端开发`',
-      `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
-      `WHERE \`工作项id\` in (${batch.join(', ')})`,
-      'LIMIT 50'
-    ].join(' ')
-    const result = await runMeegle(
-      ['workitem', 'query', '--project-key', project.key, '--mql', mql, '--format', 'json'],
-      MEEGLE_QUERY_TIMEOUT_MS
-    )
-    const response = parseCommandJson<MoqlResponse>(result, '读取需求详情')
-
-    for (const row of getRows(response)) {
-      const requirement = parseRequirement(row)
-
-      if (requirement) requirements.push(requirement)
-    }
-  }
-
-  return requirements
 }
 
 /**
@@ -715,13 +748,112 @@ const normalizeTime = (value: number | string | null | undefined): string | null
 }
 
 /**
- * 判断节点必填项是否仍未填写。
+ * 将 user search 结果转换为统一的负责人结构。
  */
-const isFormValueEmpty = (value: unknown): boolean =>
-  value === null ||
-  value === undefined ||
-  value === '' ||
-  (typeof value === 'string' && (value === '{}' || value === '[]'))
+const toOwner = (user: UserSearchUser): MeegleRequirementOwner | null => {
+  const name = user.name_cn?.trim() || user.name_en?.trim() || user.email?.trim()
+
+  if (!name) return null
+
+  return {
+    name,
+    email: user.email?.trim() || null,
+    avatarUrl: user.avatar_url?.trim() || null,
+    userKey: user.user_key?.trim() || null
+  }
+}
+
+/**
+ * 通过邮箱批量解析用户信息并补齐头像。
+ */
+const resolveUsersByEmails = async (
+  project: MeegleProject,
+  emails: string[]
+): Promise<Map<string, MeegleRequirementOwner>> => {
+  const result = new Map<string, MeegleRequirementOwner>()
+  const missing: string[] = []
+
+  for (const email of new Set(emails.filter(Boolean))) {
+    const cached = emailUserCache.get(email)
+
+    if (cached) {
+      result.set(email, cached)
+    } else {
+      missing.push(email)
+    }
+  }
+
+  for (const batch of chunk(missing, 20)) {
+    const args = ['user', 'search', '--project-key', project.key, '--format', 'json']
+
+    for (const email of batch) {
+      args.push('--user-keys', email)
+    }
+
+    const command = await runMeegle(args, MEEGLE_QUERY_TIMEOUT_MS)
+    const users = parseCommandJson<UserSearchUser[]>(command, '读取用户头像')
+
+    for (const user of users) {
+      const owner = toOwner(user)
+      const email = user.email?.trim()
+      const key = user.user_key?.trim()
+
+      if (!owner) continue
+
+      if (key) userCache.set(key, owner)
+      if (email) {
+        emailUserCache.set(email, owner)
+        result.set(email, owner)
+      }
+    }
+  }
+
+  return result
+}
+
+/**
+ * 为 MQL 中的人员字段补齐真实头像。
+ */
+const enrichRequirementAvatars = async (
+  project: MeegleProject,
+  requirements: MeegleRequirement[]
+): Promise<void> => {
+  const emails = requirements.flatMap((requirement) => [
+    requirement.createdBy?.email ?? '',
+    ...requirement.productManagers.map((owner) => owner.email ?? ''),
+    ...requirement.productOwners.map((owner) => owner.email ?? ''),
+    ...requirement.owners.map((owner) => owner.email ?? ''),
+    ...requirement.collaborators.flatMap((collaborator) =>
+      collaborator.members.map((owner) => owner.email ?? '')
+    )
+  ])
+  const users = await resolveUsersByEmails(project, emails)
+
+  const applyAvatar = (owner: MeegleRequirementOwner): MeegleRequirementOwner => {
+    const resolved = owner.email ? users.get(owner.email) : null
+
+    return resolved
+      ? {
+          ...owner,
+          avatarUrl: resolved.avatarUrl,
+          userKey: resolved.userKey
+        }
+      : owner
+  }
+
+  for (const requirement of requirements) {
+    if (requirement.createdBy) {
+      requirement.createdBy = applyAvatar(requirement.createdBy)
+    }
+    requirement.productManagers = requirement.productManagers.map(applyAvatar)
+    requirement.productOwners = requirement.productOwners.map(applyAvatar)
+    requirement.owners = requirement.owners.map(applyAvatar)
+    requirement.collaborators = requirement.collaborators.map((collaborator) => ({
+      ...collaborator,
+      members: collaborator.members.map(applyAvatar)
+    }))
+  }
+}
 
 /**
  * 通过 user_key 批量解析用户信息。
@@ -750,27 +882,24 @@ const resolveUsers = async (
       args.push('--user-keys', key)
     }
 
-    const command = await runMeegle(args, MEEGLE_QUERY_TIMEOUT_MS)
-    const users = parseCommandJson<UserSearchUser[]>(command, '读取用户信息')
+    try {
+      const command = await runMeegle(args, MEEGLE_QUERY_TIMEOUT_MS)
+      const users = parseCommandJson<UserSearchUser[]>(command, '读取用户信息')
 
-    for (const user of users) {
-      const key = user.user_key?.trim()
+      for (const user of users) {
+        const key = user.user_key?.trim()
 
-      if (!key) continue
+        if (!key) continue
 
-      const owner: MeegleRequirementOwner = {
-        name: user.name_cn?.trim() || user.name_en?.trim() || user.email?.trim() || '未知成员',
-        email: user.email?.trim() || null
+        const owner = toOwner(user)
+
+        if (!owner) continue
+
+        userCache.set(key, owner)
+        result.set(key, owner)
       }
-
-      userCache.set(key, owner)
-      result.set(key, owner)
-    }
-  }
-
-  for (const key of userKeys) {
-    if (!result.has(key)) {
-      result.set(key, { name: '未知成员', email: null })
+    } catch {
+      // 人员信息属于增强数据，查询失败时保留节点和评论主体。
     }
   }
 
@@ -808,6 +937,72 @@ const orderWorkflowNodes = (nodes: MeegleWorkflowNode[]): MeegleWorkflowNode[] =
 
   return ordered
 }
+
+/**
+ * 从 Meegle 富文本值中提取纯文本。
+ */
+const extractRichText = (value: unknown): string | null => {
+  if (!value || typeof value !== 'object') return null
+
+  const operations = Object.values(value as Record<string, unknown>).flatMap((node) => {
+    const ops = (node as { ops?: Array<{ insert?: unknown }> } | null)?.ops
+
+    return Array.isArray(ops) ? ops : []
+  })
+  const text = operations
+    .map((operation) => (typeof operation.insert === 'string' ? operation.insert : ''))
+    .join('')
+    .trim()
+
+  return text || null
+}
+
+/**
+ * 将节点表单值转换成可展示文本。
+ */
+const normalizeFormValue = (value: unknown, valueLabel?: string): string | null => {
+  const label = valueLabel?.trim()
+
+  if (label) return label
+  if (value === null || value === undefined) return null
+
+  if (typeof value === 'number') return String(value)
+  if (typeof value !== 'string') return null
+
+  const trimmed = value.trim()
+
+  if (!trimmed) return null
+
+  try {
+    const parsed = JSON.parse(trimmed) as { doc?: unknown }
+
+    if (parsed && typeof parsed === 'object' && 'doc' in parsed) {
+      const document = typeof parsed.doc === 'string' ? JSON.parse(parsed.doc) : parsed.doc
+
+      return extractRichText(document)
+    }
+  } catch {
+    // 普通字符串按原值展示。
+  }
+
+  return trimmed
+}
+
+/**
+ * 解析节点表单中的业务字段。
+ * 排期、估分、工时等 node_field 已经在节点摘要中展示，不重复放在表单里。
+ */
+const readNodeFormItems = (node: WorkflowRawNode): MeegleNodeFormItem[] =>
+  (node.form_items ?? [])
+    .filter((item) => item.form_item_type === 'field')
+    .map((item) => ({
+      key: item.field_key?.trim() || item.field_name?.trim() || '',
+      name: item.field_name?.trim() || '未命名字段',
+      type: item.field_type?.trim() || 'text',
+      required: item.is_required === true,
+      value: normalizeFormValue(item.value, item.value_label)
+    }))
+    .filter((item) => item.key)
 
 /**
  * 读取需求流程节点。
@@ -860,15 +1055,17 @@ const fetchWorkflowNodes = async (
       key: basic.node_key ?? '',
       name: basic.name ?? '未命名节点',
       status: basic.status ?? 'not_started',
-      owners: (node.assignees?.owners ?? []).map(
-        (owner) => users.get(owner.user_key ?? '') ?? { name: '未知成员', email: null }
-      ),
+      owners: (node.assignees?.owners ?? [])
+        .map((owner) => users.get(owner.user_key ?? ''))
+        .filter((owner): owner is MeegleRequirementOwner => Boolean(owner)),
       scheduleStart: normalizeTime(schedule.estimate_start_time),
       scheduleEnd: normalizeTime(schedule.estimate_finish_time),
+      actualStart: normalizeTime(schedule.actual_begin_time),
+      actualEnd: normalizeTime(schedule.actual_finish_time),
+      actualWorkTime:
+        typeof schedule.actual_work_time === 'number' ? schedule.actual_work_time : null,
       points: typeof schedule.points === 'number' ? schedule.points : null,
-      requiredFields: (node.form_items ?? [])
-        .filter((item) => item.is_required && isFormValueEmpty(item.value))
-        .map((item) => item.field_name?.trim() || '未命名必填项'),
+      formItems: readNodeFormItems(node),
       nextNodeKeys: basic.next_node_keys ?? []
     }
   })
@@ -934,7 +1131,8 @@ export const getRequirementActivity = async (
  */
 export const addRequirementComment = async (
   workItemId: string,
-  content: string
+  content: string,
+  notifyUserKeys: string[] = []
 ): Promise<void> => {
   if (!/^\d+$/.test(workItemId)) throw new Error('需求 ID 不合法')
 
@@ -943,23 +1141,30 @@ export const addRequirementComment = async (
   if (!normalizedContent) throw new Error('评论内容不能为空')
 
   const project = await getProject()
-  const result = await runMeegle(
-    [
-      'comment',
-      'add',
-      '--project-key',
-      project.key,
-      '--work-item-id',
-      workItemId,
-      '--content',
-      normalizedContent,
-      '--action',
-      'create',
-      '--format',
-      'json'
-    ],
-    MEEGLE_QUERY_TIMEOUT_MS
-  )
+  const args = [
+    'comment',
+    'add',
+    '--project-key',
+    project.key,
+    '--work-item-id',
+    workItemId,
+    '--content',
+    normalizedContent,
+    '--action',
+    'create',
+    '--format',
+    'json'
+  ]
+
+  if (notifyUserKeys.length > 0) {
+    args.push('--notify-user-type', 'user_key')
+
+    for (const key of notifyUserKeys) {
+      args.push('--notify-user-list', key)
+    }
+  }
+
+  const result = await runMeegle(args, MEEGLE_QUERY_TIMEOUT_MS)
 
   ensureWriteSuccess(result, '发表评论')
 }
@@ -1001,59 +1206,133 @@ export const transitionRequirementNode = async (
 }
 
 /**
- * 更新节点排期和估分。
+ * 更新节点排期、估分和实际工时。
+ * update-node 不支持一次修改多个类别，因此拆成两次调用。
  */
-export const updateRequirementNodeSchedule = async (
+export const updateRequirementNode = async (
   workItemId: string,
   nodeId: string,
-  input: UpdateNodeScheduleInput
+  input: UpdateNodeInfoInput
 ): Promise<void> => {
   if (!/^\d+$/.test(workItemId)) throw new Error('需求 ID 不合法')
   if (!nodeId.trim()) throw new Error('节点 ID 不合法')
-  if (!Number.isFinite(input.startAt) || !Number.isFinite(input.endAt)) {
-    throw new Error('排期时间不合法')
+
+  const hasSchedule = input.startAt !== undefined || input.endAt !== undefined
+
+  if (hasSchedule) {
+    if (!Number.isFinite(input.startAt) || !Number.isFinite(input.endAt)) {
+      throw new Error('排期时间不合法')
+    }
+    if ((input.endAt as number) < (input.startAt as number)) {
+      throw new Error('结束时间不能早于开始时间')
+    }
+  } else if (typeof input.points === 'number') {
+    throw new Error('填写估分前请先设置总排期')
   }
-  if (input.endAt < input.startAt) throw new Error('结束时间不能早于开始时间')
+
+  if (
+    input.actualWorkTime !== undefined &&
+    input.actualWorkTime !== null &&
+    (!Number.isFinite(input.actualWorkTime) || input.actualWorkTime < 0)
+  ) {
+    throw new Error('实际工时不能小于 0')
+  }
+
+  if (!hasSchedule && input.actualWorkTime === undefined) {
+    throw new Error('没有需要更新的节点信息')
+  }
 
   const project = await getProject()
-  const nodeSchedule: Record<string, number> = {
-    estimate_start_time: input.startAt,
-    estimate_finish_time: input.endAt
+
+  if (hasSchedule) {
+    const nodeSchedule: Record<string, number> = {
+      estimate_start_time: input.startAt as number,
+      estimate_finish_time: input.endAt as number
+    }
+
+    if (typeof input.points === 'number' && Number.isFinite(input.points)) {
+      nodeSchedule.points = input.points
+    }
+
+    const scheduleResult = await runMeegle(
+      [
+        'workflow',
+        'update-node',
+        '--project-key',
+        project.key,
+        '--work-item-id',
+        workItemId,
+        '--node-id',
+        nodeId,
+        '--node-schedule',
+        JSON.stringify(nodeSchedule),
+        '--format',
+        'json'
+      ],
+      MEEGLE_QUERY_TIMEOUT_MS
+    )
+
+    ensureWriteSuccess(scheduleResult, '更新节点排期')
   }
 
-  if (typeof input.points === 'number' && Number.isFinite(input.points)) {
-    nodeSchedule.points = input.points
+  if (input.actualWorkTime !== undefined) {
+    const fieldsResult = await runMeegle(
+      [
+        'workflow',
+        'update-node',
+        '--project-key',
+        project.key,
+        '--work-item-id',
+        workItemId,
+        '--node-id',
+        nodeId,
+        '--fields',
+        JSON.stringify([
+          {
+            field_key: 'actual_work_time',
+            field_value: input.actualWorkTime === null ? '' : String(input.actualWorkTime)
+          }
+        ]),
+        '--format',
+        'json'
+      ],
+      MEEGLE_QUERY_TIMEOUT_MS
+    )
+
+    ensureWriteSuccess(fieldsResult, '更新实际工时')
   }
-
-  const result = await runMeegle(
-    [
-      'workflow',
-      'update-node',
-      '--project-key',
-      project.key,
-      '--work-item-id',
-      workItemId,
-      '--node-id',
-      nodeId,
-      '--node-schedule',
-      JSON.stringify(nodeSchedule),
-      '--format',
-      'json'
-    ],
-    MEEGLE_QUERY_TIMEOUT_MS
-  )
-
-  ensureWriteSuccess(result, '更新节点排期')
 }
 
 /**
- * 读取当前用户的全部待办需求，并按迭代分组。
+ * 读取当前用户通过任意角色参与的未结束需求，并按迭代分组。
  */
 export const getMyRequirements = async (): Promise<MeegleMyRequirements> => {
   const project = await getProject()
-  const requirementIds = await fetchMyWorkRequirementIds(project)
+  const roleNames = await fetchStoryRoleNames(project)
+  const roleCondition = buildCurrentUserRoleCondition(roleNames)
   const requirements =
-    requirementIds.length > 0 ? await fetchRequirementsByIds(project, requirementIds) : []
+    roleNames.length > 0
+      ? (
+          await fetchMqlRows(
+            project,
+            [
+              'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `提出时间`, `预计上线时间`, `完成日期`, `规划版本`, `实际上车版本`, `产品线`, `需求等级`, `需求性质`, `需求复杂度`, `研发难度估分`, `预估开发量`, `技术方案`, `应用`, `标签`, `是否涉及权限`, `是否涉及历史数据`, `是否涉及性能测试`, `备注`, risk_label(), `__产品经理`, `__产品负责人`, `__研发负责人`, `__前端负责人`, `__前端开发`, `__前端APP负责人`, `__前端APP开发`, `__后端负责人`, `__后端开发`, `__数仓开发`, `__QA`, `__QA负责人`, `__测试owner`, `__测试组长`, `__性能测试负责人`, `__UI&UX`, `__PMO项目经理`, `__技术专家`, `__研发总监`',
+              `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
+              `WHERE (${roleCondition}) AND \`状态\` != '结束'`,
+              'ORDER BY `更新时间` DESC',
+              'LIMIT 50'
+            ].join(' ')
+          )
+        )
+          .map(parseRequirement)
+          .filter((requirement): requirement is MeegleRequirement => requirement !== null)
+      : []
+
+  try {
+    await enrichRequirementAvatars(project, requirements)
+  } catch {
+    // 头像不是核心数据，补齐失败时继续展示需求。
+  }
 
   return {
     project,
@@ -1075,17 +1354,27 @@ export const initializeRequirements = (): void => {
   })
   ipcMain.handle(
     'requirements:add-comment',
-    (_event, workItemId: unknown, content: unknown) => {
+    (_event, workItemId: unknown, content: unknown, notifyUserKeys: unknown) => {
       if (typeof workItemId !== 'string' || typeof content !== 'string') {
         throw new Error('评论参数不合法')
       }
 
-      return addRequirementComment(workItemId, content)
+      const notifyKeys = Array.isArray(notifyUserKeys)
+        ? notifyUserKeys.filter((key): key is string => typeof key === 'string')
+        : []
+
+      return addRequirementComment(workItemId, content, notifyKeys)
     }
   )
   ipcMain.handle(
     'requirements:transition-node',
-    (_event, workItemId: unknown, nodeId: unknown, action: unknown) => {
+    (
+      _event,
+      workItemId: unknown,
+      nodeId: unknown,
+      action: unknown,
+      rollbackReason: unknown
+    ) => {
       if (
         typeof workItemId !== 'string' ||
         typeof nodeId !== 'string' ||
@@ -1094,21 +1383,22 @@ export const initializeRequirements = (): void => {
         throw new Error('节点操作参数不合法')
       }
 
-      return transitionRequirementNode(workItemId, nodeId, action)
+      return transitionRequirementNode(
+        workItemId,
+        nodeId,
+        action,
+        typeof rollbackReason === 'string' ? rollbackReason : undefined
+      )
     }
   )
   ipcMain.handle(
-    'requirements:update-node-schedule',
+    'requirements:update-node',
     (_event, workItemId: unknown, nodeId: unknown, input: unknown) => {
       if (typeof workItemId !== 'string' || typeof nodeId !== 'string' || !input) {
-        throw new Error('排期参数不合法')
+        throw new Error('节点参数不合法')
       }
 
-      return updateRequirementNodeSchedule(
-        workItemId,
-        nodeId,
-        input as UpdateNodeScheduleInput
-      )
+      return updateRequirementNode(workItemId, nodeId, input as UpdateNodeInfoInput)
     }
   )
 }

@@ -7,7 +7,7 @@ import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState }
 import type {
   MeegleMyRequirements,
   MeegleRequirementActivity,
-  UpdateNodeScheduleInput
+  UpdateNodeInfoInput
 } from '../types/requirements'
 import type {
   CloneRepositoryInput,
@@ -159,8 +159,12 @@ const electronAPI = {
   /**
    * 发表需求评论。
    */
-  addRequirementComment: (workItemId: string, content: string): Promise<void> =>
-    ipcRenderer.invoke('requirements:add-comment', workItemId, content),
+  addRequirementComment: (
+    workItemId: string,
+    content: string,
+    notifyUserKeys?: string[]
+  ): Promise<void> =>
+    ipcRenderer.invoke('requirements:add-comment', workItemId, content, notifyUserKeys),
 
   /**
    * 完成或回滚需求节点。
@@ -168,19 +172,25 @@ const electronAPI = {
   transitionRequirementNode: (
     workItemId: string,
     nodeId: string,
-    action: 'confirm' | 'rollback'
+    action: 'confirm' | 'rollback',
+    rollbackReason?: string
   ): Promise<void> =>
-    ipcRenderer.invoke('requirements:transition-node', workItemId, nodeId, action),
+    ipcRenderer.invoke(
+      'requirements:transition-node',
+      workItemId,
+      nodeId,
+      action,
+      rollbackReason
+    ),
 
   /**
-   * 更新节点排期和估分。
+   * 更新节点排期、估分和实际工时。
    */
-  updateRequirementNodeSchedule: (
+  updateRequirementNode: (
     workItemId: string,
     nodeId: string,
-    input: UpdateNodeScheduleInput
-  ): Promise<void> =>
-    ipcRenderer.invoke('requirements:update-node-schedule', workItemId, nodeId, input),
+    input: UpdateNodeInfoInput
+  ): Promise<void> => ipcRenderer.invoke('requirements:update-node', workItemId, nodeId, input),
 
   /**
    * 读取代码仓库配置状态。

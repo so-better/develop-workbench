@@ -5,7 +5,7 @@ import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState }
 import type {
   MeegleMyRequirements,
   MeegleRequirementActivity,
-  UpdateNodeScheduleInput
+  UpdateNodeInfoInput
 } from '../types/requirements'
 import type {
   CloneRepositoryInput,
@@ -61,18 +61,23 @@ export interface ElectronAPI {
   /** 读取需求流程节点和评论。 */
   getRequirementActivity: (workItemId: string) => Promise<MeegleRequirementActivity>
   /** 发表需求评论。 */
-  addRequirementComment: (workItemId: string, content: string) => Promise<void>
+  addRequirementComment: (
+    workItemId: string,
+    content: string,
+    notifyUserKeys?: string[]
+  ) => Promise<void>
   /** 完成或回滚需求节点。 */
   transitionRequirementNode: (
     workItemId: string,
     nodeId: string,
-    action: 'confirm' | 'rollback'
+    action: 'confirm' | 'rollback',
+    rollbackReason?: string
   ) => Promise<void>
-  /** 更新节点排期和估分。 */
-  updateRequirementNodeSchedule: (
+  /** 更新节点排期、估分和实际工时。 */
+  updateRequirementNode: (
     workItemId: string,
     nodeId: string,
-    input: UpdateNodeScheduleInput
+    input: UpdateNodeInfoInput
   ) => Promise<void>
   /** 读取代码仓库配置状态。 */
   getRepositoryState: () => Promise<RepositoryState>

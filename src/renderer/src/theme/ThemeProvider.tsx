@@ -10,6 +10,9 @@ import {
 import type { ReactNode } from 'react'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import type { ThemeConfig } from 'antd'
+import zhCN from 'antd/locale/zh_CN'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'
 import type { ThemeMode, ThemeState } from '../../../types/theme'
 
 interface ThemeContextValue {
@@ -23,6 +26,9 @@ interface ThemeProviderProps {
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
+
+// Ant Design 的日期面板和 dayjs 格式化统一使用中文。
+dayjs.locale('zh-cn')
 
 /**
  * 读取系统当前的明暗偏好。
@@ -128,7 +134,9 @@ export default function ThemeProvider({ children }: ThemeProviderProps): JSX.Ele
 
   return (
     <ThemeContext.Provider value={contextValue}>
-      <ConfigProvider theme={themeConfig}>{children}</ConfigProvider>
+      <ConfigProvider theme={themeConfig} locale={zhCN}>
+        {children}
+      </ConfigProvider>
     </ThemeContext.Provider>
   )
 }

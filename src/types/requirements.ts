@@ -21,6 +21,12 @@ export interface MeegleRequirementOwner {
 
   /** 用户邮箱，接口未返回时为 null。 */
   email: string | null
+
+  /** 用户头像地址。 */
+  avatarUrl: string | null
+
+  /** 飞书 user_key，用于评论通知。 */
+  userKey: string | null
 }
 
 /**
@@ -165,6 +171,26 @@ export interface MeegleRequirementGroup {
 }
 
 /**
+ * 节点表单字段。
+ */
+export interface MeegleNodeFormItem {
+  /** 字段 key。 */
+  key: string
+
+  /** 字段名称。 */
+  name: string
+
+  /** 字段类型。 */
+  type: string
+
+  /** 是否必填。 */
+  required: boolean
+
+  /** 字段文本值；未填写时为空。 */
+  value: string | null
+}
+
+/**
  * 需求流程节点。
  */
 export interface MeegleWorkflowNode {
@@ -174,7 +200,7 @@ export interface MeegleWorkflowNode {
   /** 节点名称。 */
   name: string
 
-  /** 节点状态，例如 doing、not_started、done。 */
+  /** 节点状态，例如 doing、finished、not_started。 */
   status: string
 
   /** 节点负责人。 */
@@ -186,11 +212,20 @@ export interface MeegleWorkflowNode {
   /** 节点排期结束时间，ISO 字符串。 */
   scheduleEnd: string | null
 
+  /** 实际开始时间，ISO 字符串。 */
+  actualStart: string | null
+
+  /** 实际结束时间，ISO 字符串。 */
+  actualEnd: string | null
+
+  /** 实际工时。 */
+  actualWorkTime: number | null
+
   /** 节点估分。 */
   points: number | null
 
-  /** 尚未填写的必填项名称。 */
-  requiredFields: string[]
+  /** 节点表单字段。 */
+  formItems: MeegleNodeFormItem[]
 
   /** 后续节点 key。 */
   nextNodeKeys: string[]
@@ -231,17 +266,20 @@ export interface MeegleRequirementActivity {
 }
 
 /**
- * 节点排期更新参数。
+ * 节点信息更新参数。
  */
-export interface UpdateNodeScheduleInput {
-  /** 开始时间，Unix 毫秒时间戳。 */
-  startAt: number
+export interface UpdateNodeInfoInput {
+  /** 开始时间，Unix 毫秒时间戳。只更新工时可省略。 */
+  startAt?: number
 
-  /** 结束时间，Unix 毫秒时间戳。 */
-  endAt: number
+  /** 结束时间，Unix 毫秒时间戳。只更新工时可省略。 */
+  endAt?: number
 
-  /** 估分。 */
+  /** 总估分。 */
   points?: number
+
+  /** 总实际工时。 */
+  actualWorkTime?: number | null
 }
 
 /**
