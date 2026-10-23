@@ -6,6 +6,7 @@ import { app } from 'electron'
 import { join } from 'node:path'
 import { initializeAiConfig } from './ai-config'
 import { initializeLark } from './lark'
+import { initializeMeegle } from './meegle'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
 import { createMainWindow, focusMainWindow, getMainWindow } from './window'
@@ -36,6 +37,7 @@ if (!hasSingleInstanceLock) {
     initializeTheme()
     initializeSystem()
     initializeLark()
+    initializeMeegle()
     initializeAiConfig()
     createMainWindow()
 

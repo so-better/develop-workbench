@@ -3,6 +3,7 @@ import type { IpcRendererEvent } from 'electron'
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
+import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type { ThemeMode, ThemeState } from '../types/theme'
 
 const electronAPI = {
@@ -75,6 +76,59 @@ const electronAPI = {
 
     return () => {
       ipcRenderer.removeListener('lark:login-event', handler)
+    }
+  },
+
+  /**
+   * 读取 Meegle CLI 状态和登录用户。
+   */
+  getMeegleState: (): Promise<MeegleState> => ipcRenderer.invoke('meegle:get-state'),
+
+  /**
+   * 保存 Meegle CLI 路径；传 null 恢复自动检测。
+   */
+  setMeegleCliPath: (cliPath: string | null): Promise<MeegleCliInfo> =>
+    ipcRenderer.invoke('meegle:set-cli-path', cliPath),
+
+  /**
+   * 只执行 Meegle CLI 自动检测，不修改已保存路径。
+   */
+  detectMeegleCliInfo: (): Promise<MeegleCliInfo> =>
+    ipcRenderer.invoke('meegle:detect-cli-info'),
+
+  /**
+   * 选择 Meegle CLI 可执行文件，优先定位到当前路径所在目录。
+   */
+  selectMeegleCliPath: (currentPath?: string | null): Promise<string | null> =>
+    ipcRenderer.invoke('meegle:select-cli-path', currentPath),
+
+  /**
+   * 发起 Meegle 扫码登录，返回二维码。
+   */
+  startMeegleLogin: (): Promise<MeegleLoginSession> => ipcRenderer.invoke('meegle:start-login'),
+
+  /**
+   * 取消 Meegle 扫码登录。
+   */
+  cancelMeegleLogin: (): Promise<void> => ipcRenderer.invoke('meegle:cancel-login'),
+
+  /**
+   * 退出 Meegle 登录。
+   */
+  logoutMeegle: (): Promise<MeegleState> => ipcRenderer.invoke('meegle:logout'),
+
+  /**
+   * 订阅 Meegle 扫码登录结果，返回取消订阅函数。
+   */
+  onMeegleLoginEvent: (listener: (event: MeegleLoginEvent) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, result: MeegleLoginEvent): void => {
+      listener(result)
+    }
+
+    ipcRenderer.on('meegle:login-event', handler)
+
+    return () => {
+      ipcRenderer.removeListener('meegle:login-event', handler)
     }
   },
 

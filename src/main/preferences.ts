@@ -10,6 +10,7 @@ import type { ThemeMode } from '../types/theme'
 export interface AppPreferences {
   theme: ThemeMode
   larkCliPath?: string
+  meegleCliPath?: string
 }
 
 const DEFAULT_PREFERENCES: AppPreferences = {
@@ -54,11 +55,13 @@ const readPreferences = (): AppPreferences => {
     const parsed = JSON.parse(raw) as {
       theme?: unknown
       larkCliPath?: unknown
+      meegleCliPath?: unknown
     }
 
     cachedPreferences = {
       theme: isThemeMode(parsed.theme) ? parsed.theme : DEFAULT_PREFERENCES.theme,
-      larkCliPath: normalizePath(parsed.larkCliPath)
+      larkCliPath: normalizePath(parsed.larkCliPath),
+      meegleCliPath: normalizePath(parsed.meegleCliPath)
     }
   } catch {
     cachedPreferences = { ...DEFAULT_PREFERENCES }
@@ -83,6 +86,7 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
   }
 
   next.larkCliPath = normalizePath(next.larkCliPath)
+  next.meegleCliPath = normalizePath(next.meegleCliPath)
   cachedPreferences = next
 
   try {

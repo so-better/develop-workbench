@@ -1,6 +1,7 @@
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
+import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type { ThemeMode, ThemeState } from '../types/theme'
 
 export interface ElectronAPI {
@@ -27,6 +28,22 @@ export interface ElectronAPI {
   logoutLark: () => Promise<void>
   /** 订阅扫码登录结果，返回取消订阅函数。 */
   onLarkLoginEvent: (listener: (event: LarkLoginEvent) => void) => () => void
+  /** 读取 Meegle 状态和登录用户。 */
+  getMeegleState: () => Promise<MeegleState>
+  /** 保存 Meegle CLI 路径，传 null 恢复自动检测。 */
+  setMeegleCliPath: (cliPath: string | null) => Promise<MeegleCliInfo>
+  /** 只执行 Meegle CLI 自动检测。 */
+  detectMeegleCliInfo: () => Promise<MeegleCliInfo>
+  /** 选择 Meegle CLI 可执行文件。 */
+  selectMeegleCliPath: (currentPath?: string | null) => Promise<string | null>
+  /** 发起 Meegle 扫码登录。 */
+  startMeegleLogin: () => Promise<MeegleLoginSession>
+  /** 取消 Meegle 扫码登录。 */
+  cancelMeegleLogin: () => Promise<void>
+  /** 退出 Meegle 登录。 */
+  logoutMeegle: () => Promise<MeegleState>
+  /** 订阅 Meegle 扫码登录结果，返回取消订阅函数。 */
+  onMeegleLoginEvent: (listener: (event: MeegleLoginEvent) => void) => () => void
   /** 读取 AI 配置文件。 */
   readAiConfig: () => Promise<AiConfigDocument>
   /** 校验并写入 AI 配置文件。 */

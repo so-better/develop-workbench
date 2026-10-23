@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { CopyOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Input, Modal, Spin } from 'antd'
 import type { AppInfo } from '../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../types/lark'
 import type { SettingsSection } from '../../../types/settings'
+import MeegleSettings from './MeegleSettings'
 
 interface SettingsModalProps {
   open: boolean
@@ -47,6 +48,16 @@ export default function SettingsModal({
   const [larkPathDirty, setLarkPathDirty] = useState(false)
   const [larkLoading, setLarkLoading] = useState(false)
   const [larkError, setLarkError] = useState<string | null>(null)
+  const meegleSaveRef = useRef<(() => Promise<void>) | null>(null)
+  const [meegleReady, setMeegleReady] = useState(false)
+
+  /**
+   * 接收 Meegle 面板注册的配置保存函数。
+   */
+  const handleMeegleSaveReady = useCallback((handler: (() => Promise<void>) | null): void => {
+    meegleSaveRef.current = handler
+    setMeegleReady(Boolean(handler))
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -133,18 +144,34 @@ export default function SettingsModal({
   }
 
   /**
-   * 统一保存模型配置和 lark-cli 路径。
-   * 先校验当前草稿，再按顺序写入；任一校验失败都不会继续写入其他设置。
+   * 保存当前模型配置 JSON。
    */
-  const handleSave = async (): Promise<void> => {
+  const saveAiConfig = async (): Promise<void> => {
     try {
       JSON.parse(draft)
     } catch {
-      setActiveSection('ai')
       message.error('模型配置不是有效的 JSON，请检查后再保存')
       return
     }
 
+    setSaving(true)
+
+    try {
+      const document = await window.electron.writeAiConfig(draft)
+      setDraft(document.content)
+      message.success('模型配置已保存')
+    } catch {
+      message.error('保存模型配置失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /**
+   * 保存飞书登录所用的 lark-cli 路径。
+   * 自动检测结果未修改时继续保留自动模式，不固化为手动路径。
+   */
+  const saveLarkCliPath = async (): Promise<void> => {
     const larkPathToSave =
       larkPathDirty || larkInfo?.source === 'settings'
         ? larkPathDraft.trim() || null
@@ -153,36 +180,55 @@ export default function SettingsModal({
     setSaving(true)
 
     try {
-      let nextLarkInfo: LarkCliInfo
-
-      try {
-        nextLarkInfo = await window.electron.setLarkCliPath(larkPathToSave)
-      } catch {
-        setActiveSection('lark-cli')
-        message.error('lark-cli 路径无法执行，请重新选择可执行文件')
-        return
-      }
-
-      try {
-        const document = await window.electron.writeAiConfig(draft)
-        setDraft(document.content)
-      } catch {
-        setActiveSection('ai')
-        message.error('保存模型配置失败')
-        return
-      }
-
-      setLarkInfo(nextLarkInfo)
-      setLarkPathDraft(nextLarkInfo.path ?? '')
+      const info = await window.electron.setLarkCliPath(larkPathToSave)
+      setLarkInfo(info)
+      setLarkPathDraft(info.path ?? '')
       setLarkPathDirty(false)
       onLarkCliUpdated()
-      message.success('设置已保存')
+      message.success('飞书登录配置已保存')
+    } catch {
+      setActiveSection('lark-cli')
+      message.error('lark-cli 路径无法执行，请重新选择可执行文件')
     } finally {
       setSaving(false)
     }
   }
 
-  const saveDisabled = loading || larkLoading || Boolean(error) || Boolean(larkError)
+  /**
+   * 根据当前栏目执行对应保存逻辑。
+   */
+  const handleSave = async (): Promise<void> => {
+    if (activeSection === 'ai') {
+      await saveAiConfig()
+      return
+    }
+
+    if (activeSection === 'lark-cli') {
+      await saveLarkCliPath()
+      return
+    }
+
+    if (activeSection === 'meegle') {
+      setSaving(true)
+
+      try {
+        await meegleSaveRef.current?.()
+      } finally {
+        setSaving(false)
+      }
+    }
+  }
+
+  const saveDisabled =
+    activeSection === 'ai'
+      ? loading || Boolean(error)
+      : activeSection === 'lark-cli'
+        ? larkLoading || Boolean(larkError)
+        : activeSection === 'meegle'
+          ? !meegleReady
+          : false
+  const showSaveButton =
+    activeSection === 'ai' || activeSection === 'lark-cli' || activeSection === 'meegle'
   const appInfoItems = [
     {
       label: '应用版本',
@@ -230,15 +276,19 @@ export default function SettingsModal({
         <Button key="close" onClick={onClose}>
           关闭
         </Button>,
-        <Button
-          key="save"
-          type="primary"
-          loading={saving}
-          disabled={saveDisabled}
-          onClick={() => handleSave()}
-        >
-          保存
-        </Button>
+        ...(showSaveButton
+          ? [
+              <Button
+                key="save"
+                type="primary"
+                loading={saving}
+                disabled={saveDisabled}
+                onClick={() => handleSave()}
+              >
+                保存
+              </Button>
+            ]
+          : [])
       ]}
     >
       <div className="settings-dialog">
@@ -258,6 +308,14 @@ export default function SettingsModal({
             onClick={() => setActiveSection('lark-cli')}
           >
             飞书登录
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item${activeSection === 'meegle' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'meegle' ? 'page' : undefined}
+            onClick={() => setActiveSection('meegle')}
+          >
+            飞书项目
           </button>
           <button
             type="button"
@@ -366,6 +424,10 @@ export default function SettingsModal({
                 </>
               )}
             </>
+          ) : null}
+
+          {activeSection === 'meegle' ? (
+            <MeegleSettings onSaveReady={handleMeegleSaveReady} />
           ) : null}
 
           {activeSection === 'app-info' ? (
