@@ -8,6 +8,7 @@ import { initializeAiConfig } from './ai-config'
 import { initializeLark } from './lark'
 import { initializeMeegle } from './meegle'
 import { initializeRepositories } from './repositories'
+import { initializeRequirements } from './requirements'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
 import { createMainWindow, focusMainWindow, getMainWindow } from './window'
@@ -40,6 +41,7 @@ if (!hasSingleInstanceLock) {
     initializeLark()
     initializeMeegle()
     initializeRepositories()
+    initializeRequirements()
     initializeAiConfig()
     createMainWindow()
 

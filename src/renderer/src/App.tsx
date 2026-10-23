@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Spin } from 'antd'
 import AppFooter from './components/AppFooter'
 import LoginState from './components/LoginState'
+import RequirementWorkbench from './components/RequirementWorkbench'
 import SettingsModal from './components/SettingsModal'
 import type { AppInfo } from '../../types/app'
 import type { LarkCliInfo, LarkUser } from '../../types/lark'
@@ -104,13 +105,17 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app-shell">
-      <main className="workspace-canvas">
-        {/* 鉴权完成后才展示未登录引导，已登录时暂时保持空白工作区。 */}
+      <main
+        className={`workspace-canvas${larkUser && !authLoading ? ' workspace-canvas--workbench' : ''}`}
+      >
+        {/* 鉴权完成后才展示未登录引导或需求工作台。 */}
         {authLoading ? (
           <div className="auth-loading">
             <Spin />
           </div>
-        ) : larkUser ? null : (
+        ) : larkUser ? (
+          <RequirementWorkbench onOpenSettings={openSettings} />
+        ) : (
           <LoginState
             cliInfo={larkCliInfo}
             onOpenSettings={() => openSettings('lark-cli')}

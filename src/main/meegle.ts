@@ -175,8 +175,13 @@ const resolveMeegleCli = async (
 /**
  * 执行可执行文件并保留退出码。
  * auth status 在未登录时会返回非 0 退出码，但 stdout 仍可能是有效 JSON。
+ * timeoutMs 允许耗时业务查询使用比登录状态检查更长的超时时间。
  */
-const runExecutable = (executablePath: string, args: string[]): Promise<CommandResult> =>
+const runExecutable = (
+  executablePath: string,
+  args: string[],
+  timeoutMs = MEEGLE_COMMAND_TIMEOUT_MS
+): Promise<CommandResult> =>
   new Promise((resolve, reject) => {
     const child = spawn(executablePath, args, {
       env: process.env,
@@ -190,7 +195,7 @@ const runExecutable = (executablePath: string, args: string[]): Promise<CommandR
       settled = true
       child.kill()
       reject(new Error('Meegle CLI command timed out'))
-    }, MEEGLE_COMMAND_TIMEOUT_MS)
+    }, timeoutMs)
 
     child.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8')
@@ -222,15 +227,19 @@ const runExecutable = (executablePath: string, args: string[]): Promise<CommandR
 
 /**
  * 执行 Meegle CLI 命令。
+ * 导出给需求等业务模块复用，统一处理 CLI 路径解析和进程超时。
  */
-const runMeegle = async (args: string[]): Promise<CommandResult> => {
+export const runMeegle = async (
+  args: string[],
+  timeoutMs = MEEGLE_COMMAND_TIMEOUT_MS
+): Promise<CommandResult> => {
   const resolved = await resolveMeegleCli()
 
   if (!resolved) {
     throw new Error('Meegle CLI not found')
   }
 
-  return runExecutable(resolved.path, args)
+  return runExecutable(resolved.path, args, timeoutMs)
 }
 
 /**

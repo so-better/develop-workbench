@@ -5,6 +5,11 @@ import type { AppInfo } from '../types/app'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
+  MeegleMyRequirements,
+  MeegleRequirementActivity,
+  UpdateNodeScheduleInput
+} from '../types/requirements'
+import type {
   CloneRepositoryInput,
   RepositoryCloneProgress,
   RepositoryScanResult,
@@ -138,6 +143,44 @@ const electronAPI = {
       ipcRenderer.removeListener('meegle:login-event', handler)
     }
   },
+
+  /**
+   * 读取当前 Meegle 用户负责的需求，并按迭代分组。
+   */
+  getMyRequirements: (): Promise<MeegleMyRequirements> =>
+    ipcRenderer.invoke('requirements:get-my'),
+
+  /**
+   * 读取需求流程节点和评论。
+   */
+  getRequirementActivity: (workItemId: string): Promise<MeegleRequirementActivity> =>
+    ipcRenderer.invoke('requirements:get-activity', workItemId),
+
+  /**
+   * 发表需求评论。
+   */
+  addRequirementComment: (workItemId: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('requirements:add-comment', workItemId, content),
+
+  /**
+   * 完成或回滚需求节点。
+   */
+  transitionRequirementNode: (
+    workItemId: string,
+    nodeId: string,
+    action: 'confirm' | 'rollback'
+  ): Promise<void> =>
+    ipcRenderer.invoke('requirements:transition-node', workItemId, nodeId, action),
+
+  /**
+   * 更新节点排期和估分。
+   */
+  updateRequirementNodeSchedule: (
+    workItemId: string,
+    nodeId: string,
+    input: UpdateNodeScheduleInput
+  ): Promise<void> =>
+    ipcRenderer.invoke('requirements:update-node-schedule', workItemId, nodeId, input),
 
   /**
    * 读取代码仓库配置状态。
