@@ -59,6 +59,7 @@ const createWindow = (): void => {
     // 等页面渲染完成后再显示，避免启动时出现白屏。
     show: false,
     title: 'AI 研发工作台',
+    icon: app.isPackaged ? undefined : join(__dirname, '../../build/icon.png'),
     backgroundColor: getThemeBackgroundColor(),
     webPreferences: {
       // 预加载脚本是渲染进程访问系统能力的唯一入口。
@@ -121,7 +122,12 @@ if (!hasSingleInstanceLock) {
   app.whenReady().then(() => {
     // Windows 需要设置 AppUserModelID，任务栏分组和通知才能正确显示。
     if (process.platform === 'win32') {
-      app.setAppUserModelId('com.develop.ai-workbench')
+      app.setAppUserModelId('com.lingkai.ai-workbench')
+    }
+
+    // 开发模式下让 macOS Dock 显示项目图标，而不是默认的 Electron 图标。
+    if (process.platform === 'darwin' && !app.isPackaged) {
+      app.dock?.setIcon(join(__dirname, '../../build/icon.png'))
     }
 
     // 先恢复上次选择的主题并注册主题 IPC，再创建窗口，避免启动时主题闪烁。

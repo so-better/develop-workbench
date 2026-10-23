@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState
+} from 'react'
 import type { ReactNode } from 'react'
 import { ConfigProvider, theme as antdTheme } from 'antd'
 import type { ThemeConfig } from 'antd'
@@ -21,6 +29,19 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
  * 主进程会先应用持久化主题，因此首次读取即可得到正确结果。
  */
 const getSystemIsDark = (): boolean => window.matchMedia('(prefers-color-scheme: dark)').matches
+
+/**
+ * 将明暗状态同步到根节点。
+ * 供 CSS 变量和浏览器原生控件读取。
+ */
+const applyDocumentTheme = (isDark: boolean): void => {
+  const root = document.documentElement
+  root.dataset.theme = isDark ? 'dark' : 'light'
+  root.style.colorScheme = isDark ? 'dark' : 'light'
+}
+
+// 模块加载时先同步应用一次，确保 React 首次渲染前页面已经是正确主题。
+applyDocumentTheme(getSystemIsDark())
 
 /**
  * 全局主题提供器。
@@ -60,11 +81,9 @@ export default function ThemeProvider({ children }: ThemeProviderProps): JSX.Ele
     }
   }, [])
 
-  // 将实际明暗状态同步到根节点，供 CSS 变量和浏览器原生控件使用。
-  useEffect(() => {
-    const root = document.documentElement
-    root.dataset.theme = themeState.isDark ? 'dark' : 'light'
-    root.style.colorScheme = themeState.isDark ? 'dark' : 'light'
+  // 使用 useLayoutEffect 在绘制前同步主题，避免切换时出现浅色闪屏。
+  useLayoutEffect(() => {
+    applyDocumentTheme(themeState.isDark)
   }, [themeState.isDark])
 
   /**
@@ -83,8 +102,8 @@ export default function ThemeProvider({ children }: ThemeProviderProps): JSX.Ele
     () => ({
       algorithm: themeState.isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
       token: {
-        colorPrimary: '#5b5bd6',
-        colorInfo: '#5b5bd6',
+        colorPrimary: '#1677ff',
+        colorInfo: '#1677ff',
         colorSuccess: '#16a34a',
         colorWarning: '#f59e0b',
         colorError: '#ef4444',

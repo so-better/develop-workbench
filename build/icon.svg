@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect x="64" y="64" width="896" height="896" rx="224" fill="#1677FF" />
+  <rect
+    x="66"
+    y="66"
+    width="892"
+    height="892"
+    rx="222"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-opacity="0.16"
+    stroke-width="3"
+  />
+
+  <rect x="286" y="286" width="196" height="196" rx="52" fill="#FFFFFF" />
+  <rect x="542" y="286" width="196" height="196" rx="52" fill="#FFFFFF" />
+  <rect x="286" y="542" width="196" height="196" rx="52" fill="#FFFFFF" />
+
+  <path
+    d="M640 562C652 610 674 632 722 644C674 656 652 678 640 726C628 678 606 656 558 644C606 632 628 610 640 562Z"
+    fill="#FFFFFF"
+  />
+</svg>
