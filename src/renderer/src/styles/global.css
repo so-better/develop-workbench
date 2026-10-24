@@ -1647,6 +1647,45 @@ body {
   white-space: nowrap;
 }
 
+.workbench-weekly-entry {
+  display: flex;
+  flex-shrink: 0;
+  gap: 7px;
+  align-items: center;
+  width: calc(100% - 16px);
+  padding: 8px 10px;
+  margin: 0 8px 10px;
+  color: var(--workbench-secondary);
+  font-family: inherit;
+  font-size: 11.5px;
+  text-align: left;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.workbench-weekly-entry:hover {
+  color: var(--app-text);
+  background: var(--workbench-hover);
+  border-color: rgba(22, 119, 255, 0.2);
+}
+
+.workbench-weekly-entry .anticon {
+  color: #1677ff;
+  font-size: 12px;
+}
+
+.workbench-weekly-entry span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .workbench-sidebar-heading {
   display: flex;
   gap: 8px;
@@ -4543,4 +4582,318 @@ body {
   font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
   font-size: 12px !important;
   line-height: 1.65 !important;
+}
+
+
+/* 飞书个人工作周报。 */
+.weekly-report-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--app-bg);
+}
+
+.weekly-report-header {
+  display: flex;
+  flex-shrink: 0;
+  gap: 24px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 20px 32px 18px;
+  background: var(--workbench-panel);
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.weekly-report-header-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 10px;
+}
+
+.weekly-report-back {
+  align-self: flex-start;
+  height: 22px;
+  padding: 0;
+  color: var(--workbench-secondary) !important;
+  font-size: 11.5px;
+}
+
+.weekly-report-back:hover {
+  color: var(--app-text) !important;
+  background: transparent !important;
+}
+
+.weekly-report-heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 5px;
+}
+
+.weekly-report-eyebrow {
+  color: var(--workbench-secondary);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+}
+
+.weekly-report-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.weekly-report-title-row h1 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.weekly-report-status {
+  margin-inline-end: 0;
+}
+
+.weekly-report-heading p {
+  margin: 0;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.weekly-report-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+}
+
+.weekly-report-content {
+  flex: 1;
+  min-height: 0;
+  padding: 22px 32px 36px;
+  overflow-y: auto;
+}
+
+.weekly-report-loading,
+.weekly-report-error,
+.weekly-report-card {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.weekly-report-error {
+  margin-bottom: 16px;
+}
+
+.weekly-report-card {
+  padding: 20px 22px;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 14px;
+  box-shadow: var(--workbench-shadow);
+}
+
+.weekly-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: space-between;
+  padding-bottom: 14px;
+  color: var(--workbench-secondary);
+  font-size: 11.5px;
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.weekly-report-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 18px;
+}
+
+.weekly-report-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.weekly-report-field-heading {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.weekly-report-field-heading label {
+  color: var(--app-text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.weekly-report-field-heading label em {
+  margin-left: 3px;
+  color: #ef4444;
+  font-style: normal;
+}
+
+.weekly-report-field-heading span {
+  color: var(--workbench-secondary);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekly-report-submit-bar {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  margin-top: 22px;
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.weekly-report-submit-bar > span {
+  color: var(--workbench-secondary);
+  font-size: 10.5px;
+}
+
+@media (max-width: 760px) {
+  .weekly-report-header,
+  .weekly-report-content {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+
+  .weekly-report-submit-bar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+/* 通用富文本编辑器。 */
+.rich-text-editor {
+  position: relative;
+  min-width: 0;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 9px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.rich-text-editor:focus-within {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.rich-text-editor .ql-toolbar.ql-snow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--workbench-soft);
+  border: 0;
+  border-bottom: 1px solid var(--workbench-divider);
+  border-radius: 9px 9px 0 0;
+}
+
+.rich-text-editor .ql-container.ql-snow {
+  font-family: inherit;
+  font-size: 13.5px;
+  border: 0;
+  border-radius: 0 0 9px 9px;
+}
+
+.rich-text-editor .ql-editor {
+  min-height: var(--rich-text-min-height, 160px);
+  padding: 12px 14px;
+  color: var(--app-text);
+  line-height: 1.7;
+}
+
+.rich-text-editor .ql-editor.ql-blank::before {
+  right: 14px;
+  left: 14px;
+  color: var(--workbench-secondary);
+  font-style: normal;
+}
+
+.rich-text-editor .ql-snow .ql-stroke {
+  stroke: var(--workbench-secondary);
+}
+
+.rich-text-editor .ql-snow .ql-fill,
+.rich-text-editor .ql-snow .ql-stroke.ql-fill {
+  fill: var(--workbench-secondary);
+}
+
+.rich-text-editor .ql-snow .ql-picker {
+  color: var(--workbench-secondary);
+}
+
+.rich-text-editor .ql-snow .ql-picker-options {
+  padding: 5px;
+  background: var(--workbench-panel);
+  border-color: var(--workbench-divider);
+  border-radius: 7px;
+  box-shadow: var(--workbench-shadow);
+}
+
+.rich-text-editor .ql-snow .ql-picker-item {
+  color: var(--app-text);
+}
+
+.rich-text-editor .ql-snow .ql-picker-item:hover,
+.rich-text-editor .ql-snow .ql-picker-item.ql-selected {
+  color: #1677ff;
+}
+
+.rich-text-editor .ql-snow .ql-tooltip {
+  color: var(--app-text);
+  background: var(--workbench-panel);
+  border-color: var(--workbench-divider);
+  box-shadow: var(--workbench-shadow);
+  border-radius: 7px;
+}
+
+.rich-text-editor .ql-snow .ql-tooltip input[type="text"] {
+  color: var(--app-text);
+  background: var(--workbench-soft);
+  border-color: var(--workbench-divider);
+}
+
+.rich-text-editor .ql-editor a {
+  color: #1677ff;
+}
+
+:root[data-theme="dark"] .rich-text-editor .ql-toolbar.ql-snow {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:hover,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:focus,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button.ql-active,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-picker-label:hover,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-picker-label.ql-active {
+  color: #4096ff;
+}
+
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:hover .ql-stroke,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:focus .ql-stroke,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button.ql-active .ql-stroke,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-picker-label:hover .ql-stroke,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-picker-label.ql-active .ql-stroke {
+  stroke: #4096ff;
+}
+
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:hover .ql-fill,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button.ql-active .ql-fill {
+  fill: #4096ff;
 }

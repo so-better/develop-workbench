@@ -31,6 +31,10 @@ import type {
   UpdateRepositoryInput
 } from '../types/repository'
 import type { ThemeMode, ThemeState } from '../types/theme'
+import type {
+  SubmitWeeklyReportInput,
+  WeeklyReportState
+} from '../types/weekly-report'
 
 const electronAPI = {
   // 当前运行平台，渲染进程可在首次渲染时同步读取。
@@ -335,6 +339,18 @@ const electronAPI = {
       ipcRenderer.removeListener('auth:expired', handler)
     }
   },
+
+  /**
+   * 读取飞书个人工作周报。
+   */
+  getWeeklyReport: (): Promise<WeeklyReportState> =>
+    ipcRenderer.invoke('weekly-report:get'),
+
+  /**
+   * 提交飞书个人工作周报。
+   */
+  submitWeeklyReport: (input: SubmitWeeklyReportInput): Promise<WeeklyReportState> =>
+    ipcRenderer.invoke('weekly-report:submit', input),
 
   /**
    * 读取当前 Meegle 用户负责的需求，并按迭代分组。

@@ -17,6 +17,7 @@ import { initializeRequirementBindings } from './requirement-bindings'
 import { initializeRequirements } from './requirements'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
+import { initializeWeeklyReport } from './weekly-report'
 import { createMainWindow, focusMainWindow, getMainWindow } from './window'
 
 // 单实例锁：确保同一时间只运行一个工作台实例。
@@ -54,6 +55,7 @@ if (!hasSingleInstanceLock) {
     initializeRepositories()
     initializeRequirements()
     initializeRequirementBindings()
+    initializeWeeklyReport()
     initializeAiConfig()
     createMainWindow()
 

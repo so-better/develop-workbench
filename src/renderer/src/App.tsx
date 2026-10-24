@@ -6,6 +6,7 @@ import EmbeddedBrowserPanel from './components/EmbeddedBrowserPanel'
 import EnvironmentSetup from './components/EnvironmentSetup'
 import RequirementWorkbench from './components/RequirementWorkbench'
 import SettingsModal from './components/SettingsModal'
+import WeeklyReport from './components/WeeklyReport'
 import { useEmbeddedDownloads } from './hooks/useEmbeddedDownloads'
 import type { AppInfo } from '../../types/app'
 import type { AuthExpiredEvent } from '../../types/auth'
@@ -40,6 +41,9 @@ export default function App(): JSX.Element {
   // 设置弹窗开关状态及打开时定位到的设置分类。
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('ai')
+  const [workspace, setWorkspace] = useState<'requirements' | 'weekly-report'>(
+    'requirements'
+  )
 
   // 内嵌浏览器下载状态统一由应用层维护，Footer 和浏览器面板共用。
   const { downloads, activeCount } = useEmbeddedDownloads()
@@ -229,7 +233,14 @@ export default function App(): JSX.Element {
               <Spin />
             </div>
           ) : environmentReady ? (
-            <RequirementWorkbench onOpenSettings={openSettings} />
+            workspace === 'weekly-report' ? (
+              <WeeklyReport onBack={() => setWorkspace('requirements')} />
+            ) : (
+              <RequirementWorkbench
+                onOpenSettings={openSettings}
+                onOpenWeeklyReport={() => setWorkspace('weekly-report')}
+              />
+            )
           ) : (
             <EnvironmentSetup
               meegleState={meegleState}

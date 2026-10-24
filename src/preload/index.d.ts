@@ -29,6 +29,10 @@ import type {
   UpdateRepositoryInput
 } from '../types/repository'
 import type { ThemeMode, ThemeState } from '../types/theme'
+import type {
+  SubmitWeeklyReportInput,
+  WeeklyReportState
+} from '../types/weekly-report'
 
 export interface ElectronAPI {
   platform: string
@@ -144,6 +148,10 @@ export interface ElectronAPI {
   onMeegleLoginEvent: (listener: (event: MeegleLoginEvent) => void) => () => void
   /** 订阅 CLI 授权过期事件，返回取消订阅函数。 */
   onAuthExpired: (listener: (event: AuthExpiredEvent) => void) => () => void
+  /** 读取飞书个人工作周报。 */
+  getWeeklyReport: () => Promise<WeeklyReportState>
+  /** 提交飞书个人工作周报。 */
+  submitWeeklyReport: (input: SubmitWeeklyReportInput) => Promise<WeeklyReportState>
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: () => Promise<MeegleMyRequirements>
   /** 读取用户可访问的 Meegle 空间。 */

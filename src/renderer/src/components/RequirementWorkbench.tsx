@@ -11,6 +11,7 @@ import {
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
+  FileTextOutlined,
   FolderOpenOutlined,
   InfoCircleOutlined,
   LinkOutlined,
@@ -64,6 +65,9 @@ import RequirementFlowchart from './RequirementFlowchart'
 interface RequirementWorkbenchProps {
   /** 打开设置弹窗，并定位到指定分类。 */
   onOpenSettings: (section: SettingsSection) => void
+
+  /** 打开飞书个人工作周报。 */
+  onOpenWeeklyReport: () => void
 }
 
 interface BasicInfoField {
@@ -389,7 +393,8 @@ const formatNodeActualTime = (
  * 左侧展示当前用户的需求，右侧暂时只保留需求头部信息。
  */
 export default function RequirementWorkbench({
-  onOpenSettings
+  onOpenSettings,
+  onOpenWeeklyReport
 }: RequirementWorkbenchProps): JSX.Element {
   const { message, notification } = App.useApp()
   const [data, setData] = useState<MeegleMyRequirements | null>(null)
@@ -2116,6 +2121,15 @@ export default function RequirementWorkbench({
             />
           </div>
         </div>
+
+        <button
+          type="button"
+          className="workbench-weekly-entry"
+          onClick={onOpenWeeklyReport}
+        >
+          <FileTextOutlined />
+          <span>个人工作周报</span>
+        </button>
 
         <div className="workbench-sidebar-heading">
           <span className="workbench-sidebar-title">
