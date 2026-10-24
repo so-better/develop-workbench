@@ -2106,6 +2106,53 @@ body {
   align-items: center;
 }
 
+.requirement-node-owner-select {
+  width: 100%;
+  min-width: 180px;
+}
+
+.requirement-node-owner-option {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.requirement-node-owner-option-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.requirement-node-owner-option-name {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-node-owner-option-email {
+  overflow: hidden;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-node-owner-tag-label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  min-width: 0;
+}
+
+.requirement-node-owner-tag-label > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .requirement-node-owner {
   display: inline-flex;
   gap: 6px;

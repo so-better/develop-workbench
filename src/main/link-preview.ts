@@ -83,16 +83,88 @@ const isPrivateIPv4 = (address: string): boolean => {
   )
 }
 
+const parseIPv6Hextets = (address: string): number[] | null => {
+  let value = address.toLowerCase().split('%')[0]
+  const ipv4Match = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(value)
+
+  if (ipv4Match) {
+    const parts = ipv4Match.slice(1, 5).map(Number)
+
+    if (parts.some((part) => part < 0 || part > 255)) return null
+
+    const high = ((parts[0] << 8) | parts[1]).toString(16)
+    const low = ((parts[2] << 8) | parts[3]).toString(16)
+
+    value = `${value.slice(0, ipv4Match.index)}${high}:${low}`
+  }
+
+  const compressed = value.includes('::')
+  const halves = value.split('::')
+
+  if (halves.length > 2) return null
+
+  const left = halves[0] ? halves[0].split(':') : []
+  const right = compressed && halves[1] ? halves[1].split(':') : []
+  const missing = 8 - left.length - right.length
+
+  if (missing < 0) return null
+
+  const hextets = compressed
+    ? [...left, ...Array<string>(missing).fill('0'), ...right]
+    : left
+
+  if (hextets.length !== 8) return null
+
+  return hextets.map((hex) => {
+    if (!/^[0-9a-f]{1,4}$/.test(hex)) return Number.NaN
+    return Number.parseInt(hex, 16)
+  })
+}
+
+const ipv4FromHextets = (high: number, low: number): string =>
+  `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`
+
 /**
  * 判断 IPv6 是否属于内网或保留地址。
  */
 const isPrivateIPv6 = (address: string): boolean => {
-  const value = address.toLowerCase()
+  const hextets = parseIPv6Hextets(address)
 
-  if (value === '::' || value === '::1') return true
-  if (value.startsWith('fc') || value.startsWith('fd')) return true
-  if (/^fe[89ab]/.test(value)) return true
-  if (value.startsWith('::ffff:')) return isPrivateIPv4(value.slice(7))
+  if (!hextets || hextets.some((value) => Number.isNaN(value))) return true
+
+  const [h0, h1, h2, h3, h4, h5, h6, h7] = hextets
+
+  if (hextets.every((value) => value === 0)) return true
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0 && h6 === 0 && h7 === 1) {
+    return true
+  }
+  if ((h0 & 0xfe00) === 0xfc00) return true
+  if ((h0 & 0xffc0) === 0xfe80) return true
+  if ((h0 & 0xffc0) === 0xfec0) return true
+  if ((h0 & 0xff00) === 0xff00) return true
+
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0) {
+    return true
+  }
+
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0xffff) {
+    return isPrivateIPv4(ipv4FromHextets(h6, h7))
+  }
+
+  if (
+    h0 === 0x64 &&
+    h1 === 0xff9b &&
+    h2 === 0 &&
+    h3 === 0 &&
+    h4 === 0 &&
+    h5 === 0
+  ) {
+    return isPrivateIPv4(ipv4FromHextets(h6, h7))
+  }
+
+  if (h0 === 0x2002) {
+    return isPrivateIPv4(ipv4FromHextets(h1, h2))
+  }
 
   return false
 }
@@ -149,7 +221,7 @@ const assertPublicUrl = async (url: URL): Promise<void> => {
     throw new Error('不允许访问该端口')
   }
 
-  const hostname = url.hostname.toLowerCase()
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, '')
 
   if (hostname === 'localhost' || hostname.endsWith('.local')) {
     throw new Error('不允许访问内网地址')

@@ -10,6 +10,7 @@ import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState }
 import type {
   MeegleMyRequirements,
   MeegleRequirementActivity,
+  MeegleRequirementOwner,
   UpdateNodeInfoInput
 } from '../types/requirements'
 import type {
@@ -204,6 +205,12 @@ const electronAPI = {
    */
   getMyRequirements: (): Promise<MeegleMyRequirements> =>
     ipcRenderer.invoke('requirements:get-my'),
+
+  /**
+   * 按姓名或邮箱搜索 Meegle 用户。
+   */
+  searchRequirementUsers: (keyword: string): Promise<MeegleRequirementOwner[]> =>
+    ipcRenderer.invoke('requirements:search-users', keyword),
 
   /**
    * 更新需求描述。

@@ -8,6 +8,7 @@ import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState }
 import type {
   MeegleMyRequirements,
   MeegleRequirementActivity,
+  MeegleRequirementOwner,
   UpdateNodeInfoInput
 } from '../types/requirements'
 import type {
@@ -87,6 +88,8 @@ export interface ElectronAPI {
   onMeegleLoginEvent: (listener: (event: MeegleLoginEvent) => void) => () => void
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: () => Promise<MeegleMyRequirements>
+  /** 按姓名或邮箱搜索 Meegle 用户。 */
+  searchRequirementUsers: (keyword: string) => Promise<MeegleRequirementOwner[]>
   /** 更新需求描述。 */
   updateRequirementDescription: (workItemId: string, content: string) => Promise<void>
   /** 读取需求的代码仓库绑定。 */

@@ -637,10 +637,7 @@ export const prepareRepositoryForIde = async (
         timeout: GIT_NETWORK_TIMEOUT_MS
       })
     } catch (error) {
-      const detail =
-        error instanceof Error
-          ? error.message.split(/\r?\n/)[0].trim().slice(0, 200)
-          : '未知错误'
+      const detail = getGitErrorMessage(error)
 
       try {
         if (currentBranch) {
@@ -651,10 +648,7 @@ export const prepareRepositoryForIde = async (
           throw new Error('没有可恢复的分支')
         }
       } catch (rollbackError) {
-        const rollbackDetail =
-          rollbackError instanceof Error
-            ? rollbackError.message.split(/\r?\n/)[0].trim().slice(0, 160)
-            : '未知错误'
+        const rollbackDetail = getGitErrorMessage(rollbackError)
 
         throw new Error(
           `拉取失败，且无法恢复到原分支 ${previousLabel || '未知'}：${rollbackDetail}`

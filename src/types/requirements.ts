@@ -280,6 +280,9 @@ export interface UpdateNodeInfoInput {
 
   /** 总实际工时。 */
   actualWorkTime?: number | null
+
+  /** 节点负责人 user_key 列表；传空数组表示清空负责人。 */
+  ownerUserKeys?: string[]
 }
 
 /**

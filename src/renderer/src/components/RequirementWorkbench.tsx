@@ -386,7 +386,12 @@ export default function RequirementWorkbench({
   const [nodeEditRange, setNodeEditRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [nodeEditPoints, setNodeEditPoints] = useState<number | null>(null)
   const [nodeEditActualWorkTime, setNodeEditActualWorkTime] = useState<number | null>(null)
+  const [nodeEditOwnerKeys, setNodeEditOwnerKeys] = useState<string[]>([])
+  const [nodeOwnerOptions, setNodeOwnerOptions] = useState<MeegleRequirementOwner[]>([])
+  const [nodeOwnerSearching, setNodeOwnerSearching] = useState(false)
   const [nodeEditSubmitting, setNodeEditSubmitting] = useState(false)
+  const nodeOwnerSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nodeOwnerSearchRequestRef = useRef(0)
 
   // 回滚弹窗。
   const [rollbackOpen, setRollbackOpen] = useState(false)
@@ -1212,11 +1217,104 @@ export default function RequirementWorkbench({
     setNodeEditRange(start?.isValid() && end?.isValid() ? [start, end] : null)
     setNodeEditPoints(selectedNode.points)
     setNodeEditActualWorkTime(selectedNode.actualWorkTime)
+    setNodeEditOwnerKeys(
+      selectedNode.owners.flatMap((owner) => (owner.userKey ? [owner.userKey] : []))
+    )
+    setNodeOwnerOptions(
+      selectedNode.owners.filter((owner): owner is MeegleRequirementOwner =>
+        Boolean(owner.userKey)
+      )
+    )
+    setNodeOwnerSearching(false)
+    nodeOwnerSearchRequestRef.current += 1
+
+    if (nodeOwnerSearchTimerRef.current) {
+      clearTimeout(nodeOwnerSearchTimerRef.current)
+      nodeOwnerSearchTimerRef.current = null
+    }
+
     setNodeEditing(true)
   }
 
+  useEffect(() => {
+    if (nodeEditing) return
+
+    if (nodeOwnerSearchTimerRef.current) {
+      clearTimeout(nodeOwnerSearchTimerRef.current)
+      nodeOwnerSearchTimerRef.current = null
+    }
+
+    nodeOwnerSearchRequestRef.current += 1
+    setNodeOwnerSearching(false)
+  }, [nodeEditing])
+
+  useEffect(
+    () => () => {
+      if (nodeOwnerSearchTimerRef.current) {
+        clearTimeout(nodeOwnerSearchTimerRef.current)
+      }
+
+      nodeOwnerSearchRequestRef.current += 1
+    },
+    []
+  )
+
   /**
-   * 保存节点排期、估分和实际工时。
+   * 防抖搜索节点负责人。
+   */
+  const handleNodeOwnerSearch = (keyword: string): void => {
+    const query = keyword.trim()
+    const requestId = nodeOwnerSearchRequestRef.current + 1
+
+    nodeOwnerSearchRequestRef.current = requestId
+
+    if (nodeOwnerSearchTimerRef.current) {
+      clearTimeout(nodeOwnerSearchTimerRef.current)
+      nodeOwnerSearchTimerRef.current = null
+    }
+
+    if (!query) {
+      setNodeOwnerSearching(false)
+      return
+    }
+
+    nodeOwnerSearchTimerRef.current = setTimeout(() => {
+      nodeOwnerSearchTimerRef.current = null
+      setNodeOwnerSearching(true)
+
+      window.electron
+        .searchRequirementUsers(query)
+        .then((owners) => {
+          if (nodeOwnerSearchRequestRef.current !== requestId) return
+
+          setNodeOwnerOptions((current) => {
+            const merged = new Map(
+              current.flatMap((owner) =>
+                owner.userKey ? [[owner.userKey, owner] as const] : []
+              )
+            )
+
+            for (const owner of owners) {
+              if (owner.userKey) merged.set(owner.userKey, owner)
+            }
+
+            return Array.from(merged.values())
+          })
+        })
+        .catch((searchError) => {
+          if (nodeOwnerSearchRequestRef.current !== requestId) return
+          message.error(getErrorMessage(searchError))
+        })
+        .finally(() => {
+          if (nodeOwnerSearchRequestRef.current === requestId) {
+            setNodeOwnerSearching(false)
+          }
+        })
+    }, 300)
+  }
+
+  /**
+   * 保存节点排期、估分、负责人和实际工时。
    */
   const handleSaveNodeInfo = async (): Promise<void> => {
     if (!selectedRequirementId || !selectedNode) return
@@ -1227,6 +1325,14 @@ export default function RequirementWorkbench({
       message.warning('修改估分前请先设置总排期')
       return
     }
+
+    const currentOwnerKeys = selectedNode.owners
+      .flatMap((owner) => (owner.userKey ? [owner.userKey] : []))
+      .sort()
+    const nextOwnerKeys = [...nodeEditOwnerKeys].sort()
+    const ownersChanged =
+      nextOwnerKeys.length !== currentOwnerKeys.length ||
+      nextOwnerKeys.some((key, index) => key !== currentOwnerKeys[index])
 
     setNodeEditSubmitting(true)
 
@@ -1250,7 +1356,8 @@ export default function RequirementWorkbench({
         startAt,
         endAt,
         points: nodeEditRange ? (nodeEditPoints ?? undefined) : undefined,
-        actualWorkTime: nodeEditActualWorkTime
+        actualWorkTime: nodeEditActualWorkTime,
+        ...(ownersChanged ? { ownerUserKeys: nextOwnerKeys } : {})
       })
       message.success('节点信息已更新')
       setNodeEditing(false)
@@ -2227,29 +2334,98 @@ export default function RequirementWorkbench({
 
                         <div className={`requirement-node-summary-card${nodeEditing ? ' is-editing' : ''}`}>
                           <div className="requirement-node-summary-block is-owner">
-                            <span className="requirement-node-summary-label">
-                              负责人 <em>*</em>
-                            </span>
-                            <div className="requirement-node-owner-list">
-                              {selectedNode.owners.length > 0 ? (
-                                selectedNode.owners.map((owner, index) => (
-                                  <span
-                                    className="requirement-node-owner"
-                                    key={`${owner.email ?? owner.name}-${index}`}
-                                  >
-                                    <Avatar
-                                      size={20}
-                                      src={owner.avatarUrl ?? undefined}
+                            <span className="requirement-node-summary-label">负责人</span>
+                            {nodeEditing ? (
+                              <Select
+                                mode="multiple"
+                                showSearch
+                                allowClear
+                                maxTagCount="responsive"
+                                className="requirement-node-owner-select"
+                                placeholder="搜索姓名片段或邮箱"
+                                value={nodeEditOwnerKeys}
+                                options={nodeOwnerOptions.flatMap((owner) =>
+                                  owner.userKey
+                                    ? [{ value: owner.userKey, label: owner.name }]
+                                    : []
+                                )}
+                                loading={nodeOwnerSearching}
+                                filterOption={false}
+                                notFoundContent={
+                                  nodeOwnerSearching ? '搜索中...' : '未找到用户'
+                                }
+                                optionRender={(option) => {
+                                  const owner = nodeOwnerOptions.find(
+                                    (item) => item.userKey === String(option.value)
+                                  )
+
+                                  if (!owner) return option.label
+
+                                  return (
+                                    <span className="requirement-node-owner-option">
+                                      <Avatar
+                                        size={24}
+                                        src={owner.avatarUrl ?? undefined}
+                                      >
+                                        {owner.name.slice(0, 1)}
+                                      </Avatar>
+                                      <span className="requirement-node-owner-option-copy">
+                                        <span className="requirement-node-owner-option-name">
+                                          {owner.name}
+                                        </span>
+                                        {owner.email ? (
+                                          <span className="requirement-node-owner-option-email">
+                                            {owner.email}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    </span>
+                                  )
+                                }}
+                                labelRender={(props) => {
+                                  const owner = nodeOwnerOptions.find(
+                                    (item) => item.userKey === String(props.value)
+                                  )
+
+                                  if (!owner) return props.label
+
+                                  return (
+                                    <span className="requirement-node-owner-tag-label">
+                                      <Avatar
+                                        size={16}
+                                        src={owner.avatarUrl ?? undefined}
+                                      >
+                                        {owner.name.slice(0, 1)}
+                                      </Avatar>
+                                      <span>{owner.name}</span>
+                                    </span>
+                                  )
+                                }}
+                                onChange={(value: string[]) => setNodeEditOwnerKeys(value)}
+                                onSearch={handleNodeOwnerSearch}
+                              />
+                            ) : (
+                              <div className="requirement-node-owner-list">
+                                {selectedNode.owners.length > 0 ? (
+                                  selectedNode.owners.map((owner, index) => (
+                                    <span
+                                      className="requirement-node-owner"
+                                      key={`${owner.email ?? owner.name}-${index}`}
                                     >
-                                      {owner.name.slice(0, 1)}
-                                    </Avatar>
-                                    {owner.name}
-                                  </span>
-                                ))
-                              ) : (
-                                <span className="requirement-node-summary-empty">未分配</span>
-                              )}
-                            </div>
+                                      <Avatar
+                                        size={20}
+                                        src={owner.avatarUrl ?? undefined}
+                                      >
+                                        {owner.name.slice(0, 1)}
+                                      </Avatar>
+                                      {owner.name}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="requirement-node-summary-empty">未分配</span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           <div className="requirement-node-summary-block">

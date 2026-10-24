@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { backupCorruptStoreSync } from './store-backup'
 import type { ThemeMode } from '../types/theme'
 import { isIdePresetId } from '../types/ide'
 import type { IdeConfig } from '../types/ide'
@@ -71,25 +72,49 @@ const getPreferencesPath = (): string => join(app.getPath('userData'), 'preferen
 const readPreferences = (): AppPreferences => {
   if (cachedPreferences) return cachedPreferences
 
+  let raw: string
+
   try {
-    const raw = readFileSync(getPreferencesPath(), 'utf8')
-    const parsed = JSON.parse(raw) as {
-      theme?: unknown
-      larkCliPath?: unknown
-      meegleCliPath?: unknown
-      repositoryRoot?: unknown
-      ide?: unknown
+    raw = readFileSync(getPreferencesPath(), 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      cachedPreferences = { ...DEFAULT_PREFERENCES }
+      return cachedPreferences
     }
 
-    cachedPreferences = {
-      theme: isThemeMode(parsed.theme) ? parsed.theme : DEFAULT_PREFERENCES.theme,
-      larkCliPath: normalizePath(parsed.larkCliPath),
-      meegleCliPath: normalizePath(parsed.meegleCliPath),
-      repositoryRoot: normalizePath(parsed.repositoryRoot),
-      ide: isIdeConfig(parsed.ide) ? parsed.ide : undefined
-    }
+    throw error
+  }
+
+  let parsed: unknown
+
+  try {
+    parsed = JSON.parse(raw)
   } catch {
+    backupCorruptStoreSync(getPreferencesPath())
     cachedPreferences = { ...DEFAULT_PREFERENCES }
+    return cachedPreferences
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    backupCorruptStoreSync(getPreferencesPath())
+    cachedPreferences = { ...DEFAULT_PREFERENCES }
+    return cachedPreferences
+  }
+
+  const value = parsed as {
+    theme?: unknown
+    larkCliPath?: unknown
+    meegleCliPath?: unknown
+    repositoryRoot?: unknown
+    ide?: unknown
+  }
+
+  cachedPreferences = {
+    theme: isThemeMode(value.theme) ? value.theme : DEFAULT_PREFERENCES.theme,
+    larkCliPath: normalizePath(value.larkCliPath),
+    meegleCliPath: normalizePath(value.meegleCliPath),
+    repositoryRoot: normalizePath(value.repositoryRoot),
+    ide: isIdeConfig(value.ide) ? value.ide : undefined
   }
 
   return cachedPreferences

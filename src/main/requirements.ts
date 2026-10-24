@@ -173,11 +173,29 @@ interface UserSearchUser {
   avatar_url?: string
 }
 
+interface TeamListResponse {
+  data?: Array<{
+    team_id?: string
+    team_name?: string
+    parent_team_ids?: string[]
+    status?: string
+  }> | null
+  error?: CliError
+}
+
+interface TeamMemberResponse {
+  members?: string[] | null
+  error?: CliError
+}
+
 /** 需求查询可能比登录状态查询慢，使用更宽松的超时时间。 */
 const MEEGLE_QUERY_TIMEOUT_MS = 30_000
 
 /** Meegle 空间信息缓存时长，避免每次刷新都重复查询。 */
 const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000
+
+/** 空间团队列表缓存时长。 */
+const TEAM_CACHE_TTL_MS = 10 * 60 * 1000
 
 /** MQL 单页固定 50 条，最多读取 20 页，避免异常分页导致死循环。 */
 const MQL_PAGE_SIZE = 50
@@ -194,6 +212,13 @@ const userCache = new Map<string, MeegleRequirementOwner>()
 
 /** 按邮箱缓存用户信息，用于补齐 MQL 人员字段的头像。 */
 const emailUserCache = new Map<string, MeegleRequirementOwner>()
+
+/** 空间根团队缓存，用于模糊搜索成员。 */
+let cachedRootTeams: {
+  projectKey: string
+  expiresAt: number
+  teamIds: string[]
+} | null = null
 
 /**
  * 解析 CLI JSON 输出，并把服务端错误转为可读异常。
@@ -592,17 +617,24 @@ const fetchMqlRows = async (project: MeegleProject, mql: string): Promise<MoqlRo
   const response = parseCommandJson<MoqlResponse>(result, '读取需求列表')
   const rows = [...getRows(response)]
   const total = response.list?.[0]?.count ?? rows.length
+
+  if (rows.length >= total) return rows
+
   const sessionId = response.session_id
+
+  if (!sessionId) {
+    throw new Error(`需求列表未完整加载：已读取 ${rows.length}/${total} 条`)
+  }
+
   const groupId = response.list?.[0]?.group_infos?.[0]?.group_id ?? '1'
-  const totalPages = Math.ceil(total / MQL_PAGE_SIZE)
+  const pageSize = rows.length || MQL_PAGE_SIZE
+  const totalPages = Math.ceil(total / pageSize)
 
   if (totalPages > MAX_MQL_PAGES) {
     throw new Error(
-      `需求数量超过 ${MAX_MQL_PAGES * MQL_PAGE_SIZE} 条，暂时无法全部加载`
+      `需求数量超过 ${MAX_MQL_PAGES * pageSize} 条，暂时无法全部加载`
     )
   }
-
-  if (!sessionId || totalPages <= 1) return rows
 
   for (let page = 2; page <= totalPages; page += 1) {
     const pageResult = await runMeegle(
@@ -625,6 +657,10 @@ const fetchMqlRows = async (project: MeegleProject, mql: string): Promise<MoqlRo
     rows.push(...getRows(pageResponse))
 
     if (rows.length >= total) break
+  }
+
+  if (rows.length < total) {
+    throw new Error(`需求列表未完整加载：已读取 ${rows.length}/${total} 条`)
   }
 
   return rows
@@ -910,6 +946,174 @@ const resolveUsers = async (
   }
 
   return result
+}
+
+const fetchRootTeamIds = async (project: MeegleProject): Promise<string[]> => {
+  if (
+    cachedRootTeams &&
+    cachedRootTeams.projectKey === project.projectKey &&
+    cachedRootTeams.expiresAt > Date.now()
+  ) {
+    return cachedRootTeams.teamIds
+  }
+
+  const result = await runMeegle(
+    ['team', 'list', '--project-key', project.key, '--format', 'json'],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+  const response = parseCommandJson<TeamListResponse>(result, '读取空间团队')
+  const teams = response.data ?? []
+  const rootTeams = teams.filter(
+    (team) =>
+      team.team_id &&
+      team.status !== 'Disabled' &&
+      (team.parent_team_ids?.length ?? 0) === 0
+  )
+  const teamIds = Array.from(
+    new Set(
+      (rootTeams.length > 0 ? rootTeams : teams)
+        .map((team) => team.team_id)
+        .filter((teamId): teamId is string => Boolean(teamId))
+    )
+  )
+
+  cachedRootTeams = {
+    projectKey: project.projectKey,
+    expiresAt: Date.now() + TEAM_CACHE_TTL_MS,
+    teamIds
+  }
+
+  return teamIds
+}
+
+const searchTeamMemberKeys = async (
+  project: MeegleProject,
+  query: string
+): Promise<string[]> => {
+  const teamIds = await fetchRootTeamIds(project)
+  const results = await Promise.allSettled(
+    teamIds.map(async (teamId) => {
+      const result = await runMeegle(
+        [
+          'team',
+          'list-members',
+          '--project-key',
+          project.key,
+          '--team-id',
+          teamId,
+          '--include-sub-teams',
+          '--query',
+          query,
+          '--format',
+          'json'
+        ],
+        MEEGLE_QUERY_TIMEOUT_MS
+      )
+      const response = parseCommandJson<TeamMemberResponse>(
+        result,
+        '搜索团队成员'
+      )
+
+      return response.members ?? []
+    })
+  )
+  const keys = new Set<string>()
+  let firstError: unknown = null
+
+  for (const result of results) {
+    if (result.status === 'fulfilled') {
+      for (const key of result.value) {
+        if (key) keys.add(key)
+      }
+    } else if (firstError === null) {
+      firstError = result.reason
+    }
+  }
+
+  if (teamIds.length > 0 && results.every((result) => result.status === 'rejected')) {
+    throw firstError
+  }
+
+  return Array.from(keys)
+}
+
+const searchExactUsers = async (
+  project: MeegleProject,
+  query: string
+): Promise<MeegleRequirementOwner[]> => {
+  const result = await runMeegle(
+    [
+      'user',
+      'search',
+      '--project-key',
+      project.key,
+      '--user-keys',
+      query,
+      '--format',
+      'json'
+    ],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+  const users = parseCommandJson<UserSearchUser[]>(result, '搜索用户')
+  const owners = new Map<string, MeegleRequirementOwner>()
+
+  for (const user of users) {
+    const owner = toOwner(user)
+
+    if (!owner) continue
+
+    const key = owner.userKey ?? owner.email ?? owner.name
+
+    owners.set(key, owner)
+  }
+
+  return Array.from(owners.values())
+}
+
+/**
+ * 按姓名片段、完整姓名、邮箱或 user_key 搜索 Meegle 用户。
+ */
+export const searchRequirementUsers = async (
+  keyword: string
+): Promise<MeegleRequirementOwner[]> => {
+  const query = keyword.trim()
+
+  if (!query) return []
+  if (query.length > 100) throw new Error('搜索关键词过长')
+
+  const project = await getProject()
+  const [exactResult, memberResult] = await Promise.allSettled([
+    searchExactUsers(project, query),
+    searchTeamMemberKeys(project, query)
+  ])
+  const owners = new Map<string, MeegleRequirementOwner>()
+  let firstError: unknown = null
+
+  if (exactResult.status === 'fulfilled') {
+    for (const owner of exactResult.value) {
+      const key = owner.userKey ?? owner.email ?? owner.name
+
+      owners.set(key, owner)
+    }
+  } else {
+    firstError = exactResult.reason
+  }
+
+  if (memberResult.status === 'fulfilled') {
+    const resolved = await resolveUsers(project, memberResult.value)
+
+    for (const [key, owner] of resolved) {
+      if (!owners.has(key)) owners.set(key, owner)
+    }
+  } else if (firstError === null) {
+    firstError = memberResult.reason
+  }
+
+  if (owners.size === 0 && firstError !== null) {
+    throw firstError
+  }
+
+  return Array.from(owners.values())
 }
 
 /**
@@ -1246,8 +1450,8 @@ export const transitionRequirementNode = async (
 }
 
 /**
- * 更新节点排期、估分和实际工时。
- * update-node 不支持一次修改多个类别，因此拆成两次调用。
+ * 更新节点排期、估分、负责人和实际工时。
+ * update-node 不支持一次修改多个类别，因此拆成多次调用。
  */
 export const updateRequirementNode = async (
   workItemId: string,
@@ -1257,6 +1461,24 @@ export const updateRequirementNode = async (
   if (!/^\d+$/.test(workItemId)) throw new Error('需求 ID 不合法')
   if (!nodeId.trim()) throw new Error('节点 ID 不合法')
 
+  if (
+    input.ownerUserKeys !== undefined &&
+    (!Array.isArray(input.ownerUserKeys) ||
+      input.ownerUserKeys.some((key) => typeof key !== 'string'))
+  ) {
+    throw new Error('节点负责人参数不合法')
+  }
+
+  const hasOwners = input.ownerUserKeys !== undefined
+  const ownerUserKeys = hasOwners
+    ? Array.from(
+        new Set(
+          (input.ownerUserKeys ?? [])
+            .map((key) => key.trim())
+            .filter(Boolean)
+        )
+      )
+    : []
   const hasSchedule = input.startAt !== undefined || input.endAt !== undefined
 
   if (hasSchedule) {
@@ -1278,7 +1500,7 @@ export const updateRequirementNode = async (
     throw new Error('实际工时不能小于 0')
   }
 
-  if (!hasSchedule && input.actualWorkTime === undefined) {
+  if (!hasSchedule && input.actualWorkTime === undefined && !hasOwners) {
     throw new Error('没有需要更新的节点信息')
   }
 
@@ -1313,6 +1535,26 @@ export const updateRequirementNode = async (
     )
 
     ensureWriteSuccess(scheduleResult, '更新节点排期')
+  }
+
+  if (hasOwners) {
+    const ownerArgs = [
+      'workflow',
+      'update-node',
+      '--project-key',
+      project.key,
+      '--work-item-id',
+      workItemId,
+      '--node-id',
+      nodeId,
+      '--node-owners',
+      ...(ownerUserKeys.length > 0 ? ownerUserKeys : ['']),
+      '--format',
+      'json'
+    ]
+    const ownerResult = await runMeegle(ownerArgs, MEEGLE_QUERY_TIMEOUT_MS)
+
+    ensureWriteSuccess(ownerResult, '更新节点负责人')
   }
 
   if (input.actualWorkTime !== undefined) {
@@ -1386,6 +1628,10 @@ export const getMyRequirements = async (): Promise<MeegleMyRequirements> => {
  */
 export const initializeRequirements = (): void => {
   ipcMain.handle('requirements:get-my', () => getMyRequirements())
+  ipcMain.handle('requirements:search-users', (_event, keyword: unknown) => {
+    if (typeof keyword !== 'string') throw new Error('搜索关键词不合法')
+    return searchRequirementUsers(keyword)
+  })
   ipcMain.handle(
     'requirements:update-description',
     (_event, workItemId: unknown, content: unknown) => {
