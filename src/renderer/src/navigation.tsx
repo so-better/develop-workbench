@@ -1,0 +1,37 @@
+import { FileTextOutlined, ProjectOutlined } from '@ant-design/icons'
+import type { SettingsSection } from '../../types/settings'
+import RequirementWorkbench from './components/RequirementWorkbench'
+import WeeklyReport from './components/WeeklyReport'
+
+interface PageRenderContext {
+  onOpenSettings: (section: SettingsSection) => void
+}
+
+interface AppPageDefinition {
+  label: string
+  icon: JSX.Element
+  render: (context: PageRenderContext) => JSX.Element
+}
+
+/**
+ * 应用一级页面注册表。
+ * 新增页面时只在这里补充页面定义。
+ */
+export const APP_PAGES = [
+  {
+    key: 'requirements',
+    label: '需求',
+    icon: <ProjectOutlined />,
+    render: ({ onOpenSettings }) => (
+      <RequirementWorkbench onOpenSettings={onOpenSettings} />
+    )
+  },
+  {
+    key: 'weekly-report',
+    label: '周报',
+    icon: <FileTextOutlined />,
+    render: () => <WeeklyReport />
+  }
+] as const satisfies ReadonlyArray<AppPageDefinition & { key: string }>
+
+export type AppPage = (typeof APP_PAGES)[number]['key']

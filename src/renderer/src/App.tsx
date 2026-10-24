@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { App as AntdApp, Modal, Spin } from 'antd'
 import AppFooter from './components/AppFooter'
+import AppNavigation from './components/AppNavigation'
+import { APP_PAGES } from './navigation'
+import type { AppPage } from './navigation'
 import EmbeddedBrowserDownloads from './components/EmbeddedBrowserDownloads'
 import EmbeddedBrowserPanel from './components/EmbeddedBrowserPanel'
 import EnvironmentSetup from './components/EnvironmentSetup'
-import RequirementWorkbench from './components/RequirementWorkbench'
 import SettingsModal from './components/SettingsModal'
-import WeeklyReport from './components/WeeklyReport'
 import { useEmbeddedDownloads } from './hooks/useEmbeddedDownloads'
 import type { AppInfo } from '../../types/app'
 import type { AuthExpiredEvent } from '../../types/auth'
@@ -41,8 +42,9 @@ export default function App(): JSX.Element {
   // 设置弹窗开关状态及打开时定位到的设置分类。
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('ai')
-  const [workspace, setWorkspace] = useState<'requirements' | 'weekly-report'>(
-    'requirements'
+  const [workspace, setWorkspace] = useState<AppPage>('requirements')
+  const [visitedPages, setVisitedPages] = useState<Set<AppPage>>(
+    () => new Set<AppPage>(['requirements'])
   )
 
   // 内嵌浏览器下载状态统一由应用层维护，Footer 和浏览器面板共用。
@@ -194,6 +196,17 @@ export default function App(): JSX.Element {
     }
   }, [message, refreshEnvironment])
 
+  const handlePageChange = useCallback((page: AppPage): void => {
+    setVisitedPages((current) => {
+      if (current.has(page)) return current
+
+      const next = new Set(current)
+      next.add(page)
+      return next
+    })
+    setWorkspace(page)
+  }, [])
+
   const handleOpenDownloads = (): void => {
     if (browserVisible) {
       setDownloadsPanelOpen((value) => !value)
@@ -225,6 +238,10 @@ export default function App(): JSX.Element {
   return (
     <div className="app-shell">
       <div className="app-body">
+        {environmentReady && !environmentLoading ? (
+          <AppNavigation activePage={workspace} onChange={handlePageChange} />
+        ) : null}
+
         <main
           className={`workspace-canvas${environmentReady && !environmentLoading ? ' workspace-canvas--workbench' : ''}`}
         >
@@ -233,14 +250,16 @@ export default function App(): JSX.Element {
               <Spin />
             </div>
           ) : environmentReady ? (
-            workspace === 'weekly-report' ? (
-              <WeeklyReport onBack={() => setWorkspace('requirements')} />
-            ) : (
-              <RequirementWorkbench
-                onOpenSettings={openSettings}
-                onOpenWeeklyReport={() => setWorkspace('weekly-report')}
-              />
-            )
+            APP_PAGES.filter((page) => visitedPages.has(page.key)).map((page) => (
+              <div
+                key={page.key}
+                className="app-page"
+                hidden={workspace !== page.key}
+                aria-hidden={workspace !== page.key}
+              >
+                {page.render({ onOpenSettings: openSettings })}
+              </div>
+            ))
           ) : (
             <EnvironmentSetup
               meegleState={meegleState}

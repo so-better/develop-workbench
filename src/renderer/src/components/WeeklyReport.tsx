@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import {
-  ArrowLeftOutlined,
   LinkOutlined,
   ReloadOutlined,
   SendOutlined
@@ -13,10 +12,6 @@ import type {
   WeeklyReportState
 } from '../../../types/weekly-report'
 import RichTextEditor from './RichTextEditor'
-
-interface WeeklyReportProps {
-  onBack: () => void
-}
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : '周报加载失败'
@@ -31,9 +26,7 @@ const toDraft = (field: WeeklyReportField): RichTextContent => ({
  * 飞书个人工作周报。
  * 使用内嵌浏览器登录态读取和提交 OA 汇报接口。
  */
-export default function WeeklyReport({
-  onBack
-}: WeeklyReportProps): JSX.Element {
+export default function WeeklyReport(): JSX.Element {
   const { message, modal } = App.useApp()
   const [state, setState] = useState<WeeklyReportState | null>(null)
   const [drafts, setDrafts] = useState<Record<string, RichTextContent>>({})
@@ -138,16 +131,6 @@ export default function WeeklyReport({
     <div className="weekly-report-page">
       <header className="weekly-report-header">
         <div className="weekly-report-header-main">
-          <Button
-            type="text"
-            size="small"
-            className="weekly-report-back"
-            icon={<ArrowLeftOutlined />}
-            onClick={onBack}
-          >
-            返回需求
-          </Button>
-
           <div className="weekly-report-heading">
             <span className="weekly-report-eyebrow">飞书汇报 / 个人工作周报</span>
             <div className="weekly-report-title-row">

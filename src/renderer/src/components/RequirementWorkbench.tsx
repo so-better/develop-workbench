@@ -11,7 +11,6 @@ import {
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
-  FileTextOutlined,
   FolderOpenOutlined,
   InfoCircleOutlined,
   LinkOutlined,
@@ -20,7 +19,6 @@ import {
   NodeExpandOutlined,
   PlusOutlined,
   ReloadOutlined,
-  RightOutlined,
   RollbackOutlined,
   SearchOutlined,
   TagOutlined
@@ -66,9 +64,6 @@ import RequirementFlowchart from './RequirementFlowchart'
 interface RequirementWorkbenchProps {
   /** 打开设置弹窗，并定位到指定分类。 */
   onOpenSettings: (section: SettingsSection) => void
-
-  /** 打开飞书个人工作周报。 */
-  onOpenWeeklyReport: () => void
 }
 
 interface BasicInfoField {
@@ -394,8 +389,7 @@ const formatNodeActualTime = (
  * 左侧展示当前用户的需求，右侧暂时只保留需求头部信息。
  */
 export default function RequirementWorkbench({
-  onOpenSettings,
-  onOpenWeeklyReport
+  onOpenSettings
 }: RequirementWorkbenchProps): JSX.Element {
   const { message, notification } = App.useApp()
   const [data, setData] = useState<MeegleMyRequirements | null>(null)
@@ -2130,7 +2124,6 @@ export default function RequirementWorkbench({
       {/* 左侧：当前用户负责的需求，按所属迭代分组。 */}
       <aside className="workbench-sidebar">
         <div className="workbench-brand">
-          <div className="workbench-brand-mark">W</div>
           <div className="workbench-brand-text">
             <strong>研发工作台</strong>
             <Select
@@ -2148,21 +2141,6 @@ export default function RequirementWorkbench({
             />
           </div>
         </div>
-
-        <button
-          type="button"
-          className="workbench-weekly-entry"
-          onClick={onOpenWeeklyReport}
-        >
-          <span className="workbench-weekly-entry-icon">
-            <FileTextOutlined />
-          </span>
-          <span className="workbench-weekly-entry-copy">
-            <strong>个人工作周报</strong>
-            <span>填写并提交飞书周报</span>
-          </span>
-          <RightOutlined className="workbench-weekly-entry-arrow" />
-        </button>
 
         <div className="workbench-sidebar-heading">
           <span className="workbench-sidebar-title">
