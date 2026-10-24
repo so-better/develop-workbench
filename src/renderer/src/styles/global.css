@@ -2489,8 +2489,33 @@ body {
 
 .requirement-repo-heading-title {
   display: flex;
+  flex: 1;
   gap: 8px;
   align-items: center;
+  min-width: 0;
+}
+
+.requirement-repo-description {
+  display: inline-flex;
+  flex: 1;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  padding-left: 8px;
+  overflow: hidden;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-left: 1px solid var(--workbench-divider);
+}
+
+.requirement-repo-description .anticon {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.8;
 }
 
 .requirement-repo-heading-title h2 {
@@ -2526,8 +2551,17 @@ body {
 }
 
 .requirement-repo-refresh {
-  width: 26px;
-  padding: 0;
+  padding: 0 7px;
+}
+
+.requirement-repo-submit.ant-btn {
+  height: 24px;
+  min-width: 52px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  box-shadow: none;
 }
 
 .requirement-repo-add .ant-skeleton {

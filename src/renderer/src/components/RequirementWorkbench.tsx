@@ -2365,6 +2365,13 @@ export default function RequirementWorkbench({
                         {bindings.length} 个仓库
                       </span>
                     ) : null}
+                    <span
+                      className="requirement-repo-description"
+                      title="仅用于在工作台关联需求与代码仓库/分支，方便快速开发、提升效率"
+                    >
+                      <InfoCircleOutlined />
+                      仅用于关联需求与代码分支，方便快速开发
+                    </span>
                   </div>
                   <div className="requirement-repo-heading-actions">
                     <Tooltip title="刷新仓库和分支">
@@ -2378,7 +2385,9 @@ export default function RequirementWorkbench({
                         }
                         aria-label="刷新仓库和分支"
                         onClick={() => refreshBindings()}
-                      />
+                      >
+                        刷新
+                      </Button>
                     </Tooltip>
                     {bindings.length > 0 ? (
                       <Button
@@ -2712,6 +2721,7 @@ export default function RequirementWorkbench({
                               <Button
                                 type="primary"
                                 size="small"
+                                className="requirement-repo-submit"
                                 loading={bindingSaving}
                                 disabled={
                                   !newRepositoryId ||
