@@ -43,13 +43,13 @@ const NODE_CONTENT_PADDING = 45
 
 /**
  * 根据节点名称估算宽度。
- * 中文字符按 13px、其他字符按 7.5px 估算，并限制在合理范围内。
+ * 中文字符按 13px、其他字符按 8px 估算，并限制在合理范围内。
  */
 const measureNodeWidth = (name: string): number => {
   const textWidth = Array.from(name).reduce((width, character) => {
     const isCjk = /[\u2e80-\u9fff\uff00-\uffef]/.test(character)
 
-    return width + (isCjk ? 13 : 7.5)
+    return width + (isCjk ? 13 : 8)
   }, 0)
 
   return Math.min(

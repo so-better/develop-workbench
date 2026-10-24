@@ -377,9 +377,22 @@ const getApiHeaders = async (
 }
 
 const getCsrfToken = async (): Promise<string> => {
+  const browserSession = getBrowserSession()
+  const cookies = await browserSession.cookies.get({
+    url: 'https://oa.feishu.cn/'
+  })
+  const cookieToken = cookies.find(
+    (cookie) => cookie.name === 'lgw_csrf_token'
+  )?.value
+
+  // 优先使用浏览器页面当前持有的 token，避免请求头和 Cookie 不一致。
+  if (cookieToken) {
+    cachedCsrfToken = cookieToken
+    return cookieToken
+  }
+
   if (cachedCsrfToken) return cachedCsrfToken
 
-  const browserSession = getBrowserSession()
   const cookieHeader = await getCookieHeader('https://www.feishu.cn/')
   let responseToken: string | null = null
 
@@ -400,12 +413,7 @@ const getCsrfToken = async (): Promise<string> => {
     // 已有 Cookie 时继续尝试直接读取。
   }
 
-  const cookies = await browserSession.cookies.get({
-    url: 'https://oa.feishu.cn/'
-  })
-  const token =
-    responseToken ??
-    cookies.find((cookie) => cookie.name === 'lgw_csrf_token')?.value
+  const token = responseToken
 
   if (!token) {
     throw new WeeklyReportAuthRequiredError('需要登录飞书周报')
@@ -428,10 +436,16 @@ const apiPost = async <T>(
   }
 
   const csrfToken = withCsrf ? await getCsrfToken() : undefined
-  const requestCookieHeader =
-    csrfToken && !/(^|;\s*)lgw_csrf_token=/.test(cookieHeader)
-      ? `${cookieHeader}; lgw_csrf_token=${csrfToken}`
-      : cookieHeader
+  const cookieWithoutCsrf = cookieHeader
+    .replace(/(^|;\s*)lgw_csrf_token=[^;]*/g, '$1')
+    .replace(/;\s*;+/g, ';')
+    .replace(/^;\s*|;\s*$/g, '')
+    .trim()
+  const requestCookieHeader = csrfToken
+    ? [cookieWithoutCsrf, `lgw_csrf_token=${csrfToken}`]
+        .filter(Boolean)
+        .join('; ')
+    : cookieHeader
   const response = await fetch(`${REPORT_API_BASE}/${endpoint}`, {
     method: 'POST',
     headers: {

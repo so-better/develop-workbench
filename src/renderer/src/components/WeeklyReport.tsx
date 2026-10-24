@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import {
   ArrowLeftOutlined,
+  LinkOutlined,
   ReloadOutlined,
   SendOutlined
 } from '@ant-design/icons'
-import { Alert, App, Button, Empty, Skeleton, Tag } from 'antd'
+import { Alert, App, Button, Empty, Skeleton, Tag, Tooltip } from 'antd'
 import type { RichTextContent } from '../../../types/rich-text'
 import type {
   WeeklyReportField,
@@ -68,6 +69,16 @@ export default function WeeklyReport({
 
   const textFields =
     state?.fields.filter((field) => field.component === 'text') ?? []
+
+  const reportUrl = state?.reportId
+    ? `https://oa.feishu.cn/report/record/detail?reportId=${encodeURIComponent(
+        state.reportId
+      )}&editMode=true`
+    : state
+      ? `https://oa.feishu.cn/report/record/detail?ruleId=${encodeURIComponent(
+          state.ruleId
+        )}&editMode=true`
+      : 'https://oa.feishu.cn/report/record/entry'
 
   const handleSubmit = (): void => {
     if (!state || submitting) return
@@ -160,7 +171,21 @@ export default function WeeklyReport({
         </div>
 
         <div className="weekly-report-header-actions">
+          <Tooltip title={reportUrl}>
+            <Button
+              type="text"
+              size="small"
+              className="weekly-report-header-link"
+              icon={<LinkOutlined />}
+              onClick={() => void window.electron.openEmbeddedBrowser(reportUrl)}
+            >
+              飞书周报
+            </Button>
+          </Tooltip>
           <Button
+            type="text"
+            size="small"
+            className="weekly-report-header-refresh"
             icon={<ReloadOutlined />}
             loading={loading}
             onClick={() => void load()}

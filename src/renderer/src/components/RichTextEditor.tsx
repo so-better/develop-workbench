@@ -73,14 +73,77 @@ const normalizeFeishuListHtml = (html: string): string => {
   return root.innerHTML
 }
 
+const TOOLBAR_LABELS: Record<string, string> = {
+  bold: '加粗',
+  italic: '斜体',
+  underline: '下划线',
+  strike: '删除线',
+  blockquote: '引用',
+  link: '链接'
+}
+
+/**
+ * Quill 默认没有中文工具提示，补齐按钮和链接编辑弹层的本地化。
+ */
+const localizeToolbar = (root: HTMLElement): void => {
+  const toolbar = root.querySelector<HTMLElement>('.ql-toolbar')
+
+  if (!toolbar) return
+
+  toolbar.setAttribute('aria-label', '富文本格式工具')
+
+  for (const button of Array.from(toolbar.querySelectorAll('button'))) {
+    const classes = Array.from(button.classList)
+    const format = classes
+      .find((className) => className.startsWith('ql-') && className !== 'ql-active')
+      ?.slice(3)
+    const listValue = button.getAttribute('value')
+    const label = format === 'list'
+      ? listValue === 'ordered'
+        ? '有序列表'
+        : '无序列表'
+      : format
+        ? TOOLBAR_LABELS[format]
+        : undefined
+
+    if (!label) continue
+
+    button.setAttribute('title', label)
+    button.setAttribute('aria-label', label)
+  }
+
+  for (const picker of Array.from(toolbar.querySelectorAll('.ql-picker'))) {
+    const label = picker.querySelector<HTMLElement>('.ql-picker-label')
+
+    if (!label) continue
+
+    const text = picker.classList.contains('ql-color')
+      ? '文字颜色'
+      : picker.classList.contains('ql-background')
+        ? '背景色'
+        : null
+
+    if (!text) continue
+
+    label.setAttribute('title', text)
+    label.setAttribute('aria-label', text)
+  }
+
+  const linkInput = root.querySelector<HTMLInputElement>(
+    '.ql-tooltip input[type="text"]'
+  )
+
+  if (linkInput) {
+    linkInput.setAttribute('data-link', '请输入链接地址')
+    linkInput.setAttribute('aria-label', '链接地址')
+  }
+}
+
 const TOOLBAR_OPTIONS = [
-  [{ header: [1, 2, 3, false] }],
   ['bold', 'italic', 'underline', 'strike'],
   [{ color: [] }, { background: [] }],
   [{ list: 'ordered' }, { list: 'bullet' }],
-  ['blockquote', 'code-block'],
-  ['link'],
-  ['clean']
+  ['blockquote', 'link']
 ]
 
 /**
@@ -129,6 +192,7 @@ export default function RichTextEditor({
     })
 
     quillRef.current = quill
+    if (wrapperRef.current) localizeToolbar(wrapperRef.current)
     suppressChangeRef.current = true
 
     if (value.trim()) {

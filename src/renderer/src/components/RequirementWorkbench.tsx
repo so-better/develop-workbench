@@ -20,6 +20,7 @@ import {
   NodeExpandOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RightOutlined,
   RollbackOutlined,
   SearchOutlined,
   TagOutlined
@@ -406,6 +407,7 @@ export default function RequirementWorkbench({
   const [error, setError] = useState<string | null>(null)
   const [requirementFilter, setRequirementFilter] = useState('')
   const [statusFilters, setStatusFilters] = useState<string[]>([])
+  const [iterationFilter, setIterationFilter] = useState<string | null>(null)
 
   // 默认全部展开，只记录被用户主动收起的迭代。
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(() => new Set())
@@ -842,6 +844,7 @@ export default function RequirementWorkbench({
       setSelectedRequirementId(null)
       setRequirementFilter('')
       setStatusFilters([])
+      setIterationFilter(null)
       setCollapsedGroupKeys(new Set())
       setActivity(null)
       setBindings([])
@@ -1822,8 +1825,18 @@ export default function RequirementWorkbench({
       }))
   }, [allRequirements])
 
+  /** 迭代筛选选项。 */
+  const iterationOptions = useMemo(
+    () =>
+      (data?.groups ?? []).map((group) => ({
+        value: group.key,
+        label: `${group.iterationName}（${group.requirements.length}）`
+      })),
+    [data]
+  )
+
   /**
-   * 先按状态筛选，再按需求名称、状态或迭代名称搜索。
+   * 先限制迭代范围，再按状态筛选，最后按需求名称、状态或迭代名称搜索。
    * 迭代名称命中时，保留该迭代下符合状态条件的全部需求。
    */
   const filteredGroups = useMemo(() => {
@@ -1831,7 +1844,11 @@ export default function RequirementWorkbench({
 
     const selectedStatuses = new Set(statusFilters)
 
-    return (data?.groups ?? []).flatMap((group) => {
+    const scopedGroups = iterationFilter
+      ? (data?.groups ?? []).filter((group) => group.key === iterationFilter)
+      : data?.groups ?? []
+
+    return scopedGroups.flatMap((group) => {
       const statusFiltered =
         selectedStatuses.size > 0
           ? group.requirements.filter((requirement) =>
@@ -1859,11 +1876,21 @@ export default function RequirementWorkbench({
 
       return requirements.length > 0 ? [{ ...group, requirements }] : []
     })
-  }, [data, requirementFilter, statusFilters])
+  }, [data, iterationFilter, requirementFilter, statusFilters])
 
-  /** 是否存在有效搜索词或状态筛选。 */
+  /** 当前筛选的迭代不存在时自动恢复全部迭代。 */
+  useEffect(() => {
+    if (!iterationFilter || !data) return
+
+    if (!data.groups.some((group) => group.key === iterationFilter)) {
+      setIterationFilter(null)
+    }
+  }, [data, iterationFilter])
+
+  /** 是否存在有效搜索词、状态或迭代筛选。 */
   const hasSearch = requirementFilter.trim().length > 0
-  const hasActiveFilter = hasSearch || statusFilters.length > 0
+  const hasActiveFilter =
+    hasSearch || statusFilters.length > 0 || Boolean(iterationFilter)
 
   /** 所有分组是否都已收起，用于切换按钮的文案和图标。 */
   const allGroupsCollapsed =
@@ -2127,8 +2154,14 @@ export default function RequirementWorkbench({
           className="workbench-weekly-entry"
           onClick={onOpenWeeklyReport}
         >
-          <FileTextOutlined />
-          <span>个人工作周报</span>
+          <span className="workbench-weekly-entry-icon">
+            <FileTextOutlined />
+          </span>
+          <span className="workbench-weekly-entry-copy">
+            <strong>个人工作周报</strong>
+            <span>填写并提交飞书周报</span>
+          </span>
+          <RightOutlined className="workbench-weekly-entry-arrow" />
         </button>
 
         <div className="workbench-sidebar-heading">
@@ -2186,11 +2219,24 @@ export default function RequirementWorkbench({
           />
 
           <Select
+            allowClear
+            showSearch
+            className="workbench-filter-select workbench-iteration-filter"
+            value={iterationFilter ?? undefined}
+            options={iterationOptions}
+            placeholder={`全部迭代（${data?.groups.length ?? 0}）`}
+            aria-label="按迭代筛选"
+            optionFilterProp="label"
+            disabled={loading || !data || iterationOptions.length === 0}
+            onChange={(value?: string) => setIterationFilter(value ?? null)}
+          />
+
+          <Select
             mode="multiple"
             allowClear
             maxTagCount="responsive"
             maxTagPlaceholder={(omitted) => `+${omitted.length}`}
-            className="workbench-status-filter"
+            className="workbench-filter-select workbench-status-filter"
             value={statusFilters}
             options={statusOptions}
             placeholder={`全部状态（${allRequirements.length}）`}
