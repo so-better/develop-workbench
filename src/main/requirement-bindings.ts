@@ -83,10 +83,18 @@ const normalizeStoredBinding = (value: unknown): RequirementRepoBinding | null =
       typeof binding.qingzhouWorkItemTitle === 'string'
         ? binding.qingzhouWorkItemTitle
         : null,
+    qingzhouCodeRepositoryId:
+      typeof binding.qingzhouCodeRepositoryId === 'string'
+        ? binding.qingzhouCodeRepositoryId
+        : null,
     requirementBranch:
       typeof binding.requirementBranch === 'string' ? binding.requirementBranch : null,
     iterationBranch:
       typeof binding.iterationBranch === 'string' ? binding.iterationBranch : null,
+    qingzhouIterationBranchId:
+      typeof binding.qingzhouIterationBranchId === 'string'
+        ? binding.qingzhouIterationBranchId
+        : null,
     lastSyncedAt:
       typeof binding.lastSyncedAt === 'string' ? binding.lastSyncedAt : null,
     createdAt: binding.createdAt,
@@ -395,8 +403,10 @@ export const addRequirementBinding = async (
         qingzhouWorkItemId: null,
         qingzhouTaskId: null,
         qingzhouWorkItemTitle: null,
+        qingzhouCodeRepositoryId: null,
         requirementBranch: null,
         iterationBranch: null,
+        qingzhouIterationBranchId: null,
         lastSyncedAt: null,
         createdAt: now,
         updatedAt: now
@@ -456,8 +466,10 @@ export const addQingzhouRequirementBinding = async (
         qingzhouWorkItemId: normalizedWorkItemId,
         qingzhouTaskId: detail?.codeTaskId ?? null,
         qingzhouWorkItemTitle: detail?.workItemTitle ?? null,
+        qingzhouCodeRepositoryId: detail?.codeRepositoryId ?? null,
         requirementBranch: detail?.requirementBranch ?? null,
         iterationBranch: detail?.iterationBranch ?? null,
+        qingzhouIterationBranchId: detail?.iterationBranchId ?? null,
         lastSyncedAt: now,
         createdAt: now,
         updatedAt: now
@@ -508,8 +520,12 @@ export const syncQingzhouRequirementBinding = async (
             ...item,
             qingzhouTaskId: detail?.codeTaskId ?? null,
             qingzhouWorkItemTitle: detail?.workItemTitle ?? item.qingzhouWorkItemTitle,
+            qingzhouCodeRepositoryId:
+              detail?.codeRepositoryId ?? item.qingzhouCodeRepositoryId,
             requirementBranch: detail?.requirementBranch ?? null,
             iterationBranch: detail?.iterationBranch ?? null,
+            qingzhouIterationBranchId:
+              detail?.iterationBranchId ?? item.qingzhouIterationBranchId,
             lastSyncedAt: now,
             updatedAt: now
           }

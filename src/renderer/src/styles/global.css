@@ -2638,7 +2638,7 @@ body {
   white-space: nowrap;
 }
 
-.requirement-repo-copy span {
+.requirement-repo-copy > span {
   overflow: hidden;
   color: var(--workbench-secondary);
   font-size: 12px;
@@ -2646,12 +2646,24 @@ body {
   white-space: nowrap;
 }
 
+.requirement-repo-qingzhou-link .anticon {
+  color: inherit;
+  font-size: inherit;
+}
+
+.requirement-repo-qingzhou-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  margin-top: 2px;
+}
+
 .requirement-repo-qingzhou-link {
   display: inline-flex;
   gap: 4px;
   align-items: center;
   width: fit-content;
-  margin-top: 2px;
   color: #1677ff;
   font-size: 11px;
   text-decoration: none;

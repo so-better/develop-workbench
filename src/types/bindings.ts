@@ -23,11 +23,17 @@ export interface RequirementRepoBinding {
   /** 轻舟工作项名称。 */
   qingzhouWorkItemTitle: string | null
 
+  /** 轻舟代码仓库 ID；普通模式为 null。 */
+  qingzhouCodeRepositoryId: string | null
+
   /** 轻舟需求分支；普通模式为 null。 */
   requirementBranch: string | null
 
   /** 轻舟迭代分支；普通模式为 null。 */
   iterationBranch: string | null
+
+  /** 轻舟迭代分支 ID，用于打开构建页；普通模式或缺失时为 null。 */
+  qingzhouIterationBranchId: string | null
 
   /** 轻舟绑定最后一次同步时间。 */
   lastSyncedAt: string | null

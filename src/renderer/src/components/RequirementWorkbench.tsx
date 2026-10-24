@@ -17,6 +17,7 @@ import {
   MinusCircleOutlined,
   NodeCollapseOutlined,
   NodeExpandOutlined,
+  DeploymentUnitOutlined,
   PlusOutlined,
   ReloadOutlined,
   RollbackOutlined,
@@ -2432,8 +2433,22 @@ export default function RequirementWorkbench({
                           const qingzhouTasksUrl = binding.qingzhouWorkItemId
                             ? `https://z.xlbsoft.com/workList/tasks?workItemId=${encodeURIComponent(
                                 binding.qingzhouWorkItemId
-                              )}&archiveStatus=all`
+                              )}&archiveStatus=all${
+                                binding.qingzhouCodeRepositoryId
+                                  ? `&codeRepositoryId=${encodeURIComponent(
+                                      binding.qingzhouCodeRepositoryId
+                                    )}`
+                                  : ''
+                              }`
                             : null
+                          const qingzhouIterationBuildUrl =
+                            isQingzhou &&
+                            binding.iterationBranch &&
+                            binding.qingzhouIterationBranchId
+                              ? `https://z.xlbsoft.com/workList/branch/${encodeURIComponent(
+                                  binding.qingzhouIterationBranchId
+                                )}`
+                              : null
                           const targetBranch = isQingzhou
                             ? binding.requirementBranch
                             : binding.branchName
@@ -2463,20 +2478,33 @@ export default function RequirementWorkbench({
                                 </span>
                                 <div className="requirement-repo-copy">
                                   <strong>{repository?.name ?? '仓库已移除'}</strong>
-                                  <span title={repository?.localPath}>
-                                    {repository?.localPath ?? binding.repositoryId}
-                                  </span>
                                   {isQingzhou && qingzhouTasksUrl ? (
-                                    <a
-                                      className="requirement-repo-qingzhou-link"
-                                      href={qingzhouTasksUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      title="打开轻舟工作任务"
-                                    >
-                                      <LinkOutlined />
-                                      轻舟工作任务
-                                    </a>
+                                    <span className="requirement-repo-qingzhou-links">
+                                      <Tooltip title="去创建合并">
+                                        <a
+                                          className="requirement-repo-qingzhou-link"
+                                          href={qingzhouTasksUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          <LinkOutlined />
+                                          轻舟工作任务
+                                        </a>
+                                      </Tooltip>
+                                      {qingzhouIterationBuildUrl ? (
+                                        <Tooltip title="去构建流水线">
+                                          <a
+                                            className="requirement-repo-qingzhou-link"
+                                            href={qingzhouIterationBuildUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            <DeploymentUnitOutlined />
+                                            轻舟迭代分支构建
+                                          </a>
+                                        </Tooltip>
+                                      ) : null}
+                                    </span>
                                   ) : null}
                                 </div>
                                 {repository && !repository.available ? (
