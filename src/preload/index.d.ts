@@ -36,6 +36,8 @@ export interface ElectronAPI {
   getAppInfo: () => Promise<AppInfo>
   /** 获取链接预览信息。 */
   getLinkPreview: (url: string) => Promise<LinkPreview>
+  /** 通过应用内浏览器登录态获取飞书 Markdown 图片。 */
+  getMarkdownImage: (url: string) => Promise<string | null>
   /** 在应用内浏览器打开链接。 */
   openEmbeddedBrowser: (url: string) => Promise<boolean>
   /** 读取内嵌浏览器状态。 */

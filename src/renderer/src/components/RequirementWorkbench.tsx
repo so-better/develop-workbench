@@ -58,6 +58,7 @@ import type {
 } from '../../../types/requirements'
 import type { SettingsSection } from '../../../types/settings'
 import MarkdownContent from './MarkdownContent'
+import MarkdownEditor from './MarkdownEditor'
 import RequirementFlowchart from './RequirementFlowchart'
 
 interface RequirementWorkbenchProps {
@@ -1997,7 +1998,11 @@ export default function RequirementWorkbench({
           if (!productContact) {
             return (
               <span className="workbench-requirement-item-owner is-empty">
-                产品经理未填写
+                <span
+                  className="workbench-requirement-item-owner-empty-dot"
+                  aria-hidden="true"
+                />
+                待补充产品经理
               </span>
             )
           }
@@ -2018,10 +2023,12 @@ export default function RequirementWorkbench({
                 </Avatar>
                 <span className="workbench-requirement-item-owner-text">
                   {productContact.label} · {productContact.members[0].name}
-                  {productContact.members.length > 1
-                    ? ` +${productContact.members.length - 1}`
-                    : ''}
                 </span>
+                {productContact.members.length > 1 ? (
+                  <span className="workbench-requirement-item-owner-extra">
+                    等 {productContact.members.length} 人
+                  </span>
+                ) : null}
               </span>
             </Tooltip>
           )
@@ -2066,7 +2073,13 @@ export default function RequirementWorkbench({
             <DownOutlined className="workbench-requirement-group-chevron" />
             <span className="workbench-requirement-group-name">{group.iterationName}</span>
           </span>
-          <span className="workbench-requirement-group-count">{group.requirements.length}</span>
+          <span
+            className="workbench-requirement-group-count"
+            aria-label={`${group.requirements.length} 个需求`}
+          >
+            {group.requirements.length}
+            <span className="workbench-requirement-group-count-unit">项</span>
+          </span>
         </button>
 
         {collapsed ? null : (
@@ -2105,9 +2118,16 @@ export default function RequirementWorkbench({
         </div>
 
         <div className="workbench-sidebar-heading">
-          <span>我负责的需求</span>
+          <span className="workbench-sidebar-title">
+            <span>我负责的需求</span>
+            <span
+              className="workbench-sidebar-count"
+              aria-label={`共 ${data?.total ?? 0} 项`}
+            >
+              共 {data?.total ?? 0} 项
+            </span>
+          </span>
           <span className="workbench-sidebar-heading-actions">
-            <span className="workbench-sidebar-count">{data?.total ?? 0}</span>
             <Tooltip title="刷新数据">
               <Button
                 type="text"
@@ -2303,7 +2323,9 @@ export default function RequirementWorkbench({
                   <div className="requirement-repo-heading-title">
                     <h2>关联代码仓库</h2>
                     {bindings.length > 0 ? (
-                      <span className="requirement-repo-count">{bindings.length}</span>
+                      <span className="requirement-repo-count">
+                        {bindings.length} 个仓库
+                      </span>
                     ) : null}
                   </div>
                   <div className="requirement-repo-heading-actions">
@@ -3039,17 +3061,15 @@ export default function RequirementWorkbench({
                             </div>
                             {descriptionEditing ? (
                               <>
-                                <Input.TextArea
+                                <MarkdownEditor
                                   className="requirement-description-editor"
                                   rows={10}
                                   value={descriptionDraft}
-                                  placeholder="支持 Markdown"
-                                  onChange={(event) =>
-                                    setDescriptionDraft(event.target.value)
-                                  }
+                                  placeholder="支持 Markdown，可插入标题、列表、链接等"
+                                  onChange={setDescriptionDraft}
                                 />
                                 <p className="requirement-description-edit-hint">
-                                  支持 Markdown，保存后会直接同步到飞书项目。
+                                  保存后会直接同步到飞书项目。
                                 </p>
                               </>
                             ) : (() => {
@@ -3125,7 +3145,7 @@ export default function RequirementWorkbench({
                           <div className="requirement-comments-heading">
                             <h3>评论</h3>
                             {activity ? (
-                              <span>{activity.commentsTotal} 条</span>
+                              <span>共 {activity.commentsTotal} 条</span>
                             ) : null}
                           </div>
 
@@ -3212,8 +3232,8 @@ export default function RequirementWorkbench({
                                     </Button>
                                   </div>
                                 ) : null}
-                                <Input.TextArea
-                                  rows={3}
+                                <MarkdownEditor
+                                  rows={4}
                                   value={commentDraft}
                                   placeholder={
                                     replyToComment
@@ -3221,7 +3241,7 @@ export default function RequirementWorkbench({
                                       : '写下评论，支持 Markdown'
                                   }
                                   disabled={commentSubmitting}
-                                  onChange={(event) => setCommentDraft(event.target.value)}
+                                  onChange={setCommentDraft}
                                 />
                                 <div className="requirement-comment-editor-footer">
                                   <span>评论会直接同步到飞书项目</span>

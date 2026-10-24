@@ -24,8 +24,10 @@
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
     "@dagrejs/dagre": "^3.1.1",
+    "@monaco-editor/react": "^4.7.0",
     "antd": "^5.29.3",
     "dayjs": "^1.11.23",
+    "monaco-editor": "^0.57.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

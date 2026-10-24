@@ -29,20 +29,22 @@ const clampPanelWidth = (value: number): number =>
   )
 
 /**
- * 原生浏览视图永远在最上层，弹窗打开时必须临时隐藏。
+ * 原生浏览视图永远在最上层，弹窗或图片预览打开时必须临时隐藏。
  */
-const hasVisibleModal = (): boolean =>
-  Array.from(document.querySelectorAll<HTMLElement>('.ant-modal-wrap')).some(
-    (element) => {
-      const style = window.getComputedStyle(element)
+const hasVisibleOverlay = (): boolean =>
+  Array.from(
+    document.querySelectorAll<HTMLElement>(
+      '.ant-modal-wrap, .ant-image-preview-root'
+    )
+  ).some((element) => {
+    const style = window.getComputedStyle(element)
 
-      return (
-        style.display !== 'none' &&
-        style.visibility !== 'hidden' &&
-        element.getAttribute('aria-hidden') !== 'true'
-      )
-    }
-  )
+    return (
+      style.display !== 'none' &&
+      style.visibility !== 'hidden' &&
+      element.getAttribute('aria-hidden') !== 'true'
+    )
+  })
 
 interface EmbeddedBrowserPanelProps {
   /** 应用层维护的下载列表。 */
@@ -176,7 +178,7 @@ export default function EmbeddedBrowserPanel({
       const target = event.target
 
       if (target instanceof Node && panelRef.current?.contains(target)) return
-      if (hasVisibleModal()) return
+      if (hasVisibleOverlay()) return
 
       requestClose()
     }
@@ -282,12 +284,12 @@ export default function EmbeddedBrowserPanel({
     const updateSuppressed = (): void => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => {
-        const modalVisible = hasVisibleModal()
+        const overlayVisible = hasVisibleOverlay()
 
-        if (modalVisible === suppressed) return
+        if (overlayVisible === suppressed) return
 
-        suppressed = modalVisible
-        void window.electron.setEmbeddedBrowserSuppressed(modalVisible)
+        suppressed = overlayVisible
+        void window.electron.setEmbeddedBrowserSuppressed(overlayVisible)
       })
     }
 

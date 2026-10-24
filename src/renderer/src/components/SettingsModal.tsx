@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { CopyOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Input, Modal, Spin } from 'antd'
 import type { AppInfo } from '../../../types/app'
@@ -9,6 +9,8 @@ import LarkAuth from './LarkAuth'
 import IdeSettings from './IdeSettings'
 import MeegleSettings from './MeegleSettings'
 import RepositorySettings from './RepositorySettings'
+
+const CodeEditor = lazy(() => import('./CodeEditor'))
 
 interface SettingsModalProps {
   open: boolean
@@ -342,13 +344,21 @@ export default function SettingsModal({
               ) : error ? (
                 <Alert type="error" showIcon message={error} />
               ) : (
-                <Input.TextArea
-                  className="config-editor"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  autoSize={{ minRows: 10, maxRows: 18 }}
-                  spellCheck={false}
-                />
+                <Suspense
+                  fallback={
+                    <div className="settings-loading">
+                      <Spin />
+                    </div>
+                  }
+                >
+                  <CodeEditor
+                    className="config-editor"
+                    language="json"
+                    height={360}
+                    value={draft}
+                    onChange={setDraft}
+                  />
+                </Suspense>
               )}
             </>
           ) : activeSection === 'lark-cli' ? (

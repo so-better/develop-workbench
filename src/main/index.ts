@@ -10,6 +10,7 @@ import { initializeGit } from './git'
 import { initializeIde } from './ide'
 import { initializeLark } from './lark'
 import { initializeLinkPreview } from './link-preview'
+import { initializeMarkdownImages } from './markdown-images'
 import { initializeMeegle } from './meegle'
 import { initializeRepositories } from './repositories'
 import { initializeRequirementBindings } from './requirement-bindings'
@@ -48,6 +49,7 @@ if (!hasSingleInstanceLock) {
     initializeIde()
     initializeLark()
     initializeLinkPreview()
+    initializeMarkdownImages()
     initializeMeegle()
     initializeRepositories()
     initializeRequirements()

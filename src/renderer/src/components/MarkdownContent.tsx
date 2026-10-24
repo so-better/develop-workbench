@@ -1,6 +1,21 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import LinkPreview from './LinkPreview'
+import MarkdownImage from './MarkdownImage'
+
+/**
+ * 飞书导出的图片地址可能包含换行，导致 Markdown 图片语法失效。
+ * 只处理确实跨行的图片地址，避免影响代码块中的示例。
+ */
+const normalizeMarkdownImages = (content: string): string =>
+  content.replace(
+    /(!\[[^\]]*\]\()([\s\S]*?)\)/g,
+    (match, prefix: string, destination: string) => {
+      if (!/[\r\n]/.test(destination)) return match
+
+      return `${prefix}${destination.replace(/\s*[\r\n]+\s*/g, '')})`
+    }
+  )
 
 interface MarkdownContentProps {
   /** Markdown 原文。 */
@@ -33,10 +48,13 @@ export default function MarkdownContent({
                 {children}
               </a>
             )
-          }
+          },
+          img: ({ src, alt, title }) => (
+            <MarkdownImage src={src} alt={alt} title={title} />
+          )
         }}
       >
-        {content}
+        {normalizeMarkdownImages(content)}
       </ReactMarkdown>
     </div>
   )

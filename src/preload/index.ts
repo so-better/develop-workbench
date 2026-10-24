@@ -47,6 +47,12 @@ const electronAPI = {
   getLinkPreview: (url: string): Promise<LinkPreview> =>
     ipcRenderer.invoke('link-preview:get', url),
 
+  /**
+   * 通过应用内浏览器登录态获取飞书 Markdown 图片。
+   */
+  getMarkdownImage: (url: string): Promise<string | null> =>
+    ipcRenderer.invoke('markdown:get-image', url),
+
   openEmbeddedBrowser: (url: string): Promise<boolean> =>
     ipcRenderer.invoke('embedded-browser:open', url),
 
