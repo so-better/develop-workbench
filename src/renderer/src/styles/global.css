@@ -2674,6 +2674,19 @@ body {
   text-decoration: underline;
 }
 
+.requirement-repo-mr-link {
+  padding: 0;
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.requirement-repo-mr-link .anticon {
+  color: inherit;
+  font-size: inherit;
+}
+
 :root[data-theme="dark"] .requirement-repo-qingzhou-link {
   color: #84b9ff;
 }
@@ -2717,7 +2730,8 @@ body {
   gap: 8px;
   align-items: center;
   min-width: 0;
-  padding: 10px 12px;
+  min-height: 28px;
+  padding: 4px 8px;
   background: linear-gradient(
     90deg,
     rgba(18, 183, 106, 0.1) 0%,
@@ -2773,11 +2787,11 @@ body {
 
 .requirement-repo-single-branch .ant-tag {
   flex-shrink: 0;
-  height: 19px;
-  padding: 0 6px;
+  height: 20px;
+  padding: 0 7px;
   margin-inline-end: 0;
-  font-size: 10px;
-  line-height: 17px;
+  font-size: 11px;
+  line-height: 18px;
   border-radius: 4px;
 }
 
@@ -4319,6 +4333,34 @@ body {
 .requirement-comment-editor-footer > span {
   color: var(--workbench-secondary);
   font-size: 10px;
+}
+
+.requirement-mr-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.requirement-mr-form p {
+  margin: 0 0 4px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.requirement-mr-form label {
+  margin-top: 4px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.requirement-mr-branch {
+  width: 100%;
+}
+
+.requirement-mr-form .ant-alert {
+  margin-top: 2px;
 }
 
 .requirement-branch-choice {

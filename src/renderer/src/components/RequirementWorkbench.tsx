@@ -19,6 +19,7 @@ import {
   NodeExpandOutlined,
   DeploymentUnitOutlined,
   PlusOutlined,
+  PullRequestOutlined,
   ReloadOutlined,
   RollbackOutlined,
   SearchOutlined,
@@ -141,6 +142,59 @@ const getErrorMessage = (error: unknown): string => {
   const message = error instanceof Error ? error.message : String(error)
 
   return message.replace(/\s+/g, ' ').trim().slice(0, 280) || '未知错误'
+}
+
+/**
+ * 将 Git 远程地址转换为不包含 .git 的仓库根地址。
+ * 支持 https 和常见 SSH 地址。
+ */
+const getRemoteRepositoryBaseUrl = (remoteUrl?: string | null): string | null => {
+  if (!remoteUrl?.trim()) return null
+
+  let normalized = remoteUrl.trim()
+
+  const scpMatch = normalized.match(/^git@([^:]+):(.+)$/)
+  const sshMatch = normalized.match(/^ssh:\/\/git@([^/]+)\/(.+)$/)
+
+  if (scpMatch) {
+    normalized = `https://${scpMatch[1]}/${scpMatch[2]}`
+  } else if (sshMatch) {
+    normalized = `https://${sshMatch[1]}/${sshMatch[2]}`
+  }
+
+  try {
+    const url = new URL(normalized)
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+
+    const path = url.pathname.replace(/\.git\/?$/i, '').replace(/\/$/, '')
+
+    return path ? `${url.origin}${path}` : null
+  } catch {
+    return null
+  }
+}
+
+/** 打开远程仓库分支页面。 */
+const getRemoteBranchesUrl = (remoteUrl?: string | null): string | null => {
+  const baseUrl = getRemoteRepositoryBaseUrl(remoteUrl)
+
+  return baseUrl ? `${baseUrl}/branches` : null
+}
+
+/** 按 Codeup 地址格式生成创建合并请求页面。 */
+const getMergeRequestUrl = (
+  remoteUrl: string | null | undefined,
+  sourceBranch: string,
+  targetBranch: string
+): string | null => {
+  const baseUrl = getRemoteRepositoryBaseUrl(remoteUrl)
+
+  if (!baseUrl) return null
+
+  return `${baseUrl}/changes/new?target_branch=${encodeURIComponent(
+    targetBranch
+  )}&source_branch=${encodeURIComponent(sourceBranch)}`
 }
 
 /**
@@ -515,6 +569,15 @@ export default function RequirementWorkbench({
   const [branchChoiceType, setBranchChoiceType] = useState<
     'requirement' | 'iteration'
   >('requirement')
+
+  // 创建合并请求弹窗。
+  const [mergeRequestBinding, setMergeRequestBinding] =
+    useState<RequirementRepoBinding | null>(null)
+  const [mergeRequestSource, setMergeRequestSource] = useState<string | null>(null)
+  const [mergeRequestTarget, setMergeRequestTarget] = useState<string | null>(null)
+  const [mergeRequestBranches, setMergeRequestBranches] = useState<string[]>([])
+  const [mergeRequestBranchesLoading, setMergeRequestBranchesLoading] = useState(false)
+  const [mergeRequestWarning, setMergeRequestWarning] = useState<string | null>(null)
   const openingIdeRef = useRef<string | null>(null)
   const [bindingStatuses, setBindingStatuses] = useState<
     Record<string, RepositoryBindingStatus>
@@ -1370,6 +1433,57 @@ export default function RequirementWorkbench({
       setOpeningIdeBindingId(null)
     }
   }
+
+  /**
+   * 打开创建 MR 弹窗，并按当前绑定预选来源和目标分支。
+   */
+  const handleOpenCreateMergeRequest = async (
+    binding: RequirementRepoBinding
+  ): Promise<void> => {
+    const repository = repositoryMap.get(binding.repositoryId)
+    const source =
+      binding.mode === 'qingzhou' ? binding.requirementBranch : binding.branchName
+    const target =
+      binding.mode === 'qingzhou'
+        ? binding.iterationBranch ?? repository?.defaultBranch ?? null
+        : repository?.defaultBranch ?? null
+
+    setMergeRequestBinding(binding)
+    setMergeRequestSource(source)
+    setMergeRequestTarget(target)
+    setMergeRequestBranches([])
+    setMergeRequestWarning(null)
+    setMergeRequestBranchesLoading(true)
+
+    try {
+      const result = await window.electron.listRepositoryBranches(binding.repositoryId, true)
+      setMergeRequestBranches(result.branches)
+      setMergeRequestWarning(result.fetchWarning)
+    } catch (error) {
+      setMergeRequestWarning(getErrorMessage(error))
+    } finally {
+      setMergeRequestBranchesLoading(false)
+    }
+  }
+
+  const mergeRequestRepository = mergeRequestBinding
+    ? repositoryMap.get(mergeRequestBinding.repositoryId) ?? null
+    : null
+  const mergeRequestUrl =
+    mergeRequestSource && mergeRequestTarget
+      ? getMergeRequestUrl(
+          mergeRequestRepository?.remoteUrl,
+          mergeRequestSource,
+          mergeRequestTarget
+        )
+      : null
+  const mergeRequestBranchOptions = Array.from(
+    new Set([
+      ...mergeRequestBranches,
+      ...(mergeRequestSource ? [mergeRequestSource] : []),
+      ...(mergeRequestTarget ? [mergeRequestTarget] : [])
+    ])
+  ).map((branch) => ({ value: branch, label: branch }))
 
   const getBranchChoiceKey = (repositoryId: string): string =>
     `qingzhou-ide-branch:${repositoryId}`
@@ -2449,6 +2563,9 @@ export default function RequirementWorkbench({
                                   binding.qingzhouIterationBranchId
                                 )}`
                               : null
+                          const remoteBranchesUrl = isQingzhou
+                            ? null
+                            : getRemoteBranchesUrl(repository?.remoteUrl)
                           const targetBranch = isQingzhou
                             ? binding.requirementBranch
                             : binding.branchName
@@ -2502,6 +2619,34 @@ export default function RequirementWorkbench({
                                             <DeploymentUnitOutlined />
                                             轻舟迭代分支构建
                                           </a>
+                                        </Tooltip>
+                                      ) : null}
+                                    </span>
+                                  ) : remoteBranchesUrl ? (
+                                    <span className="requirement-repo-qingzhou-links">
+                                      <Tooltip title="打开远程仓库分支">
+                                        <a
+                                          className="requirement-repo-qingzhou-link"
+                                          href={remoteBranchesUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          <BranchesOutlined />
+                                          远程仓库
+                                        </a>
+                                      </Tooltip>
+                                      {repository?.remoteUrl ? (
+                                        <Tooltip title="选择来源和目标分支">
+                                          <button
+                                            type="button"
+                                            className="requirement-repo-qingzhou-link requirement-repo-mr-link"
+                                            onClick={() =>
+                                              void handleOpenCreateMergeRequest(binding)
+                                            }
+                                          >
+                                            <PullRequestOutlined />
+                                            创建 MR
+                                          </button>
                                         </Tooltip>
                                       ) : null}
                                     </span>
@@ -3358,6 +3503,78 @@ export default function RequirementWorkbench({
           </div>
         )}
       </section>
+
+      <Modal
+        title="创建合并请求"
+        open={Boolean(mergeRequestBinding)}
+        okText="打开创建页"
+        cancelText="取消"
+        destroyOnHidden
+        okButtonProps={{
+          disabled:
+            !mergeRequestUrl ||
+            !mergeRequestSource ||
+            !mergeRequestTarget ||
+            mergeRequestSource === mergeRequestTarget
+        }}
+        onOk={() => {
+          if (!mergeRequestUrl || !mergeRequestSource || !mergeRequestTarget) return
+
+          if (mergeRequestSource === mergeRequestTarget) {
+            message.warning('来源分支和目标分支不能相同')
+            return
+          }
+
+          const url = mergeRequestUrl
+          setMergeRequestBinding(null)
+          void window.electron.openEmbeddedBrowser(url)
+        }}
+        onCancel={() => {
+          setMergeRequestBinding(null)
+          setMergeRequestSource(null)
+          setMergeRequestTarget(null)
+          setMergeRequestBranches([])
+          setMergeRequestWarning(null)
+        }}
+      >
+        <div className="requirement-mr-form">
+          <p>
+            选择合并请求的来源和目标分支，将在应用内浏览器打开 Codeup 创建页面。
+            冲突由 Codeup 显示和处理。
+          </p>
+          {mergeRequestWarning ? (
+            <Alert type="warning" showIcon message={mergeRequestWarning} />
+          ) : null}
+          <label>来源分支</label>
+          <Select
+            showSearch
+            className="requirement-mr-branch"
+            value={mergeRequestSource ?? undefined}
+            options={mergeRequestBranchOptions}
+            loading={mergeRequestBranchesLoading}
+            placeholder="选择来源分支"
+            optionFilterProp="label"
+            onChange={(value: string) => setMergeRequestSource(value)}
+          />
+          <label>目标分支</label>
+          <Select
+            showSearch
+            className="requirement-mr-branch"
+            value={mergeRequestTarget ?? undefined}
+            options={mergeRequestBranchOptions}
+            loading={mergeRequestBranchesLoading}
+            placeholder="选择目标分支"
+            optionFilterProp="label"
+            onChange={(value: string) => setMergeRequestTarget(value)}
+          />
+          {mergeRequestSource === mergeRequestTarget && mergeRequestSource ? (
+            <Alert type="warning" showIcon message="来源分支和目标分支不能相同" />
+          ) : null}
+          {!mergeRequestUrl && mergeRequestSource && mergeRequestTarget ? (
+            <Alert type="warning" showIcon message="无法生成合并请求地址，请检查远程仓库地址" />
+          ) : null}
+        </div>
+      </Modal>
 
       <Modal
         title="选择打开 IDE 的分支"
