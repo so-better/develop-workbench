@@ -4,18 +4,12 @@
  */
 import { BrowserWindow, session } from 'electron'
 import type { Session } from 'electron'
-import {
-  BROWSER_PARTITION,
-  isEmbeddedBrowserVisible,
-  openEmbeddedBrowser,
-  requestEmbeddedBrowserClose
-} from './embedded-browser'
+import { BROWSER_PARTITION } from './embedded-browser'
+import { withBrowserAuth } from './browser-auth'
 
 const CODE_TASKS_URL =
   'https://z.xlbsoft.com/api/efficiency/api/v1/workitem/requirement/code-tasks'
 const QINGZHOU_REQUIREMENT_URL = 'https://z.xlbsoft.com/workList/requirement'
-const AUTH_POLL_INTERVAL_MS = 1_500
-const AUTH_TIMEOUT_MS = 180_000
 const AUTH_COOKIE_TTL_SECONDS = 30 * 24 * 60 * 60
 
 interface CodeTaskBranchInfo {
@@ -61,11 +55,6 @@ export interface QingzhouCodeTaskDetail {
 
 /** 仅用于内部控制登录跳转，不向渲染层暴露。 */
 class QingzhouAuthRequiredError extends Error {}
-
-const delay = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms)
-  })
 
 /**
  * 将轻舟任务转换成绑定层使用的结构。
@@ -189,42 +178,11 @@ export const getQingzhouCodeTasks = async (
     throw new Error('飞书需求 ID 不合法，无法查询轻舟工作项')
   }
 
-  // 已登录时直接返回，正常流程不会打开浏览器面板。
-  try {
-    return await requestCodeTasks(normalizedWorkItemId)
-  } catch (error) {
-    if (!(error instanceof QingzhouAuthRequiredError)) throw error
-  }
-
-  // 打开具体需求页面，登录成功后用户能回到原上下文。
-  const opened = openEmbeddedBrowser(
-    window,
-    `${QINGZHOU_REQUIREMENT_URL}/${encodeURIComponent(normalizedWorkItemId)}`
-  )
-
-  if (!opened) throw new Error('无法打开轻舟登录页面')
-
-  const deadline = Date.now() + AUTH_TIMEOUT_MS
-
-  try {
-    // 不解析登录页 DOM，直接轮询接口；接口成功才是真正的登录完成。
-    while (Date.now() < deadline) {
-      await delay(AUTH_POLL_INTERVAL_MS)
-
-      if (!isEmbeddedBrowserVisible(window)) {
-        throw new Error('轻舟登录已取消')
-      }
-
-      try {
-        return await requestCodeTasks(normalizedWorkItemId)
-      } catch (error) {
-        if (error instanceof QingzhouAuthRequiredError) continue
-        throw error
-      }
-    }
-
-    throw new Error('轻舟登录超时，请重新尝试')
-  } finally {
-    requestEmbeddedBrowserClose(window)
-  }
+  return withBrowserAuth(window, {
+    authName: '轻舟',
+    // 打开具体需求页面，登录成功后用户能回到原上下文。
+    loginUrl: `${QINGZHOU_REQUIREMENT_URL}/${encodeURIComponent(normalizedWorkItemId)}`,
+    operation: () => requestCodeTasks(normalizedWorkItemId),
+    isAuthError: (error) => error instanceof QingzhouAuthRequiredError
+  })
 }

@@ -3,12 +3,8 @@
  * 走飞书汇报网页的内部接口，复用内嵌浏览器的登录态。
  */
 import { BrowserWindow, ipcMain, session } from 'electron'
-import {
-  BROWSER_PARTITION,
-  isEmbeddedBrowserVisible,
-  openEmbeddedBrowser,
-  requestEmbeddedBrowserClose
-} from './embedded-browser'
+import { BROWSER_PARTITION } from './embedded-browser'
+import { withBrowserAuth } from './browser-auth'
 import type {
   SubmitWeeklyReportInput,
   WeeklyReportField,
@@ -19,8 +15,6 @@ const REPORT_API_BASE = 'https://oa.feishu.cn/report/v3/api'
 const REPORT_ENTRY_URL = 'https://oa.feishu.cn/report/record/entry'
 const CSRF_TOKEN_URL = 'https://www.feishu.cn/lgw/csrf_token'
 const REQUEST_TIMEOUT_MS = 20_000
-const AUTH_POLL_INTERVAL_MS = 1_500
-const AUTH_TIMEOUT_MS = 180_000
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36'
 
@@ -95,9 +89,6 @@ interface ReportContext {
 let cachedCsrfToken: string | null = null
 
 class WeeklyReportAuthRequiredError extends Error {}
-
-const delay = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms))
 
 const getBrowserSession = (): Electron.Session =>
   session.fromPartition(BROWSER_PARTITION)
@@ -451,16 +442,24 @@ const apiPost = async <T>(
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   })
   const text = await response.text()
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+  const looksLikeHtml = /^\s*</.test(text)
+
+  if (
+    response.status === 401 ||
+    response.status === 403 ||
+    !contentType.includes('application/json') ||
+    looksLikeHtml ||
+    !text.trim()
+  ) {
+    throw new WeeklyReportAuthRequiredError('飞书周报登录态失效')
+  }
 
   let payload: ApiResponse<T>
 
   try {
     payload = JSON.parse(text) as ApiResponse<T>
   } catch {
-    if (response.status === 401 || response.status === 403) {
-      throw new WeeklyReportAuthRequiredError('飞书周报登录态失效')
-    }
-
     throw new Error('飞书周报接口返回了无法解析的内容')
   }
 
@@ -607,47 +606,18 @@ const toState = (context: ReportContext): WeeklyReportState => {
 /**
  * 未登录时打开飞书周报页，轮询到登录成功后关闭面板并重试原操作。
  */
-const withWeeklyReportAuth = async <T>(
+const withWeeklyReportAuth = <T>(
   window: BrowserWindow,
   operation: () => Promise<T>
-): Promise<T> => {
-  try {
-    return await operation()
-  } catch (error) {
-    if (!(error instanceof WeeklyReportAuthRequiredError)) throw error
-  }
-
-  const opened = openEmbeddedBrowser(window, REPORT_ENTRY_URL)
-
-  if (!opened) throw new Error('无法打开飞书周报登录页面')
-
-  const deadline = Date.now() + AUTH_TIMEOUT_MS
-
-  try {
-    while (Date.now() < deadline) {
-      await delay(AUTH_POLL_INTERVAL_MS)
-
-      if (!isEmbeddedBrowserVisible(window)) {
-        throw new Error('飞书周报登录已取消')
-      }
-
-      try {
-        // 以读取汇报规则成功作为登录完成信号，操作成功后再关闭面板。
-        await getWeeklyRule()
-        const result = await operation()
-        requestEmbeddedBrowserClose(window)
-        return result
-      } catch (error) {
-        if (error instanceof WeeklyReportAuthRequiredError) continue
-        throw error
-      }
-    }
-
-    throw new Error('飞书周报登录超时，请重新尝试')
-  } finally {
-    requestEmbeddedBrowserClose(window)
-  }
-}
+): Promise<T> =>
+  withBrowserAuth(window, {
+    authName: '飞书周报',
+    loginUrl: REPORT_ENTRY_URL,
+    operation,
+    // 以读取汇报规则成功作为登录完成信号。
+    probe: getWeeklyRule,
+    isAuthError: (error) => error instanceof WeeklyReportAuthRequiredError
+  })
 
 /**
  * 读取当前用户的本周周报。
