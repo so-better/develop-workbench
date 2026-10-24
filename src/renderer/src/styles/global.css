@@ -1996,7 +1996,6 @@ body {
 .workbench-requirement-item.is-active {
   background: var(--workbench-selected-bg);
   border-color: rgba(22, 119, 255, 0.45);
-  box-shadow: inset 2px 0 0 rgba(22, 119, 255, 0.72);
 }
 
 .workbench-requirement-item.is-active:hover {
