@@ -8,8 +8,14 @@ export interface RequirementRepoBinding {
   /** 关联的代码仓库 ID。 */
   repositoryId: string
 
-  /** 该仓库对应的需求开发分支。 */
-  branchName: string
+  /** 绑定模式：普通分支或轻舟工作项。 */
+  mode: 'normal' | 'qingzhou'
+
+  /** 普通模式下的开发分支；轻舟模式为 null。 */
+  branchName: string | null
+
+  /** 轻舟模式下的工作项 ID；普通模式为 null。 */
+  qingzhouTaskId: string | null
 
   /** 创建时间，ISO 字符串。 */
   createdAt: string

@@ -120,6 +120,12 @@ export interface ElectronAPI {
     repositoryId: string,
     branchName: string
   ) => Promise<RequirementBindingState>
+  /** 绑定轻舟工作项。 */
+  addQingzhouRequirementBinding: (
+    requirementId: string,
+    repositoryId: string,
+    taskId: string
+  ) => Promise<RequirementBindingState>
   /** 修改绑定分支。 */
   updateRequirementBinding: (
     requirementId: string,

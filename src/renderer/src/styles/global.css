@@ -1940,6 +1940,27 @@ body {
   width: 100%;
 }
 
+.requirement-repo-qingzhou {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+  min-height: 28px;
+}
+
+.requirement-repo-qingzhou .ant-tag {
+  height: 20px;
+  padding: 0 7px;
+  margin-inline-end: 0;
+  font-size: 11px;
+  line-height: 18px;
+  border-radius: 4px;
+}
+
+.requirement-repo-task-input {
+  height: 28px;
+}
+
 .requirement-repo-row-actions {
   display: flex;
   gap: 2px;
@@ -2110,6 +2131,27 @@ body {
 
 .requirement-repo-add-field .requirement-repo-branch {
   width: 100%;
+}
+
+.requirement-repo-qingzhou {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  align-items: center;
+  min-height: 28px;
+}
+
+.requirement-repo-qingzhou .ant-tag {
+  height: 20px;
+  padding: 0 7px;
+  margin-inline-end: 0;
+  font-size: 11px;
+  line-height: 18px;
+  border-radius: 4px;
+}
+
+.requirement-repo-task-input {
+  height: 28px;
 }
 
 .requirement-flow-section {

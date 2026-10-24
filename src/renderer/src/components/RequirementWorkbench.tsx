@@ -424,6 +424,7 @@ export default function RequirementWorkbench({
   const [addBindingOpen, setAddBindingOpen] = useState(false)
   const [newRepositoryId, setNewRepositoryId] = useState<string | null>(null)
   const [newBranchName, setNewBranchName] = useState<string | null>(null)
+  const [newQingzhouTaskId, setNewQingzhouTaskId] = useState('')
   const [bindingSaving, setBindingSaving] = useState(false)
   const [updatingBindingId, setUpdatingBindingId] = useState<string | null>(null)
   const [removingBindingId, setRemovingBindingId] = useState<string | null>(null)
@@ -478,6 +479,10 @@ export default function RequirementWorkbench({
         label: branch
       }))
     : []
+  const newRepository = newRepositoryId
+    ? repositoryMap.get(newRepositoryId) ?? null
+    : null
+  const newRepositoryIsQingzhou = newRepository?.qingzhouEnabled ?? false
 
   /**
    * 生成绑定行的分支选项，保留当前值避免历史分支不在列表中时显示为空。
@@ -878,6 +883,7 @@ export default function RequirementWorkbench({
     setBindingsError(null)
     setNewRepositoryId(null)
     setNewBranchName(null)
+    setNewQingzhouTaskId('')
     setCreateBranchOpen(false)
 
     window.electron
@@ -889,7 +895,9 @@ export default function RequirementWorkbench({
         setAddBindingOpen(state.bindings.length === 0)
 
         for (const binding of state.bindings) {
-          void loadBranches(binding.repositoryId)
+          if (binding.mode === 'normal') {
+            void loadBranches(binding.repositoryId)
+          }
         }
       })
       .catch((bindingError) => {
@@ -918,6 +926,8 @@ export default function RequirementWorkbench({
 
     Promise.all(
       bindings.map(async (binding) => {
+        if (binding.mode !== 'normal' || !binding.branchName) return null
+
         try {
           const status = await window.electron.getRepositoryBindingStatus(
             binding.repositoryId,
@@ -950,24 +960,44 @@ export default function RequirementWorkbench({
    * 新增仓库绑定。
    */
   const handleAddBinding = async (): Promise<void> => {
-    if (!selectedRequirementId || !newRepositoryId || !newBranchName) {
-      message.warning('请选择仓库和开发分支')
+    if (!selectedRequirementId || !newRepositoryId || !newRepository) {
+      message.warning('请选择仓库')
+      return
+    }
+
+    if (newRepositoryIsQingzhou) {
+      if (!newQingzhouTaskId.trim()) {
+        message.warning('请填写轻舟工作项 ID')
+        return
+      }
+    } else if (!newBranchName) {
+      message.warning('请选择开发分支')
       return
     }
 
     setBindingSaving(true)
 
     try {
-      const state = await window.electron.addRequirementBinding(
-        selectedRequirementId,
-        newRepositoryId,
-        newBranchName
-      )
+      const state = newRepositoryIsQingzhou
+        ? await window.electron.addQingzhouRequirementBinding(
+            selectedRequirementId,
+            newRepositoryId,
+            newQingzhouTaskId
+          )
+        : await window.electron.addRequirementBinding(
+            selectedRequirementId,
+            newRepositoryId,
+            newBranchName as string
+          )
+
       setBindings(state.bindings)
       setNewRepositoryId(null)
       setNewBranchName(null)
+      setNewQingzhouTaskId('')
       setAddBindingOpen(false)
-      message.success('仓库绑定已保存')
+      message.success(
+        newRepositoryIsQingzhou ? '轻舟工作项已绑定' : '仓库绑定已保存'
+      )
     } catch (bindingError) {
       message.error(getErrorMessage(bindingError))
     } finally {
@@ -1028,7 +1058,7 @@ export default function RequirementWorkbench({
    * 打开新建分支弹窗，默认使用仓库主分支作为基线。
    */
   const openCreateBranch = async (): Promise<void> => {
-    if (!newRepositoryId) return
+    if (!newRepositoryId || newRepositoryIsQingzhou) return
 
     const branches =
       repoBranches[newRepositoryId]?.length > 0
@@ -1052,6 +1082,7 @@ export default function RequirementWorkbench({
     if (
       !selectedRequirementId ||
       !newRepositoryId ||
+      newRepositoryIsQingzhou ||
       !createBranchBase ||
       !createBranchName.trim()
     ) {
@@ -1107,7 +1138,9 @@ export default function RequirementWorkbench({
    * 在 IDE 中打开仓库。
    */
   const handleOpenInIde = async (binding: RequirementRepoBinding): Promise<void> => {
-    if (openingIdeRef.current !== null) return
+    if (openingIdeRef.current !== null || binding.mode !== 'normal' || !binding.branchName) {
+      return
+    }
 
     openingIdeRef.current = binding.id
     setOpeningIdeBindingId(binding.id)
@@ -1174,9 +1207,15 @@ export default function RequirementWorkbench({
    * 刷新仓库和绑定数据。
    */
   const refreshBindings = async (): Promise<void> => {
-    const repositoryIds = new Set(bindings.map((binding) => binding.repositoryId))
+    const repositoryIds = new Set(
+      bindings
+        .filter((binding) => binding.mode === 'normal')
+        .map((binding) => binding.repositoryId)
+    )
 
-    if (newRepositoryId) repositoryIds.add(newRepositoryId)
+    if (newRepositoryId && !newRepositoryIsQingzhou) {
+      repositoryIds.add(newRepositoryId)
+    }
 
     branchCacheRef.current.clear()
     setRepoBranches({})
@@ -2048,6 +2087,7 @@ export default function RequirementWorkbench({
                       <div className="requirement-repo-list">
                         {bindings.map((binding) => {
                           const repository = repositoryMap.get(binding.repositoryId)
+                          const isQingzhou = binding.mode === 'qingzhou'
                           const branchesLoading = branchLoadingIds.has(binding.repositoryId)
                           const openingThisBinding = openingIdeBindingId === binding.id
                           const bindingStatus = bindingStatuses[binding.id]
@@ -2074,41 +2114,56 @@ export default function RequirementWorkbench({
                               <div className="requirement-repo-branch-field">
                                 <span className="requirement-repo-field-label">
                                   <BranchesOutlined />
-                                  开发分支
+                                  {isQingzhou ? '轻舟工作项' : '开发分支'}
                                 </span>
-                                <Select
-                                  size="small"
-                                  showSearch
-                                  className="requirement-repo-branch"
-                                  value={binding.branchName}
-                                  options={getBindingBranchOptions(
-                                    binding.repositoryId,
-                                    binding.branchName
-                                  )}
-                                  loading={
-                                    branchesLoading || updatingBindingId === binding.id
-                                  }
-                                  disabled={!repository?.available}
-                                  onChange={(value: string) =>
-                                    handleUpdateBinding(binding.id, value)
-                                  }
-                                />
-                                {bindingStatus && repository?.available ? (
-                                  <span className="requirement-repo-branch-state">
-                                    {!bindingStatus.branchExists ? (
-                                      <Tag color="red" bordered={false}>
-                                        分支不存在
-                                      </Tag>
-                                    ) : bindingStatus.currentBranch === binding.branchName ? (
-                                      <Tag color="green" bordered={false}>
-                                        已切换
-                                      </Tag>
-                                    ) : (
-                                      <span className="requirement-repo-branch-current">
-                                        当前 {bindingStatus.currentBranch ?? '未知'} · 未切换
+                                {isQingzhou ? (
+                                  <div className="requirement-repo-qingzhou">
+                                    <Tag color="purple" bordered={false}>
+                                      {binding.qingzhouTaskId}
+                                    </Tag>
+                                    <span className="requirement-repo-branch-current">
+                                      需求分支、迭代分支待同步
+                                    </span>
+                                  </div>
+                                ) : binding.branchName ? (
+                                  <>
+                                    <Select
+                                      size="small"
+                                      showSearch
+                                      className="requirement-repo-branch"
+                                      value={binding.branchName}
+                                      options={getBindingBranchOptions(
+                                        binding.repositoryId,
+                                        binding.branchName
+                                      )}
+                                      loading={
+                                        branchesLoading || updatingBindingId === binding.id
+                                      }
+                                      disabled={!repository?.available}
+                                      onChange={(value: string) =>
+                                        handleUpdateBinding(binding.id, value)
+                                      }
+                                    />
+                                    {bindingStatus && repository?.available ? (
+                                      <span className="requirement-repo-branch-state">
+                                        {!bindingStatus.branchExists ? (
+                                          <Tag color="red" bordered={false}>
+                                            分支不存在
+                                          </Tag>
+                                        ) : bindingStatus.currentBranch ===
+                                          binding.branchName ? (
+                                          <Tag color="green" bordered={false}>
+                                            已切换
+                                          </Tag>
+                                        ) : (
+                                          <span className="requirement-repo-branch-current">
+                                            当前 {bindingStatus.currentBranch ?? '未知'} ·
+                                            未切换
+                                          </span>
+                                        )}
                                       </span>
-                                    )}
-                                  </span>
+                                    ) : null}
+                                  </>
                                 ) : null}
                               </div>
 
@@ -2120,6 +2175,7 @@ export default function RequirementWorkbench({
                                   icon={<CodeOutlined />}
                                   loading={openingThisBinding}
                                   disabled={
+                                    isQingzhou ||
                                     !repository?.available ||
                                     bindingStatus?.branchExists === false ||
                                     (openingIdeBindingId !== null && !openingThisBinding)
@@ -2173,46 +2229,75 @@ export default function RequirementWorkbench({
                                   label: repository.name
                                 }))}
                                 onChange={(value: string) => {
+                                  const repository = repositoryMap.get(value)
+
                                   setNewRepositoryId(value)
                                   setNewBranchName(null)
-                                  void loadBranches(value, true, true)
+                                  setNewQingzhouTaskId('')
+
+                                  if (!repository?.qingzhouEnabled) {
+                                    void loadBranches(value, true, true)
+                                  }
                                 }}
                               />
                             </div>
-                            <div className="requirement-repo-add-field">
-                              <label>开发分支</label>
-                              <Select
-                                size="small"
-                                showSearch
-                                className="requirement-repo-branch"
-                                placeholder="选择开发分支"
-                                value={newBranchName}
-                                disabled={!newRepositoryId}
-                                loading={
-                                  newRepositoryId
-                                    ? branchLoadingIds.has(newRepositoryId)
-                                    : false
-                                }
-                                options={newRepositoryBranchOptions}
-                                onChange={(value: string) => setNewBranchName(value)}
-                              />
-                            </div>
+                            {newRepositoryIsQingzhou ? (
+                              <div className="requirement-repo-add-field">
+                                <label>轻舟工作项 ID</label>
+                                <Input
+                                  size="small"
+                                  className="requirement-repo-task-input"
+                                  placeholder="填写轻舟工作项 ID"
+                                  value={newQingzhouTaskId}
+                                  spellCheck={false}
+                                  onChange={(event) =>
+                                    setNewQingzhouTaskId(event.target.value)
+                                  }
+                                />
+                              </div>
+                            ) : (
+                              <div className="requirement-repo-add-field">
+                                <label>开发分支</label>
+                                <Select
+                                  size="small"
+                                  showSearch
+                                  className="requirement-repo-branch"
+                                  placeholder="选择开发分支"
+                                  value={newBranchName}
+                                  disabled={!newRepositoryId}
+                                  loading={
+                                    newRepositoryId
+                                      ? branchLoadingIds.has(newRepositoryId)
+                                      : false
+                                  }
+                                  options={newRepositoryBranchOptions}
+                                  onChange={(value: string) => setNewBranchName(value)}
+                                />
+                              </div>
+                            )}
                             <div className="requirement-repo-add-actions">
-                              <Button
-                                type="text"
-                                size="small"
-                                className="requirement-repo-create-branch"
-                                icon={<PlusOutlined />}
-                                disabled={!newRepositoryId}
-                                onClick={() => openCreateBranch()}
-                              >
-                                新建分支
-                              </Button>
+                              {!newRepositoryIsQingzhou ? (
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  className="requirement-repo-create-branch"
+                                  icon={<PlusOutlined />}
+                                  disabled={!newRepositoryId}
+                                  onClick={() => openCreateBranch()}
+                                >
+                                  新建分支
+                                </Button>
+                              ) : null}
                               <Button
                                 type="primary"
                                 size="small"
                                 loading={bindingSaving}
-                                disabled={!newRepositoryId || !newBranchName}
+                                disabled={
+                                  !newRepositoryId ||
+                                  (newRepositoryIsQingzhou
+                                    ? !newQingzhouTaskId.trim()
+                                    : !newBranchName)
+                                }
                                 onClick={() => handleAddBinding()}
                               >
                                 添加

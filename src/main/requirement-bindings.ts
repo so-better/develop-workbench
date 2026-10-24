@@ -7,7 +7,7 @@ import { open, readFile, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { getProject } from './requirements'
-import { listRepositoryBranches } from './repositories'
+import { getRepositoryState, listRepositoryBranches } from './repositories'
 import { backupCorruptStore } from './store-backup'
 import type { RequirementBindingState, RequirementRepoBinding } from '../types/bindings'
 
@@ -32,35 +32,73 @@ const getStorePath = (): string => join(app.getPath('userData'), STORE_FILE)
 /**
  * 校验持久化的绑定记录。
  */
-const isStoredBinding = (value: unknown): value is RequirementRepoBinding => {
-  if (!value || typeof value !== 'object') return false
+const normalizeStoredBinding = (value: unknown): RequirementRepoBinding | null => {
+  if (!value || typeof value !== 'object') return null
 
   const binding = value as Record<string, unknown>
 
-  return (
-    typeof binding.id === 'string' &&
-    typeof binding.repositoryId === 'string' &&
-    typeof binding.branchName === 'string' &&
-    typeof binding.createdAt === 'string' &&
-    typeof binding.updatedAt === 'string'
-  )
+  if (
+    typeof binding.id !== 'string' ||
+    typeof binding.repositoryId !== 'string' ||
+    (binding.mode !== 'normal' && binding.mode !== 'qingzhou') ||
+    (binding.branchName !== null && typeof binding.branchName !== 'string') ||
+    (binding.qingzhouTaskId !== null &&
+      typeof binding.qingzhouTaskId !== 'string') ||
+    typeof binding.createdAt !== 'string' ||
+    typeof binding.updatedAt !== 'string'
+  ) {
+    return null
+  }
+
+  const mode = binding.mode
+  const branchName =
+    typeof binding.branchName === 'string' ? binding.branchName.trim() || null : null
+  const qingzhouTaskId =
+    typeof binding.qingzhouTaskId === 'string'
+      ? binding.qingzhouTaskId.trim() || null
+      : null
+
+  if (mode === 'normal' && !branchName) return null
+  if (mode === 'qingzhou' && !qingzhouTaskId) return null
+
+  return {
+    id: binding.id,
+    repositoryId: binding.repositoryId,
+    mode,
+    branchName,
+    qingzhouTaskId,
+    createdAt: binding.createdAt,
+    updatedAt: binding.updatedAt
+  }
 }
 
 /**
  * 校验持久化的工作区记录。
  */
-const isStoredWorkspace = (value: unknown): value is StoredWorkspace => {
-  if (!value || typeof value !== 'object') return false
+const normalizeStoredWorkspace = (value: unknown): StoredWorkspace | null => {
+  if (!value || typeof value !== 'object') return null
 
   const workspace = value as Record<string, unknown>
 
-  return (
-    typeof workspace.projectKey === 'string' &&
-    typeof workspace.requirementId === 'string' &&
-    typeof workspace.updatedAt === 'string' &&
-    Array.isArray(workspace.bindings) &&
-    workspace.bindings.every(isStoredBinding)
-  )
+  if (
+    typeof workspace.projectKey !== 'string' ||
+    typeof workspace.requirementId !== 'string' ||
+    typeof workspace.updatedAt !== 'string' ||
+    !Array.isArray(workspace.bindings)
+  ) {
+    return null
+  }
+
+  const bindings = workspace.bindings.map(normalizeStoredBinding)
+
+  if (bindings.some((binding) => binding === null)) return null
+
+  return {
+    projectKey: workspace.projectKey,
+    requirementId: workspace.requirementId,
+    bindings: bindings as RequirementRepoBinding[],
+    updatedAt: workspace.updatedAt
+  }
 }
 
 /**
@@ -94,7 +132,9 @@ const readStore = async (): Promise<BindingStore> => {
   }
 
   return {
-    workspaces: parsed.workspaces.filter(isStoredWorkspace)
+    workspaces: parsed.workspaces
+      .map(normalizeStoredWorkspace)
+      .filter((workspace): workspace is StoredWorkspace => workspace !== null)
   }
 }
 
@@ -236,7 +276,53 @@ export const addRequirementBinding = async (
       {
         id: randomUUID(),
         repositoryId,
+        mode: 'normal',
         branchName: normalizedBranch,
+        qingzhouTaskId: null,
+        createdAt: now,
+        updatedAt: now
+      }
+    ]
+  })
+}
+
+/**
+ * 绑定轻舟工作项。
+ */
+export const addQingzhouRequirementBinding = async (
+  requirementId: string,
+  repositoryId: string,
+  taskId: string
+): Promise<RequirementBindingState> => {
+  const normalizedTaskId = taskId.trim()
+
+  if (!repositoryId.trim()) throw new Error('仓库 ID 不合法')
+  if (!normalizedTaskId) throw new Error('请填写轻舟工作项 ID')
+  if (normalizedTaskId.length > 128) throw new Error('轻舟工作项 ID 过长')
+
+  const repositoryState = await getRepositoryState()
+  const repository = repositoryState.repositories.find(
+    (item) => item.id === repositoryId
+  )
+
+  if (!repository) throw new Error('仓库不存在')
+  if (!repository.qingzhouEnabled) throw new Error('该仓库未接入轻舟')
+
+  return updateBindings(requirementId, (bindings) => {
+    if (bindings.some((binding) => binding.repositoryId === repositoryId)) {
+      throw new Error('该仓库已经绑定')
+    }
+
+    const now = new Date().toISOString()
+
+    return [
+      ...bindings,
+      {
+        id: randomUUID(),
+        repositoryId,
+        mode: 'qingzhou',
+        branchName: null,
+        qingzhouTaskId: normalizedTaskId,
         createdAt: now,
         updatedAt: now
       }
@@ -260,6 +346,7 @@ export const updateRequirementBinding = async (
   const binding = state.bindings.find((item) => item.id === bindingId)
 
   if (!binding) throw new Error('绑定记录不存在')
+  if (binding.mode !== 'normal') throw new Error('轻舟绑定不支持手动选择分支')
 
   await assertBranchExists(binding.repositoryId, normalizedBranch)
 
@@ -312,6 +399,21 @@ export const initializeRequirementBindings = (): void => {
       }
 
       return addRequirementBinding(requirementId, repositoryId, branchName)
+    }
+  )
+
+  ipcMain.handle(
+    'bindings:add-qingzhou',
+    (_event, requirementId: unknown, repositoryId: unknown, taskId: unknown) => {
+      if (
+        typeof requirementId !== 'string' ||
+        typeof repositoryId !== 'string' ||
+        typeof taskId !== 'string'
+      ) {
+        throw new Error('绑定参数不合法')
+      }
+
+      return addQingzhouRequirementBinding(requirementId, repositoryId, taskId)
     }
   )
 

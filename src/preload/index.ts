@@ -271,6 +271,16 @@ const electronAPI = {
     ipcRenderer.invoke('bindings:add', requirementId, repositoryId, branchName),
 
   /**
+   * 绑定轻舟工作项。
+   */
+  addQingzhouRequirementBinding: (
+    requirementId: string,
+    repositoryId: string,
+    taskId: string
+  ): Promise<RequirementBindingState> =>
+    ipcRenderer.invoke('bindings:add-qingzhou', requirementId, repositoryId, taskId),
+
+  /**
    * 修改绑定分支。
    */
   updateRequirementBinding: (
