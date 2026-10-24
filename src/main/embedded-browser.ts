@@ -1,7 +1,9 @@
-import { BrowserWindow, ipcMain, session, WebContentsView } from 'electron'
-import type { Rectangle } from 'electron'
+import { BrowserWindow, ipcMain, session, shell, WebContentsView } from 'electron'
+import type { DownloadItem, Rectangle } from 'electron'
+import { randomUUID } from 'node:crypto'
 import type {
   EmbeddedBrowserBounds,
+  EmbeddedBrowserDownload,
   EmbeddedBrowserState
 } from '../types/embedded-browser'
 
@@ -22,6 +24,14 @@ interface BrowserEntry {
 }
 
 const entries = new Map<number, BrowserEntry>()
+const downloads = new Map<
+  string,
+  { item: DownloadItem; state: EmbeddedBrowserDownload }
+>()
+const retryWindows = new Map<
+  number,
+  { window: BrowserWindow; timer: NodeJS.Timeout }
+>()
 let browserSessionConfigured = false
 
 const getEmptyState = (): EmbeddedBrowserState => ({
@@ -31,6 +41,44 @@ const getEmptyState = (): EmbeddedBrowserState => ({
   loading: false,
   error: null
 })
+
+const closeRetryWindow = (webContentsId: number): void => {
+  const retry = retryWindows.get(webContentsId)
+
+  if (!retry) return
+
+  clearTimeout(retry.timer)
+  retryWindows.delete(webContentsId)
+
+  if (!retry.window.isDestroyed()) retry.window.destroy()
+}
+
+/**
+ * 向所有窗口广播下载列表，面板关闭后重新打开也能恢复记录。
+ */
+const broadcastDownloads = (): void => {
+  const state = Array.from(downloads.values())
+    .map((entry) => entry.state)
+    .sort((left, right) => right.startedAt - left.startedAt)
+
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue
+    window.webContents.send('embedded-browser:downloads', state)
+  }
+}
+
+const syncDownloadState = (
+  item: DownloadItem,
+  state: EmbeddedBrowserDownload
+): void => {
+  state.filename = item.getFilename() || state.filename
+  state.savePath = item.getSavePath() || null
+  state.totalBytes = item.getTotalBytes()
+  state.receivedBytes = item.getReceivedBytes()
+  state.bytesPerSecond = item.getCurrentBytesPerSecond()
+  state.canResume = item.canResume()
+  state.paused = item.isPaused()
+}
 
 const configureBrowserSession = (): void => {
   if (browserSessionConfigured) return
@@ -43,6 +91,44 @@ const configureBrowserSession = (): void => {
     callback(false)
   })
   browserSession.setPermissionCheckHandler(() => false)
+
+  // 保留 Electron 默认保存对话框，同时记录下载状态供面板展示和操作。
+  browserSession.on('will-download', (_event, item, webContents) => {
+    const state: EmbeddedBrowserDownload = {
+      id: randomUUID(),
+      filename: item.getFilename(),
+      url: item.getURL(),
+      savePath: null,
+      totalBytes: item.getTotalBytes(),
+      receivedBytes: 0,
+      bytesPerSecond: 0,
+      paused: false,
+      status: 'progressing',
+      startedAt: Date.now(),
+      canResume: item.canResume()
+    }
+
+    item.setSaveDialogOptions({
+      title: '保存文件',
+      buttonLabel: '保存'
+    })
+    downloads.set(state.id, { item, state })
+    broadcastDownloads()
+
+    item.on('updated', (_updatedEvent, updatedState) => {
+      syncDownloadState(item, state)
+      state.status = updatedState
+      broadcastDownloads()
+    })
+
+    item.on('done', (_doneEvent, result) => {
+      syncDownloadState(item, state)
+      state.status = result
+      state.savePath = item.getSavePath() || state.savePath
+      broadcastDownloads()
+      closeRetryWindow(webContents.id)
+    })
+  })
 }
 
 const normalizeHttpUrl = (rawUrl: string): string | null => {
@@ -383,6 +469,40 @@ export const openEmbeddedBrowser = (window: BrowserWindow, rawUrl: string): bool
   return loadUrl(entry, rawUrl)
 }
 
+const retryDownload = (downloadId: string): void => {
+  const entry = downloads.get(downloadId)
+
+  if (!entry) throw new Error('下载记录不存在')
+  if (entry.state.status !== 'interrupted') {
+    throw new Error('只有中断的下载可以重试')
+  }
+
+  const retryWindow = new BrowserWindow({
+    show: false,
+    width: 1,
+    height: 1,
+    skipTaskbar: true,
+    webPreferences: {
+      partition: BROWSER_PARTITION,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  })
+  const timer = setTimeout(() => {
+    closeRetryWindow(retryWindow.webContents.id)
+  }, 30 * 60 * 1000)
+
+  retryWindows.set(retryWindow.webContents.id, { window: retryWindow, timer })
+
+  try {
+    retryWindow.webContents.downloadURL(entry.state.url)
+  } catch (error) {
+    closeRetryWindow(retryWindow.webContents.id)
+    throw error
+  }
+}
+
 export const initializeEmbeddedBrowser = (): void => {
   ipcMain.handle('embedded-browser:open', (event, rawUrl: unknown) => {
     if (typeof rawUrl !== 'string') throw new Error('链接格式不合法')
@@ -504,5 +624,87 @@ export const initializeEmbeddedBrowser = (): void => {
     }
 
     applyVisibility(entry)
+  })
+
+  ipcMain.handle('embedded-browser:get-downloads', () =>
+    Array.from(downloads.values())
+      .map((entry) => entry.state)
+      .sort((left, right) => right.startedAt - left.startedAt)
+  )
+
+  ipcMain.handle('embedded-browser:cancel-download', (_event, downloadId: unknown) => {
+    if (typeof downloadId !== 'string') throw new Error('下载 ID 不合法')
+
+    downloads.get(downloadId)?.item.cancel()
+  })
+
+  ipcMain.handle('embedded-browser:open-download', async (_event, downloadId: unknown) => {
+    if (typeof downloadId !== 'string') throw new Error('下载 ID 不合法')
+
+    const entry = downloads.get(downloadId)
+
+    if (!entry?.state.savePath || entry.state.status !== 'completed') {
+      throw new Error('文件尚未下载完成')
+    }
+
+    const error = await shell.openPath(entry.state.savePath)
+
+    if (error) throw new Error(error)
+  })
+
+  ipcMain.handle(
+    'embedded-browser:show-download',
+    (_event, downloadId: unknown) => {
+      if (typeof downloadId !== 'string') throw new Error('下载 ID 不合法')
+
+      const entry = downloads.get(downloadId)
+
+      if (!entry?.state.savePath) throw new Error('文件路径不存在')
+
+      shell.showItemInFolder(entry.state.savePath)
+    }
+  )
+
+  ipcMain.handle('embedded-browser:clear-downloads', () => {
+    for (const [id, entry] of downloads) {
+      if (entry.state.status !== 'progressing') downloads.delete(id)
+    }
+
+    broadcastDownloads()
+  })
+
+  ipcMain.handle('embedded-browser:pause-download', (_event, downloadId: unknown) => {
+    if (typeof downloadId !== 'string') throw new Error('下载 ID 不合法')
+
+    const entry = downloads.get(downloadId)
+
+    if (!entry || entry.state.status !== 'progressing') {
+      throw new Error('当前下载不能暂停')
+    }
+
+    entry.item.pause()
+    syncDownloadState(entry.item, entry.state)
+    entry.state.paused = true
+    broadcastDownloads()
+  })
+
+  ipcMain.handle('embedded-browser:resume-download', (_event, downloadId: unknown) => {
+    if (typeof downloadId !== 'string') throw new Error('下载 ID 不合法')
+
+    const entry = downloads.get(downloadId)
+
+    if (!entry || entry.state.status !== 'progressing') {
+      throw new Error('当前下载不能继续')
+    }
+
+    entry.item.resume()
+    syncDownloadState(entry.item, entry.state)
+    entry.state.paused = false
+    broadcastDownloads()
+  })
+
+  ipcMain.handle('embedded-browser:retry-download', (_event, downloadId: unknown) => {
+    if (typeof downloadId !== 'string') throw new Error('下载 ID 不合法')
+    retryDownload(downloadId)
   })
 }

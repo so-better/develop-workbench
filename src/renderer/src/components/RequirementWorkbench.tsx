@@ -48,6 +48,7 @@ import type { RequirementRepoBinding } from '../../../types/bindings'
 import type { Repository, RepositoryBindingStatus } from '../../../types/repository'
 import type {
   MeegleMyRequirements,
+  MeegleProject,
   MeegleRequirement,
   MeegleRequirementActivity,
   MeegleRequirementCollaborator,
@@ -391,6 +392,9 @@ export default function RequirementWorkbench({
 }: RequirementWorkbenchProps): JSX.Element {
   const { message, notification } = App.useApp()
   const [data, setData] = useState<MeegleMyRequirements | null>(null)
+  const [projects, setProjects] = useState<MeegleProject[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectSwitching, setProjectSwitching] = useState(false)
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -408,6 +412,20 @@ export default function RequirementWorkbench({
     () => data?.groups.flatMap((group) => group.requirements) ?? [],
     [data]
   )
+
+  /** 空间选择器选项，始终包含当前需求列表所属空间。 */
+  const projectOptions = useMemo(() => {
+    const options = new Map(projects.map((project) => [project.projectKey, project]))
+
+    if (data?.project) {
+      options.set(data.project.projectKey, data.project)
+    }
+
+    return Array.from(options.values()).map((project) => ({
+      value: project.projectKey,
+      label: project.name
+    }))
+  }, [data?.project, projects])
 
   /** 当前选中的需求。 */
   const selectedRequirement =
@@ -778,6 +796,59 @@ export default function RequirementWorkbench({
     loadRequirements()
   }, [loadRequirements])
 
+  useEffect(() => {
+    let mounted = true
+
+    setProjectsLoading(true)
+    window.electron
+      .listMeegleProjects()
+      .then((items) => {
+        if (mounted) setProjects(items)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (mounted) setProjectsLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  /**
+   * 切换 Meegle 空间并重新加载需求。
+   * 绑定数据按 projectKey 隔离，切换后由需求 ID 重新读取。
+   */
+  const handleProjectChange = async (projectKey: string): Promise<void> => {
+    if (!projectKey || projectKey === data?.project.projectKey) return
+
+    setProjectSwitching(true)
+
+    try {
+      const project = await window.electron.setMeegleProject(projectKey)
+
+      localStorage.removeItem(SELECTED_REQUIREMENT_KEY)
+      setProjects((current) =>
+        current.some((item) => item.projectKey === project.projectKey)
+          ? current
+          : [...current, project]
+      )
+      setSelectedRequirementId(null)
+      setRequirementFilter('')
+      setStatusFilters([])
+      setCollapsedGroupKeys(new Set())
+      setActivity(null)
+      setBindings([])
+      setData(null)
+      await loadRequirements()
+      message.success(`已切换到 ${project.name}`)
+    } catch (switchError) {
+      message.error(getErrorMessage(switchError))
+    } finally {
+      setProjectSwitching(false)
+    }
+  }
+
   /**
    * 刷新需求和流程节点。
    */
@@ -971,18 +1042,20 @@ export default function RequirementWorkbench({
 
     Promise.all(
       bindings.map(async (binding) => {
-        // 轻舟模式检查需求分支；迭代分支只展示，不作为 IDE 检出目标。
-        const branchName =
+        const requirementBranch =
           binding.mode === 'qingzhou'
             ? binding.requirementBranch
             : binding.branchName
+        const iterationBranch =
+          binding.mode === 'qingzhou' ? binding.iterationBranch : null
 
-        if (!branchName) return null
+        if (!requirementBranch && !iterationBranch) return null
 
         try {
           const status = await window.electron.getRepositoryBindingStatus(
             binding.repositoryId,
-            branchName
+            requirementBranch ?? '',
+            iterationBranch
           )
 
           return [binding.id, status] as const
@@ -1305,8 +1378,15 @@ export default function RequirementWorkbench({
       binding.mode === 'qingzhou' ? binding.requirementBranch : binding.branchName
     const iterationBranch =
       binding.mode === 'qingzhou' ? binding.iterationBranch : null
+    const status = bindingStatuses[binding.id]
+    const canUseRequirement = Boolean(
+      requirementBranch && (!status || status.branchExists)
+    )
+    const canUseIteration = Boolean(
+      iterationBranch && (!status || status.iterationBranchExists)
+    )
 
-    if (binding.mode === 'qingzhou' && requirementBranch && iterationBranch) {
+    if (binding.mode === 'qingzhou' && canUseRequirement && canUseIteration) {
       const stored = localStorage.getItem(getBranchChoiceKey(binding.repositoryId))
 
       setBranchChoiceType(stored === 'iteration' ? 'iteration' : 'requirement')
@@ -1315,9 +1395,17 @@ export default function RequirementWorkbench({
       return
     }
 
-    const branchName = requirementBranch || iterationBranch
+    if (canUseRequirement) {
+      void handleOpenInIde(binding, requirementBranch as string)
+      return
+    }
 
-    if (branchName) void handleOpenInIde(binding, branchName)
+    if (canUseIteration) {
+      void handleOpenInIde(binding, iterationBranch as string)
+      return
+    }
+
+    message.error('绑定的分支在本地不存在，请先点击同步或刷新')
   }
 
   const handleConfirmBranchChoice = (): void => {
@@ -2000,7 +2088,19 @@ export default function RequirementWorkbench({
           <div className="workbench-brand-mark">W</div>
           <div className="workbench-brand-text">
             <strong>研发工作台</strong>
-            <span>{projectName}</span>
+            <Select
+              size="small"
+              variant="borderless"
+              showSearch
+              className="workbench-project-select"
+              value={data?.project.projectKey}
+              options={projectOptions}
+              loading={projectsLoading || projectSwitching}
+              disabled={projectSwitching}
+              optionFilterProp="label"
+              popupMatchSelectWidth={220}
+              onChange={(value: string) => void handleProjectChange(value)}
+            />
           </div>
         </div>
 
@@ -2273,6 +2373,18 @@ export default function RequirementWorkbench({
                               bindingStatus &&
                               !bindingStatus.branchExists
                           )
+                          const iterationBranchMissing = Boolean(
+                            isQingzhou &&
+                              binding.iterationBranch &&
+                              bindingStatus &&
+                              !bindingStatus.iterationBranchExists
+                          )
+                          const qingzhouBranchesMissing = Boolean(
+                            isQingzhou &&
+                              bindingStatus &&
+                              !bindingStatus.branchExists &&
+                              !bindingStatus.iterationBranchExists
+                          )
 
                           return (
                             <div className="requirement-repo-row" key={binding.id}>
@@ -2329,6 +2441,13 @@ export default function RequirementWorkbench({
                                       icon={<TagOutlined />}
                                       value={binding.iterationBranch}
                                       placeholder="待绑定"
+                                      status={
+                                        iterationBranchMissing ? (
+                                          <Tag color="red" bordered={false}>
+                                            不存在
+                                          </Tag>
+                                        ) : undefined
+                                      }
                                       onCopy={handleCopyBranchName}
                                     />
                                     {!binding.qingzhouTaskId ? (
@@ -2418,8 +2537,10 @@ export default function RequirementWorkbench({
                                   disabled={
                                     !repository?.available ||
                                     (isQingzhou
-                                      ? !binding.requirementBranch && !binding.iterationBranch
+                                      ? !binding.requirementBranch &&
+                                        !binding.iterationBranch
                                       : bindingStatus?.branchExists === false) ||
+                                    qingzhouBranchesMissing ||
                                     (openingIdeBindingId !== null && !openingThisBinding)
                                   }
                                   onClick={() => handleRequestOpenInIde(binding)}

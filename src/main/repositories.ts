@@ -695,7 +695,8 @@ export const prepareRepositoryForIde = async (
  */
 export const getRepositoryBindingStatus = async (
   repositoryId: string,
-  branchName: string
+  branchName: string,
+  iterationBranch?: string | null
 ): Promise<RepositoryBindingStatus> => {
   const repositories = await readStore()
   const repository = repositories.find((item) => item.id === repositoryId)
@@ -703,14 +704,16 @@ export const getRepositoryBindingStatus = async (
   if (!repository) {
     return {
       available: false,
-      branchExists: false
+      branchExists: false,
+      iterationBranchExists: false
     }
   }
 
   if (!(await pathExists(repository.localPath))) {
     return {
       available: false,
-      branchExists: false
+      branchExists: false,
+      iterationBranchExists: false
     }
   }
 
@@ -718,7 +721,8 @@ export const getRepositoryBindingStatus = async (
 
   return {
     available: true,
-    branchExists: branches.includes(branchName)
+    branchExists: Boolean(branchName) && branches.includes(branchName),
+    iterationBranchExists: Boolean(iterationBranch) && branches.includes(iterationBranch as string)
   }
 }
 
@@ -1241,12 +1245,21 @@ export const initializeRepositories = (): void => {
   // 读取需求仓库绑定的实时状态。
   ipcMain.handle(
     'repositories:get-binding-status',
-    (_event, repositoryId: unknown, branchName: unknown) => {
+    (
+      _event,
+      repositoryId: unknown,
+      branchName: unknown,
+      iterationBranch: unknown
+    ) => {
       if (typeof repositoryId !== 'string' || typeof branchName !== 'string') {
         throw new Error('Invalid binding status input')
       }
 
-      return getRepositoryBindingStatus(repositoryId, branchName)
+      return getRepositoryBindingStatus(
+        repositoryId,
+        branchName,
+        typeof iterationBranch === 'string' && iterationBranch ? iterationBranch : null
+      )
     }
   )
 

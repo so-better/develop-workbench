@@ -3,6 +3,7 @@ import type { AppInfo } from '../types/app'
 import type { GitInfo } from '../types/git'
 import type {
   EmbeddedBrowserBounds,
+  EmbeddedBrowserDownload,
   EmbeddedBrowserState
 } from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
@@ -12,6 +13,7 @@ import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
   MeegleMyRequirements,
+  MeegleProject,
   MeegleRequirementActivity,
   MeegleRequirementOwner,
   UpdateNodeInfoInput
@@ -45,6 +47,26 @@ export interface ElectronAPI {
   setEmbeddedBrowserBounds: (bounds: EmbeddedBrowserBounds) => Promise<void>
   /** 临时隐藏/恢复内嵌浏览器，用于覆盖层和弹窗。 */
   setEmbeddedBrowserSuppressed: (suppressed: boolean) => Promise<void>
+  /** 读取内嵌浏览器下载列表。 */
+  getEmbeddedBrowserDownloads: () => Promise<EmbeddedBrowserDownload[]>
+  /** 取消下载。 */
+  cancelEmbeddedBrowserDownload: (downloadId: string) => Promise<void>
+  /** 暂停下载。 */
+  pauseEmbeddedBrowserDownload: (downloadId: string) => Promise<void>
+  /** 继续下载。 */
+  resumeEmbeddedBrowserDownload: (downloadId: string) => Promise<void>
+  /** 重试中断的下载。 */
+  retryEmbeddedBrowserDownload: (downloadId: string) => Promise<void>
+  /** 打开已下载文件。 */
+  openEmbeddedBrowserDownload: (downloadId: string) => Promise<void>
+  /** 在文件管理器中显示下载文件。 */
+  showEmbeddedBrowserDownload: (downloadId: string) => Promise<void>
+  /** 清除已结束的下载记录。 */
+  clearEmbeddedBrowserDownloads: () => Promise<void>
+  /** 订阅下载列表变化。 */
+  onEmbeddedBrowserDownloads: (
+    listener: (downloads: EmbeddedBrowserDownload[]) => void
+  ) => () => void
   /** 订阅内嵌浏览器状态。 */
   onEmbeddedBrowserState: (
     listener: (state: EmbeddedBrowserState) => void
@@ -119,6 +141,10 @@ export interface ElectronAPI {
   onMeegleLoginEvent: (listener: (event: MeegleLoginEvent) => void) => () => void
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: () => Promise<MeegleMyRequirements>
+  /** 读取用户可访问的 Meegle 空间。 */
+  listMeegleProjects: () => Promise<MeegleProject[]>
+  /** 切换当前 Meegle 空间。 */
+  setMeegleProject: (projectKey: string) => Promise<MeegleProject>
   /** 按姓名或邮箱搜索 Meegle 用户。 */
   searchRequirementUsers: (keyword: string) => Promise<MeegleRequirementOwner[]>
   /** 更新需求描述。 */
@@ -179,7 +205,8 @@ export interface ElectronAPI {
   /** 读取需求仓库绑定的实时状态。 */
   getRepositoryBindingStatus: (
     repositoryId: string,
-    branchName: string
+    branchName: string,
+    iterationBranch?: string | null
   ) => Promise<RepositoryBindingStatus>
   /** 从基线分支创建本地开发分支。 */
   createRepositoryBranch: (

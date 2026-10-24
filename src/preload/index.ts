@@ -5,6 +5,7 @@ import type { AppInfo } from '../types/app'
 import type { GitInfo } from '../types/git'
 import type {
   EmbeddedBrowserBounds,
+  EmbeddedBrowserDownload,
   EmbeddedBrowserState
 } from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
@@ -14,6 +15,7 @@ import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
   MeegleMyRequirements,
+  MeegleProject,
   MeegleRequirementActivity,
   MeegleRequirementOwner,
   UpdateNodeInfoInput
@@ -61,6 +63,47 @@ const electronAPI = {
 
   setEmbeddedBrowserSuppressed: (suppressed: boolean): Promise<void> =>
     ipcRenderer.invoke('embedded-browser:set-suppressed', suppressed),
+
+  getEmbeddedBrowserDownloads: (): Promise<EmbeddedBrowserDownload[]> =>
+    ipcRenderer.invoke('embedded-browser:get-downloads'),
+
+  cancelEmbeddedBrowserDownload: (downloadId: string): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:cancel-download', downloadId),
+
+  pauseEmbeddedBrowserDownload: (downloadId: string): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:pause-download', downloadId),
+
+  resumeEmbeddedBrowserDownload: (downloadId: string): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:resume-download', downloadId),
+
+  retryEmbeddedBrowserDownload: (downloadId: string): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:retry-download', downloadId),
+
+  openEmbeddedBrowserDownload: (downloadId: string): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:open-download', downloadId),
+
+  showEmbeddedBrowserDownload: (downloadId: string): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:show-download', downloadId),
+
+  clearEmbeddedBrowserDownloads: (): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:clear-downloads'),
+
+  onEmbeddedBrowserDownloads: (
+    listener: (downloads: EmbeddedBrowserDownload[]) => void
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      downloads: EmbeddedBrowserDownload[]
+    ): void => {
+      listener(downloads)
+    }
+
+    ipcRenderer.on('embedded-browser:downloads', handler)
+
+    return () => {
+      ipcRenderer.removeListener('embedded-browser:downloads', handler)
+    }
+  },
 
   onEmbeddedBrowserState: (
     listener: (state: EmbeddedBrowserState) => void
@@ -278,6 +321,18 @@ const electronAPI = {
     ipcRenderer.invoke('requirements:get-my'),
 
   /**
+   * 读取用户可访问的 Meegle 空间。
+   */
+  listMeegleProjects: (): Promise<MeegleProject[]> =>
+    ipcRenderer.invoke('requirements:list-projects'),
+
+  /**
+   * 切换当前 Meegle 空间。
+   */
+  setMeegleProject: (projectKey: string): Promise<MeegleProject> =>
+    ipcRenderer.invoke('requirements:set-project', projectKey),
+
+  /**
    * 按姓名或邮箱搜索 Meegle 用户。
    */
   searchRequirementUsers: (keyword: string): Promise<MeegleRequirementOwner[]> =>
@@ -400,9 +455,15 @@ const electronAPI = {
    */
   getRepositoryBindingStatus: (
     repositoryId: string,
-    branchName: string
+    branchName: string,
+    iterationBranch?: string | null
   ): Promise<RepositoryBindingStatus> =>
-    ipcRenderer.invoke('repositories:get-binding-status', repositoryId, branchName),
+    ipcRenderer.invoke(
+      'repositories:get-binding-status',
+      repositoryId,
+      branchName,
+      iterationBranch
+    ),
 
   /**
    * 从基线分支创建本地开发分支。

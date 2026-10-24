@@ -1,6 +1,10 @@
 import { useState } from 'react'
-import { LogoutOutlined, SettingOutlined } from '@ant-design/icons'
-import { App, Avatar, Button, Popconfirm } from 'antd'
+import {
+  DownloadOutlined,
+  LogoutOutlined,
+  SettingOutlined
+} from '@ant-design/icons'
+import { App, Avatar, Badge, Button, Popconfirm, Tooltip } from 'antd'
 import ThemeSwitcher from './ThemeSwitcher'
 import type { AppInfo } from '../../../types/app'
 import type { LarkUser } from '../../../types/lark'
@@ -10,6 +14,8 @@ interface AppFooterProps {
   appInfo: AppInfo | null
   onOpenSettings: () => void
   onLogout: () => Promise<void>
+  downloadCount: number
+  onOpenDownloads: () => void
 }
 
 /**
@@ -20,7 +26,9 @@ export default function AppFooter({
   user,
   appInfo,
   onOpenSettings,
-  onLogout
+  onLogout,
+  downloadCount,
+  onOpenDownloads
 }: AppFooterProps): JSX.Element {
   const { message } = App.useApp()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -71,12 +79,30 @@ export default function AppFooter({
       </div>
 
       <div className="footer-actions">
-        {appInfo ? <span className="footer-version">v{appInfo.appVersion}</span> : null}
-        <button type="button" className="footer-settings" onClick={onOpenSettings}>
-          <SettingOutlined />
-          <span>设置</span>
-        </button>
+        <Badge count={downloadCount} size="small">
+          <Tooltip title="下载管理">
+            <Button
+              type="text"
+              size="small"
+              className="footer-download"
+              icon={<DownloadOutlined />}
+              aria-label="下载管理"
+              onClick={onOpenDownloads}
+            />
+          </Tooltip>
+        </Badge>
+        <Tooltip title="设置">
+          <button
+            type="button"
+            className="footer-settings"
+            aria-label="设置"
+            onClick={onOpenSettings}
+          >
+            <SettingOutlined />
+          </button>
+        </Tooltip>
         <ThemeSwitcher />
+        {appInfo ? <span className="footer-version">v{appInfo.appVersion}</span> : null}
       </div>
     </footer>
   )

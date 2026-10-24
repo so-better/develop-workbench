@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Spin } from 'antd'
+import { Modal, Spin } from 'antd'
 import AppFooter from './components/AppFooter'
+import EmbeddedBrowserDownloads from './components/EmbeddedBrowserDownloads'
 import EmbeddedBrowserPanel from './components/EmbeddedBrowserPanel'
 import LoginState from './components/LoginState'
 import RequirementWorkbench from './components/RequirementWorkbench'
 import SettingsModal from './components/SettingsModal'
+import { useEmbeddedDownloads } from './hooks/useEmbeddedDownloads'
 import type { AppInfo } from '../../types/app'
 import type { LarkCliInfo, LarkUser } from '../../types/lark'
 import type { SettingsSection } from '../../types/settings'
@@ -29,6 +31,12 @@ export default function App(): JSX.Element {
   // 设置弹窗开关状态及打开时定位到的设置分类。
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('ai')
+
+  // 内嵌浏览器下载状态统一由应用层维护，Footer 和浏览器面板共用。
+  const { downloads, activeCount } = useEmbeddedDownloads()
+  const [browserVisible, setBrowserVisible] = useState(false)
+  const [downloadsPanelOpen, setDownloadsPanelOpen] = useState(false)
+  const [downloadsModalOpen, setDownloadsModalOpen] = useState(false)
 
   /**
    * 刷新 lark 登录状态。
@@ -84,8 +92,38 @@ export default function App(): JSX.Element {
   useEffect(() => {
     if (!authLoading && !larkUser) {
       void window.electron.closeEmbeddedBrowser()
+      setDownloadsPanelOpen(false)
+      setDownloadsModalOpen(false)
     }
   }, [authLoading, larkUser])
+
+  useEffect(() => {
+    let mounted = true
+
+    window.electron
+      .getEmbeddedBrowserState()
+      .then((state) => {
+        if (mounted) setBrowserVisible(state.visible)
+      })
+      .catch(() => undefined)
+
+    const unsubscribe = window.electron.onEmbeddedBrowserState((state) => {
+      setBrowserVisible(state.visible)
+    })
+
+    return () => {
+      mounted = false
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (browserVisible) {
+      setDownloadsModalOpen(false)
+    } else {
+      setDownloadsPanelOpen(false)
+    }
+  }, [browserVisible])
 
   useEffect(() => {
     let mounted = true
@@ -110,6 +148,15 @@ export default function App(): JSX.Element {
     }
   }, [refreshLarkState])
 
+  const handleOpenDownloads = (): void => {
+    if (browserVisible) {
+      setDownloadsPanelOpen((value) => !value)
+      return
+    }
+
+    setDownloadsModalOpen(true)
+  }
+
   return (
     <div className="app-shell">
       <div className="app-body">
@@ -132,7 +179,13 @@ export default function App(): JSX.Element {
           )}
         </main>
 
-        {larkUser && !authLoading ? <EmbeddedBrowserPanel /> : null}
+        {larkUser && !authLoading ? (
+          <EmbeddedBrowserPanel
+            downloads={downloads}
+            downloadsOpen={downloadsPanelOpen}
+            onCloseDownloads={() => setDownloadsPanelOpen(false)}
+          />
+        ) : null}
       </div>
 
       {/* 未登录时 Footer 左侧为空，右侧始终保留设置入口和版本号。 */}
@@ -141,6 +194,8 @@ export default function App(): JSX.Element {
         appInfo={appInfo}
         onOpenSettings={() => openSettings()}
         onLogout={handleLogout}
+        downloadCount={activeCount}
+        onOpenDownloads={handleOpenDownloads}
       />
 
       {/* lark-cli 路径修改后立即刷新登录状态。 */}
@@ -152,6 +207,17 @@ export default function App(): JSX.Element {
         onClose={() => setSettingsOpen(false)}
       />
 
+      <Modal
+        title="下载管理"
+        open={downloadsModalOpen}
+        footer={null}
+        width={620}
+        className="download-manager-modal"
+        destroyOnHidden
+        onCancel={() => setDownloadsModalOpen(false)}
+      >
+        <EmbeddedBrowserDownloads downloads={downloads} />
+      </Modal>
     </div>
   )
 }

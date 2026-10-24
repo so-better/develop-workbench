@@ -61,6 +61,9 @@ export interface RepositoryBindingStatus {
 
   /** 绑定的目标分支是否存在。 */
   branchExists: boolean
+
+  /** 轻舟迭代分支是否存在。 */
+  iterationBranchExists: boolean
 }
 
 /**

@@ -1,5 +1,5 @@
 import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
-import { Button, Dropdown } from 'antd'
+import { Button, Dropdown, Tooltip } from 'antd'
 import type { MenuProps } from 'antd'
 import type { ThemeMode } from '../../../types/theme'
 import { useTheme } from '../theme/ThemeProvider'
@@ -36,14 +36,17 @@ export default function ThemeSwitcher(): JSX.Element {
         onClick: ({ key }) => setMode(key as ThemeMode)
       }}
     >
-      <Button
-        type="text"
-        size="small"
-        className="theme-trigger"
-        icon={activeOption.icon}
-        aria-label={`主题：${activeOption.label}`}
-        title={`主题：${activeOption.label}`}
-      />
+      <span className="theme-trigger-wrapper">
+        <Tooltip title={`主题：${activeOption.label}`}>
+          <Button
+            type="text"
+            size="small"
+            className="theme-trigger"
+            icon={activeOption.icon}
+            aria-label={`主题：${activeOption.label}`}
+          />
+        </Tooltip>
+      </span>
     </Dropdown>
   )
 }

@@ -14,6 +14,7 @@ export interface AppPreferences {
   theme: ThemeMode
   larkCliPath?: string
   meegleCliPath?: string
+  meegleProjectKey?: string
   repositoryRoot?: string
   gitPath?: string
   ide?: IdeConfig
@@ -106,6 +107,7 @@ const readPreferences = (): AppPreferences => {
     theme?: unknown
     larkCliPath?: unknown
     meegleCliPath?: unknown
+    meegleProjectKey?: unknown
     repositoryRoot?: unknown
     gitPath?: unknown
     ide?: unknown
@@ -115,6 +117,7 @@ const readPreferences = (): AppPreferences => {
     theme: isThemeMode(value.theme) ? value.theme : DEFAULT_PREFERENCES.theme,
     larkCliPath: normalizePath(value.larkCliPath),
     meegleCliPath: normalizePath(value.meegleCliPath),
+    meegleProjectKey: normalizePath(value.meegleProjectKey),
     repositoryRoot: normalizePath(value.repositoryRoot),
     gitPath: normalizePath(value.gitPath),
     ide: isIdeConfig(value.ide) ? value.ide : undefined
@@ -140,6 +143,7 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
 
   next.larkCliPath = normalizePath(next.larkCliPath)
   next.meegleCliPath = normalizePath(next.meegleCliPath)
+  next.meegleProjectKey = normalizePath(next.meegleProjectKey)
   next.repositoryRoot = normalizePath(next.repositoryRoot)
   next.gitPath = normalizePath(next.gitPath)
   next.ide = isIdeConfig(next.ide) ? next.ide : undefined

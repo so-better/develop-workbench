@@ -3,13 +3,16 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import {
   CloseOutlined,
   CompressOutlined,
+  DownloadOutlined,
   ExpandOutlined,
   GlobalOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
 import { Button, Tooltip } from 'antd'
+import EmbeddedBrowserDownloads from './EmbeddedBrowserDownloads'
 import type {
   EmbeddedBrowserBounds,
+  EmbeddedBrowserDownload,
   EmbeddedBrowserState
 } from '../../../types/embedded-browser'
 
@@ -41,11 +44,26 @@ const hasVisibleModal = (): boolean =>
     }
   )
 
+interface EmbeddedBrowserPanelProps {
+  /** 应用层维护的下载列表。 */
+  downloads: EmbeddedBrowserDownload[]
+
+  /** 是否展开底部下载抽屉。 */
+  downloadsOpen: boolean
+
+  /** 关闭底部下载抽屉。 */
+  onCloseDownloads: () => void
+}
+
 /**
  * 应用内浏览器。
  * 所有外部链接统一在这个面板中打开，不调用系统浏览器。
  */
-export default function EmbeddedBrowserPanel(): JSX.Element | null {
+export default function EmbeddedBrowserPanel({
+  downloads,
+  downloadsOpen,
+  onCloseDownloads
+}: EmbeddedBrowserPanelProps): JSX.Element | null {
   const [state, setState] = useState<EmbeddedBrowserState | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [opening, setOpening] = useState(false)
@@ -385,7 +403,35 @@ export default function EmbeddedBrowserPanel(): JSX.Element | null {
       ) : null}
 
         <div ref={viewportRef} className="embedded-browser-viewport" />
+
+        {downloadsOpen ? (
+          <section className="embedded-browser-download-panel">
+            <div className="embedded-browser-download-panel-head">
+              <strong>
+                <DownloadOutlined />
+                下载管理
+              </strong>
+              <span className="embedded-browser-download-summary">
+                {downloads.filter((item) => item.status === 'progressing').length > 0
+                  ? `${
+                      downloads.filter((item) => item.status === 'progressing').length
+                    } 个下载中 · `
+                  : ''}
+                共 {downloads.length} 项
+              </span>
+              <Button
+                type="text"
+                size="small"
+                icon={<CloseOutlined />}
+                aria-label="关闭下载管理"
+                onClick={onCloseDownloads}
+              />
+            </div>
+            <EmbeddedBrowserDownloads downloads={downloads} />
+          </section>
+        ) : null}
       </aside>
+
     </>
   )
 }

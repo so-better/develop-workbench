@@ -4,6 +4,7 @@
  */
 import { ipcMain } from 'electron'
 import { runMeegle } from './meegle'
+import { getPreferences, updatePreferences } from './preferences'
 import type {
   MeegleMyRequirements,
   MeegleNodeFormItem,
@@ -36,6 +37,11 @@ interface ProjectSearchResponse {
     project_key?: string
     simple_name?: string
   }>
+  pagination?: {
+    has_more?: boolean
+    page_num?: number
+    total?: number
+  }
   error?: CliError
 }
 
@@ -267,27 +273,126 @@ const ensureWriteSuccess = (result: CommandResult, action: string): void => {
   }
 }
 
+const toMeegleProject = (
+  project: { name?: string; project_key?: string; simple_name?: string } | undefined
+): MeegleProject | null => {
+  const name = project?.name?.trim()
+  const projectKey = project?.project_key?.trim()
+  const key = project?.simple_name?.trim() || projectKey
+
+  if (!name || !key || !projectKey) return null
+
+  return { key, projectKey, name }
+}
+
+const clearProjectScopedCaches = (): void => {
+  cachedProject = null
+  roleCache.clear()
+  cachedRootTeams = null
+}
+
 /**
- * 获取当前最近访问的 Meegle 空间。
- * 空间信息在进程内缓存，避免每次切换需求都重复查询。
+ * 读取用户可访问的 Meegle 空间。
+ */
+export const listMeegleProjects = async (): Promise<MeegleProject[]> => {
+  const projects = new Map<string, MeegleProject>()
+  let page = 1
+
+  while (page <= 20) {
+    const result = await runMeegle(
+      [
+        'project',
+        'search',
+        '--page-num',
+        String(page),
+        '--format',
+        'json'
+      ],
+      MEEGLE_QUERY_TIMEOUT_MS
+    )
+    const response = parseCommandJson<ProjectSearchResponse>(result, '读取 Meegle 空间')
+
+    for (const project of response.projects ?? []) {
+      const normalized = toMeegleProject(project)
+
+      if (normalized) projects.set(normalized.projectKey, normalized)
+    }
+
+    if (!response.pagination?.has_more) break
+
+    page += 1
+  }
+
+  return Array.from(projects.values())
+}
+
+/**
+ * 切换 Meegle 空间。
+ * 手动选择的空间持久化在偏好中，并清空该空间相关的角色/团队缓存。
+ */
+export const setMeegleProject = async (projectKey: string): Promise<MeegleProject> => {
+  const normalizedKey = projectKey.trim()
+
+  if (!normalizedKey) throw new Error('空间 key 不合法')
+
+  const result = await runMeegle(
+    [
+      'project',
+      'search',
+      '--project-key',
+      normalizedKey,
+      '--format',
+      'json'
+    ],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+  const response = parseCommandJson<ProjectSearchResponse>(result, '切换 Meegle 空间')
+  const project = toMeegleProject(response.projects?.[0])
+
+  if (!project) throw new Error('没有找到可用的 Meegle 空间')
+
+  updatePreferences({ meegleProjectKey: project.projectKey })
+  clearProjectScopedCaches()
+  cachedProject = {
+    value: project,
+    expiresAt: Date.now() + PROJECT_CACHE_TTL_MS
+  }
+
+  return project
+}
+
+/**
+ * 获取当前选中的 Meegle 空间。
+ * 未手动选择时继续使用最近访问的空间。
  */
 export const getProject = async (): Promise<MeegleProject> => {
   if (cachedProject && cachedProject.expiresAt > Date.now()) {
     return cachedProject.value
   }
 
-  const result = await runMeegle(['project', 'search', '--format', 'json'], MEEGLE_QUERY_TIMEOUT_MS)
+  const selectedProjectKey = getPreferences().meegleProjectKey
+  const result = await runMeegle(
+    selectedProjectKey
+      ? [
+          'project',
+          'search',
+          '--project-key',
+          selectedProjectKey,
+          '--format',
+          'json'
+        ]
+      : ['project', 'search', '--format', 'json'],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
   const response = parseCommandJson<ProjectSearchResponse>(result, '读取 Meegle 空间')
-  const project = response.projects?.[0]
-  const name = project?.name?.trim()
-  const projectKey = project?.project_key?.trim()
-  const key = project?.simple_name?.trim() || projectKey
+  const value = toMeegleProject(response.projects?.[0])
 
-  if (!name || !key || !projectKey) {
-    throw new Error('没有找到可用的 Meegle 空间')
+  if (!value) {
+    throw new Error(
+      selectedProjectKey ? '当前选择的 Meegle 空间不可用' : '没有找到可用的 Meegle 空间'
+    )
   }
 
-  const value: MeegleProject = { key, projectKey, name }
   cachedProject = {
     value,
     expiresAt: Date.now() + PROJECT_CACHE_TTL_MS
@@ -1628,6 +1733,11 @@ export const getMyRequirements = async (): Promise<MeegleMyRequirements> => {
  */
 export const initializeRequirements = (): void => {
   ipcMain.handle('requirements:get-my', () => getMyRequirements())
+  ipcMain.handle('requirements:list-projects', () => listMeegleProjects())
+  ipcMain.handle('requirements:set-project', (_event, projectKey: unknown) => {
+    if (typeof projectKey !== 'string') throw new Error('空间 key 不合法')
+    return setMeegleProject(projectKey)
+  })
   ipcMain.handle('requirements:search-users', (_event, keyword: unknown) => {
     if (typeof keyword !== 'string') throw new Error('搜索关键词不合法')
     return searchRequirementUsers(keyword)
