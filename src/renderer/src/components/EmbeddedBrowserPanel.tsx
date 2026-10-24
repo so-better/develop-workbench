@@ -16,12 +16,18 @@ import type {
 const PANEL_WIDTH_KEY = 'embedded-browser-panel-width'
 const MIN_PANEL_WIDTH = 360
 
+/**
+ * 面板宽度限制在 360px 到窗口宽度的 90% 之间。
+ */
 const clampPanelWidth = (value: number): number =>
   Math.max(
     MIN_PANEL_WIDTH,
     Math.min(value, window.innerWidth * 0.9)
   )
 
+/**
+ * 原生浏览视图永远在最上层，弹窗打开时必须临时隐藏。
+ */
 const hasVisibleModal = (): boolean =>
   Array.from(document.querySelectorAll<HTMLElement>('.ant-modal-wrap')).some(
     (element) => {
@@ -84,6 +90,8 @@ export default function EmbeddedBrowserPanel(): JSX.Element | null {
     }
   }, [state?.visible])
 
+  // 打开动画开始前先记录未偏移的目标准位置，
+  // 否则面板 transform 后会量到错误的 bounds。
   useLayoutEffect(() => {
     const previousVisible = previousVisibleRef.current
 
@@ -123,6 +131,9 @@ export default function EmbeddedBrowserPanel(): JSX.Element | null {
     }
   }, [state?.visible])
 
+  /**
+   * 关闭必须由渲染层触发，才能同时播放面板滑出动画。
+   */
   const requestClose = (): void => {
     if (closingRef.current) return
 
@@ -132,6 +143,14 @@ export default function EmbeddedBrowserPanel(): JSX.Element | null {
     void window.electron.closeEmbeddedBrowser()
   }
 
+  // 轻舟登录完成后由主进程请求关闭浏览器面板。
+  useEffect(() => {
+    return window.electron.onEmbeddedBrowserCloseRequest(() => {
+      requestClose()
+    })
+  }, [])
+
+  // 点击面板外关闭；弹窗打开时不处理，避免登录或确认流程被中断。
   useEffect(() => {
     if (!state?.visible) return
 
@@ -165,6 +184,9 @@ export default function EmbeddedBrowserPanel(): JSX.Element | null {
     }
   }, [])
 
+  /**
+   * 拖拽左边缘调整宽度，原生视图通过 ResizeObserver 跟随。
+   */
   const startResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
     event.preventDefault()
 
@@ -195,6 +217,7 @@ export default function EmbeddedBrowserPanel(): JSX.Element | null {
     window.addEventListener('pointerup', handleUp)
   }
 
+  // 将占位区域的屏幕位置同步给主进程，原生 WebContentsView 不能使用 CSS 定位。
   useEffect(() => {
     const element = viewportRef.current
 
@@ -213,6 +236,7 @@ export default function EmbeddedBrowserPanel(): JSX.Element | null {
 
       if (!next) return
 
+      // 重复的 ResizeObserver 回调不应打断主进程滑入动画。
       const key = [next.x, next.y, next.width, next.height].join(':')
 
       if (lastBoundsRef.current === key) return

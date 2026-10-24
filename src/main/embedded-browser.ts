@@ -5,7 +5,7 @@ import type {
   EmbeddedBrowserState
 } from '../types/embedded-browser'
 
-const BROWSER_PARTITION = 'persist:workbench-browser'
+export const BROWSER_PARTITION = 'persist:workbench-browser'
 const BATCH_LOAD_ABORTED = -3
 
 interface BrowserEntry {
@@ -116,6 +116,10 @@ const cancelViewAnimation = (entry: BrowserEntry): void => {
   entry.animationTimer = null
 }
 
+/**
+ * 关闭动画结束后销毁原生视图。
+ * 不复用旧页面，避免下一次打开时先闪出上一页内容。
+ */
 const disposeEntry = (entry: BrowserEntry): void => {
   cancelViewAnimation(entry)
 
@@ -131,14 +135,19 @@ const disposeEntry = (entry: BrowserEntry): void => {
     }
   }
 
+  // 窗口关闭时 WebContentsView 可能已经先被销毁，webContents 会变成 undefined。
   const webContents = entry.view.webContents
 
-  if (!webContents.isDestroyed()) {
+  if (webContents && !webContents.isDestroyed()) {
     webContents.removeAllListeners()
     webContents.close()
   }
 }
 
+/**
+ * 原生视图没有 CSS 动画能力，只能从右侧目标外逐帧移动 bounds。
+ * 渲染层的面板滑入动画与这里保持同一时长和方向。
+ */
 const animateViewIn = (entry: BrowserEntry, target: Rectangle): void => {
   const startX = target.x + target.width
   const duration = 200
@@ -171,6 +180,9 @@ const animateViewIn = (entry: BrowserEntry, target: Rectangle): void => {
   entry.animationTimer = setTimeout(tick, 16)
 }
 
+/**
+ * 关闭时把原生视图移出窗口，动画完成后再隐藏并销毁。
+ */
 const animateViewOut = (entry: BrowserEntry): void => {
   const target = entry.bounds
 
@@ -223,6 +235,48 @@ const animateViewOut = (entry: BrowserEntry): void => {
 
   entry.animationTimer = setTimeout(tick, 16)
 }
+
+/**
+ * 统一关闭入口：被弹窗遮挡时直接隐藏，否则走滑出动画。
+ */
+const closeBrowserEntry = (entry: BrowserEntry): void => {
+  if (!entry.visible || entry.closing) return
+
+  if (entry.suppressed) {
+    entry.visible = false
+    applyVisibility(entry)
+    broadcastState(entry)
+    disposeEntry(entry)
+    return
+  }
+
+  animateViewOut(entry)
+}
+
+export const closeEmbeddedBrowserForWindow = (window: BrowserWindow): void => {
+  const entry = entries.get(window.id)
+
+  if (entry) closeBrowserEntry(entry)
+}
+
+/**
+ * 主进程请求关闭时先通知渲染层，让面板播放滑出动画。
+ * 400ms 后兜底强制关闭，避免渲染层未响应时原生视图残留。
+ */
+export const requestEmbeddedBrowserClose = (window: BrowserWindow): void => {
+  const entry = entries.get(window.id)
+
+  if (!entry?.visible) return
+
+  window.webContents.send('embedded-browser:request-close')
+
+  setTimeout(() => {
+    if (entries.get(window.id) === entry) closeBrowserEntry(entry)
+  }, 400)
+}
+
+export const isEmbeddedBrowserVisible = (window: BrowserWindow): boolean =>
+  entries.get(window.id)?.visible ?? false
 
 const getEntry = (window: BrowserWindow): BrowserEntry => {
   const existing = entries.get(window.id)
@@ -357,19 +411,7 @@ export const initializeEmbeddedBrowser = (): void => {
 
     const entry = entries.get(window.id)
 
-    if (!entry) return
-
-    if (!entry.visible || entry.closing) return
-
-    if (entry.suppressed) {
-      entry.visible = false
-      applyVisibility(entry)
-      broadcastState(entry)
-      disposeEntry(entry)
-      return
-    }
-
-    animateViewOut(entry)
+    if (entry) closeBrowserEntry(entry)
   })
 
   ipcMain.handle(
@@ -411,6 +453,7 @@ export const initializeEmbeddedBrowser = (): void => {
 
       const target = { x, y, width, height }
 
+      // ResizeObserver 初始化时会重复回报相同尺寸，不能因此取消滑入动画。
       if (
         entry.animationTimer &&
         entry.bounds &&

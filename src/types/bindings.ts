@@ -14,8 +14,23 @@ export interface RequirementRepoBinding {
   /** 普通模式下的开发分支；轻舟模式为 null。 */
   branchName: string | null
 
-  /** 轻舟模式下的工作项 ID；普通模式为 null。 */
+  /** 轻舟工作项 ID，通常与飞书需求 ID 相同。 */
+  qingzhouWorkItemId: string | null
+
+  /** 轻舟代码任务 ID；尚未创建代码任务时为 null。 */
   qingzhouTaskId: string | null
+
+  /** 轻舟工作项名称。 */
+  qingzhouWorkItemTitle: string | null
+
+  /** 轻舟需求分支；普通模式为 null。 */
+  requirementBranch: string | null
+
+  /** 轻舟迭代分支；普通模式为 null。 */
+  iterationBranch: string | null
+
+  /** 轻舟绑定最后一次同步时间。 */
+  lastSyncedAt: string | null
 
   /** 创建时间，ISO 字符串。 */
   createdAt: string

@@ -48,6 +48,8 @@ export interface ElectronAPI {
   onEmbeddedBrowserState: (
     listener: (state: EmbeddedBrowserState) => void
   ) => () => void
+  /** 订阅主进程发起的关闭请求。 */
+  onEmbeddedBrowserCloseRequest: (listener: () => void) => () => void
   /** 读取 IDE 配置。 */
   getIdeConfig: () => Promise<IdeConfigState>
   /** 保存 IDE 配置。 */
@@ -123,14 +125,12 @@ export interface ElectronAPI {
   /** 绑定轻舟工作项。 */
   addQingzhouRequirementBinding: (
     requirementId: string,
-    repositoryId: string,
-    taskId: string
+    repositoryId: string
   ) => Promise<RequirementBindingState>
-  /** 修改绑定分支。 */
-  updateRequirementBinding: (
+  /** 同步轻舟工作项分支。 */
+  syncQingzhouRequirementBinding: (
     requirementId: string,
-    bindingId: string,
-    branchName: string
+    bindingId: string
   ) => Promise<RequirementBindingState>
   /** 解除需求仓库绑定。 */
   removeRequirementBinding: (

@@ -59,9 +59,6 @@ export interface RepositoryBindingStatus {
   /** 仓库路径是否可访问。 */
   available: boolean
 
-  /** 仓库当前检出的分支。 */
-  currentBranch: string | null
-
   /** 绑定的目标分支是否存在。 */
   branchExists: boolean
 }

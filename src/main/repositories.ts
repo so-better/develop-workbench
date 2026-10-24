@@ -493,6 +493,21 @@ const getGitErrorMessage = (error: unknown): string => {
   return message.replace(/(https?:\/\/)[^@\s/]+@/gi, '$1***@').slice(0, 200)
 }
 
+const hasUpstreamBranch = async (cwd: string): Promise<boolean> => {
+  try {
+    const upstream = (
+      await runGit(
+        ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+        { cwd }
+      )
+    ).trim()
+
+    return Boolean(upstream)
+  } catch {
+    return false
+  }
+}
+
 /**
  * 读取仓库的本地与远程分支。
  * 远程分支统一去掉 origin/ 前缀并去重。
@@ -586,7 +601,8 @@ export const prepareRepositoryForIde = async (
   if (!repository) throw new Error('仓库不存在')
   if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
 
-  const { branches } = await listRepositoryBranches(repositoryId)
+  // 打开 IDE 前先刷新远程引用，避免新分支未 fetch 到本地而误判为不存在。
+  const { branches } = await listRepositoryBranches(repositoryId, true)
 
   if (!branches.includes(branchName)) throw new Error(`分支不存在：${branchName}`)
 
@@ -596,11 +612,26 @@ export const prepareRepositoryForIde = async (
   ).trim()
 
   if (currentBranch === branchName) {
+    const hasUpstream = await hasUpstreamBranch(cwd)
+
+    if (hasUpstream) {
+      try {
+        await runGit(['pull', '--ff-only'], {
+          cwd,
+          timeout: GIT_NETWORK_TIMEOUT_MS
+        })
+      } catch (error) {
+        throw new Error(
+          `当前分支拉取失败：${getGitErrorMessage(error)}`
+        )
+      }
+    }
+
     return {
       localPath: cwd,
       switched: false,
-      pulled: false,
-      hasUpstream: false
+      pulled: hasUpstream,
+      hasUpstream
     }
   }
 
@@ -615,20 +646,7 @@ export const prepareRepositoryForIde = async (
 
   await runGit(['switch', branchName], { cwd })
 
-  let hasUpstream = false
-
-  try {
-    const upstream = (
-      await runGit(
-        ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
-        { cwd }
-      )
-    ).trim()
-
-    hasUpstream = Boolean(upstream)
-  } catch {
-    hasUpstream = false
-  }
+  const hasUpstream = await hasUpstreamBranch(cwd)
 
   if (hasUpstream) {
     try {
@@ -682,7 +700,6 @@ export const getRepositoryBindingStatus = async (
   if (!repository) {
     return {
       available: false,
-      currentBranch: null,
       branchExists: false
     }
   }
@@ -690,19 +707,14 @@ export const getRepositoryBindingStatus = async (
   if (!(await pathExists(repository.localPath))) {
     return {
       available: false,
-      currentBranch: null,
       branchExists: false
     }
   }
 
-  const currentBranch =
-    (await runGit(['branch', '--show-current'], { cwd: repository.localPath })).trim() ||
-    null
   const { branches } = await listRepositoryBranches(repositoryId)
 
   return {
     available: true,
-    currentBranch,
     branchExists: branches.includes(branchName)
   }
 }

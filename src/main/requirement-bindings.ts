@@ -1,14 +1,16 @@
 /**
  * 需求与代码仓库绑定模块。
- * 只保存仓库和分支映射，不修改 Git 工作区。
+ * 负责普通分支绑定、轻舟工作项绑定和轻舟分支快照，不修改 Git 工作区。
  */
-import { app, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import { open, readFile, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { getProject } from './requirements'
 import { getRepositoryState, listRepositoryBranches } from './repositories'
 import { backupCorruptStore } from './store-backup'
+import { getQingzhouCodeTasks } from './qingzhou'
+import type { QingzhouCodeTaskDetail } from './qingzhou'
 import type { RequirementBindingState, RequirementRepoBinding } from '../types/bindings'
 
 interface StoredWorkspace {
@@ -31,6 +33,7 @@ const getStorePath = (): string => join(app.getPath('userData'), STORE_FILE)
 
 /**
  * 校验持久化的绑定记录。
+ * 普通绑定必须有开发分支，轻舟绑定必须有工作项 ID。
  */
 const normalizeStoredBinding = (value: unknown): RequirementRepoBinding | null => {
   if (!value || typeof value !== 'object') return null
@@ -42,7 +45,11 @@ const normalizeStoredBinding = (value: unknown): RequirementRepoBinding | null =
     typeof binding.repositoryId !== 'string' ||
     (binding.mode !== 'normal' && binding.mode !== 'qingzhou') ||
     (binding.branchName !== null && typeof binding.branchName !== 'string') ||
-    (binding.qingzhouTaskId !== null &&
+    (binding.qingzhouWorkItemId !== undefined &&
+      binding.qingzhouWorkItemId !== null &&
+      typeof binding.qingzhouWorkItemId !== 'string') ||
+    (binding.qingzhouTaskId !== undefined &&
+      binding.qingzhouTaskId !== null &&
       typeof binding.qingzhouTaskId !== 'string') ||
     typeof binding.createdAt !== 'string' ||
     typeof binding.updatedAt !== 'string'
@@ -53,20 +60,35 @@ const normalizeStoredBinding = (value: unknown): RequirementRepoBinding | null =
   const mode = binding.mode
   const branchName =
     typeof binding.branchName === 'string' ? binding.branchName.trim() || null : null
+  const qingzhouWorkItemId =
+    typeof binding.qingzhouWorkItemId === 'string'
+      ? binding.qingzhouWorkItemId.trim() || null
+      : null
   const qingzhouTaskId =
     typeof binding.qingzhouTaskId === 'string'
       ? binding.qingzhouTaskId.trim() || null
       : null
 
   if (mode === 'normal' && !branchName) return null
-  if (mode === 'qingzhou' && !qingzhouTaskId) return null
+  if (mode === 'qingzhou' && !qingzhouWorkItemId) return null
 
   return {
     id: binding.id,
     repositoryId: binding.repositoryId,
     mode,
     branchName,
+    qingzhouWorkItemId,
     qingzhouTaskId,
+    qingzhouWorkItemTitle:
+      typeof binding.qingzhouWorkItemTitle === 'string'
+        ? binding.qingzhouWorkItemTitle
+        : null,
+    requirementBranch:
+      typeof binding.requirementBranch === 'string' ? binding.requirementBranch : null,
+    iterationBranch:
+      typeof binding.iterationBranch === 'string' ? binding.iterationBranch : null,
+    lastSyncedAt:
+      typeof binding.lastSyncedAt === 'string' ? binding.lastSyncedAt : null,
     createdAt: binding.createdAt,
     updatedAt: binding.updatedAt
   }
@@ -249,6 +271,98 @@ const assertBranchExists = async (repositoryId: string, branchName: string): Pro
   }
 }
 
+const normalizeRepositoryUrl = (value: string | null): string =>
+  (value ?? '')
+    .trim()
+    .replace(/\.git$/i, '')
+    .replace(/\/+$/, '')
+    .toLowerCase()
+
+/**
+ * 从 HTTPS 或 SSH 地址中提取仓库名，用于兼容不同协议的远程地址。
+ */
+const getRepositorySlug = (value: string | null): string => {
+  const raw = (value ?? '').trim()
+
+  if (!raw) return ''
+
+  try {
+    const path = new URL(raw).pathname
+
+    return (path.split('/').filter(Boolean).pop() ?? '')
+      .replace(/\.git$/i, '')
+      .toLowerCase()
+  } catch {
+    const last = raw.split(/[/:]/).filter(Boolean).pop() ?? ''
+
+    return last.replace(/\.git$/i, '').toLowerCase()
+  }
+}
+
+/**
+ * 防止把其他需求的工作项绑到当前需求。
+ */
+const assertDetailMatchesRequirement = (
+  requirementId: string,
+  detail: QingzhouCodeTaskDetail
+): void => {
+  if (detail.workItemId && detail.workItemId !== requirementId) {
+    throw new Error('该轻舟工作项不属于当前需求')
+  }
+}
+
+const detailMatchesRepository = (
+  repository: { name: string; remoteUrl: string | null },
+  detail: QingzhouCodeTaskDetail
+): boolean => {
+  const localNames = new Set(
+    [repository.name.trim().toLowerCase(), getRepositorySlug(repository.remoteUrl)].filter(
+      Boolean
+    )
+  )
+  const detailNames = new Set(
+    [
+      detail.repositoryName?.trim().toLowerCase() ?? '',
+      getRepositorySlug(detail.repositoryUrl)
+    ].filter(Boolean)
+  )
+  const urlMatches =
+    Boolean(detail.repositoryUrl) &&
+    normalizeRepositoryUrl(repository.remoteUrl) ===
+      normalizeRepositoryUrl(detail.repositoryUrl)
+  const nameMatches = Array.from(detailNames).some((name) => localNames.has(name))
+
+  return !detail.repositoryUrl && !detail.repositoryName
+    ? true
+    : urlMatches || nameMatches
+}
+
+/**
+ * 一个轻舟工作项可能存在多个代码任务，需要按当前仓库挑选。
+ * 没有任何代码任务时返回 null，表示工作项已创建但分支尚未创建。
+ */
+const selectCodeTaskForRepository = (
+  repository: { name: string; remoteUrl: string | null },
+  tasks: QingzhouCodeTaskDetail[]
+): QingzhouCodeTaskDetail | null => {
+  const activeTasks = tasks.filter((task) => !task.archived)
+  const matchingTasks = activeTasks.filter((task) =>
+    detailMatchesRepository(repository, task)
+  )
+
+  if (matchingTasks.length > 0) return matchingTasks[0]
+
+  if (activeTasks.length > 0) {
+    throw new Error(
+      `工作项下的代码任务仓库与当前仓库不一致：${activeTasks
+        .map((task) => task.repositoryName ?? '未知仓库')
+        .join('、')}`
+    )
+  }
+
+  return null
+}
+
 /**
  * 新增仓库绑定。
  */
@@ -278,7 +392,12 @@ export const addRequirementBinding = async (
         repositoryId,
         mode: 'normal',
         branchName: normalizedBranch,
+        qingzhouWorkItemId: null,
         qingzhouTaskId: null,
+        qingzhouWorkItemTitle: null,
+        requirementBranch: null,
+        iterationBranch: null,
+        lastSyncedAt: null,
         createdAt: now,
         updatedAt: now
       }
@@ -290,15 +409,15 @@ export const addRequirementBinding = async (
  * 绑定轻舟工作项。
  */
 export const addQingzhouRequirementBinding = async (
+  window: BrowserWindow,
   requirementId: string,
-  repositoryId: string,
-  taskId: string
+  repositoryId: string
 ): Promise<RequirementBindingState> => {
-  const normalizedTaskId = taskId.trim()
-
+  if (!/^\d+$/.test(requirementId)) throw new Error('需求 ID 不合法')
   if (!repositoryId.trim()) throw new Error('仓库 ID 不合法')
-  if (!normalizedTaskId) throw new Error('请填写轻舟工作项 ID')
-  if (normalizedTaskId.length > 128) throw new Error('轻舟工作项 ID 过长')
+
+  // 飞书 story id 就是轻舟 workItemId，不需要用户额外填写。
+  const normalizedWorkItemId = requirementId
 
   const repositoryState = await getRepositoryState()
   const repository = repositoryState.repositories.find(
@@ -307,6 +426,18 @@ export const addQingzhouRequirementBinding = async (
 
   if (!repository) throw new Error('仓库不存在')
   if (!repository.qingzhouEnabled) throw new Error('该仓库未接入轻舟')
+
+  const existing = await getState(requirementId)
+
+  if (existing.bindings.some((binding) => binding.repositoryId === repositoryId)) {
+    throw new Error('该仓库已经绑定')
+  }
+
+  // 查询可能触发内嵌浏览器登录；按 workItemId 拉取代码任务后再匹配当前仓库。
+  const tasks = await getQingzhouCodeTasks(window, normalizedWorkItemId)
+  const detail = selectCodeTaskForRepository(repository, tasks)
+
+  if (detail) assertDetailMatchesRequirement(requirementId, detail)
 
   return updateBindings(requirementId, (bindings) => {
     if (bindings.some((binding) => binding.repositoryId === repositoryId)) {
@@ -322,7 +453,12 @@ export const addQingzhouRequirementBinding = async (
         repositoryId,
         mode: 'qingzhou',
         branchName: null,
-        qingzhouTaskId: normalizedTaskId,
+        qingzhouWorkItemId: normalizedWorkItemId,
+        qingzhouTaskId: detail?.codeTaskId ?? null,
+        qingzhouWorkItemTitle: detail?.workItemTitle ?? null,
+        requirementBranch: detail?.requirementBranch ?? null,
+        iterationBranch: detail?.iterationBranch ?? null,
+        lastSyncedAt: now,
         createdAt: now,
         updatedAt: now
       }
@@ -331,36 +467,51 @@ export const addQingzhouRequirementBinding = async (
 }
 
 /**
- * 修改绑定分支。
+ * 同步轻舟工作项的分支信息。
  */
-export const updateRequirementBinding = async (
+export const syncQingzhouRequirementBinding = async (
+  window: BrowserWindow,
   requirementId: string,
-  bindingId: string,
-  branchName: string
+  bindingId: string
 ): Promise<RequirementBindingState> => {
-  const normalizedBranch = branchName.trim()
-
-  if (!normalizedBranch) throw new Error('请选择开发分支')
-
   const state = await getState(requirementId)
   const binding = state.bindings.find((item) => item.id === bindingId)
 
   if (!binding) throw new Error('绑定记录不存在')
-  if (binding.mode !== 'normal') throw new Error('轻舟绑定不支持手动选择分支')
+  if (binding.mode !== 'qingzhou' || !binding.qingzhouWorkItemId) {
+    throw new Error('该绑定不是轻舟工作项')
+  }
 
-  await assertBranchExists(binding.repositoryId, normalizedBranch)
+  const repositoryState = await getRepositoryState()
+  const repository = repositoryState.repositories.find(
+    (item) => item.id === binding.repositoryId
+  )
+
+  if (!repository) throw new Error('仓库不存在')
+
+  // 每次同步都重新从轻舟取快照，分支在轻舟侧变更后可刷新到本地绑定。
+  const tasks = await getQingzhouCodeTasks(window, binding.qingzhouWorkItemId)
+  const detail = selectCodeTaskForRepository(repository, tasks)
+
+  if (detail) assertDetailMatchesRequirement(requirementId, detail)
 
   return updateBindings(requirementId, (bindings) => {
     if (!bindings.some((item) => item.id === bindingId)) {
       throw new Error('绑定记录不存在')
     }
 
+    const now = new Date().toISOString()
+
     return bindings.map((item) =>
       item.id === bindingId
         ? {
             ...item,
-            branchName: normalizedBranch,
-            updatedAt: new Date().toISOString()
+            qingzhouTaskId: detail?.codeTaskId ?? null,
+            qingzhouWorkItemTitle: detail?.workItemTitle ?? item.qingzhouWorkItemTitle,
+            requirementBranch: detail?.requirementBranch ?? null,
+            iterationBranch: detail?.iterationBranch ?? null,
+            lastSyncedAt: now,
+            updatedAt: now
           }
         : item
     )
@@ -404,31 +555,31 @@ export const initializeRequirementBindings = (): void => {
 
   ipcMain.handle(
     'bindings:add-qingzhou',
-    (_event, requirementId: unknown, repositoryId: unknown, taskId: unknown) => {
-      if (
-        typeof requirementId !== 'string' ||
-        typeof repositoryId !== 'string' ||
-        typeof taskId !== 'string'
-      ) {
+    (event, requirementId: unknown, repositoryId: unknown) => {
+      if (typeof requirementId !== 'string' || typeof repositoryId !== 'string') {
         throw new Error('绑定参数不合法')
       }
 
-      return addQingzhouRequirementBinding(requirementId, repositoryId, taskId)
+      const window = BrowserWindow.fromWebContents(event.sender)
+
+      if (!window) throw new Error('窗口不存在')
+
+      return addQingzhouRequirementBinding(window, requirementId, repositoryId)
     }
   )
 
   ipcMain.handle(
-    'bindings:update',
-    (_event, requirementId: unknown, bindingId: unknown, branchName: unknown) => {
-      if (
-        typeof requirementId !== 'string' ||
-        typeof bindingId !== 'string' ||
-        typeof branchName !== 'string'
-      ) {
+    'bindings:sync-qingzhou',
+    (event, requirementId: unknown, bindingId: unknown) => {
+      if (typeof requirementId !== 'string' || typeof bindingId !== 'string') {
         throw new Error('绑定参数不合法')
       }
 
-      return updateRequirementBinding(requirementId, bindingId, branchName)
+      const window = BrowserWindow.fromWebContents(event.sender)
+
+      if (!window) throw new Error('窗口不存在')
+
+      return syncQingzhouRequirementBinding(window, requirementId, bindingId)
     }
   )
 

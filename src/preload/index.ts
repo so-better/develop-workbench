@@ -75,6 +75,18 @@ const electronAPI = {
     }
   },
 
+  onEmbeddedBrowserCloseRequest: (listener: () => void): (() => void) => {
+    const handler = (): void => {
+      listener()
+    }
+
+    ipcRenderer.on('embedded-browser:request-close', handler)
+
+    return () => {
+      ipcRenderer.removeListener('embedded-browser:request-close', handler)
+    }
+  },
+
   /**
    * 读取 IDE 配置。
    */
@@ -275,20 +287,18 @@ const electronAPI = {
    */
   addQingzhouRequirementBinding: (
     requirementId: string,
-    repositoryId: string,
-    taskId: string
+    repositoryId: string
   ): Promise<RequirementBindingState> =>
-    ipcRenderer.invoke('bindings:add-qingzhou', requirementId, repositoryId, taskId),
+    ipcRenderer.invoke('bindings:add-qingzhou', requirementId, repositoryId),
 
   /**
-   * 修改绑定分支。
+   * 同步轻舟工作项分支。
    */
-  updateRequirementBinding: (
+  syncQingzhouRequirementBinding: (
     requirementId: string,
-    bindingId: string,
-    branchName: string
+    bindingId: string
   ): Promise<RequirementBindingState> =>
-    ipcRenderer.invoke('bindings:update', requirementId, bindingId, branchName),
+    ipcRenderer.invoke('bindings:sync-qingzhou', requirementId, bindingId),
 
   /**
    * 解除需求仓库绑定。
