@@ -10,8 +10,8 @@ import {
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
-  ExportOutlined,
   FolderOpenOutlined,
+  InfoCircleOutlined,
   LinkOutlined,
   MinusCircleOutlined,
   NodeCollapseOutlined,
@@ -1962,21 +1962,23 @@ export default function RequirementWorkbench({
                     {formatUpdatedAt(selectedRequirement.updatedAt)}
                   </span>
                 </div>
+                {requirementUrl ? (
+                  <div className="workbench-feishu-callout">
+                    <InfoCircleOutlined className="workbench-feishu-callout-icon" />
+                    <span className="workbench-feishu-callout-text">
+                      飞书详情页包含更完整的操作，需要时可在应用内打开完整页面。
+                    </span>
+                    <a
+                      className="workbench-feishu-callout-action"
+                      href={requirementUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      打开完整飞书详情页 →
+                    </a>
+                  </div>
+                ) : null}
               </div>
-
-              {requirementUrl ? (
-                <Button
-                  variant="filled"
-                  size="small"
-                  className="workbench-open-feishu"
-                  icon={<ExportOutlined />}
-                  href={requirementUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  在浏览器打开
-                </Button>
-              ) : null}
             </header>
 
             <div className="workbench-content">

@@ -1,5 +1,9 @@
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
+import type {
+  EmbeddedBrowserBounds,
+  EmbeddedBrowserState
+} from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
 import type { RequirementBindingState } from '../types/bindings'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
@@ -28,6 +32,22 @@ export interface ElectronAPI {
   getAppInfo: () => Promise<AppInfo>
   /** 获取链接预览信息。 */
   getLinkPreview: (url: string) => Promise<LinkPreview>
+  /** 在应用内浏览器打开链接。 */
+  openEmbeddedBrowser: (url: string) => Promise<boolean>
+  /** 读取内嵌浏览器状态。 */
+  getEmbeddedBrowserState: () => Promise<EmbeddedBrowserState>
+  /** 关闭内嵌浏览器面板。 */
+  closeEmbeddedBrowser: () => Promise<void>
+  /** 内嵌浏览器刷新。 */
+  reloadEmbeddedBrowser: () => Promise<void>
+  /** 更新内嵌浏览器视图位置。 */
+  setEmbeddedBrowserBounds: (bounds: EmbeddedBrowserBounds) => Promise<void>
+  /** 临时隐藏/恢复内嵌浏览器，用于覆盖层和弹窗。 */
+  setEmbeddedBrowserSuppressed: (suppressed: boolean) => Promise<void>
+  /** 订阅内嵌浏览器状态。 */
+  onEmbeddedBrowserState: (
+    listener: (state: EmbeddedBrowserState) => void
+  ) => () => void
   /** 读取 IDE 配置。 */
   getIdeConfig: () => Promise<IdeConfigState>
   /** 保存 IDE 配置。 */

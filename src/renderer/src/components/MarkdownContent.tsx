@@ -12,7 +12,7 @@ interface MarkdownContentProps {
 
 /**
  * 统一的 Markdown 渲染组件。
- * 关闭原始 HTML，链接统一交给系统浏览器打开。
+ * 关闭原始 HTML，链接统一交给应用内浏览器打开。
  */
 export default function MarkdownContent({
   content,

@@ -2,6 +2,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
+import type {
+  EmbeddedBrowserBounds,
+  EmbeddedBrowserState
+} from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
 import type { RequirementBindingState } from '../types/bindings'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
@@ -38,6 +42,38 @@ const electronAPI = {
    */
   getLinkPreview: (url: string): Promise<LinkPreview> =>
     ipcRenderer.invoke('link-preview:get', url),
+
+  openEmbeddedBrowser: (url: string): Promise<boolean> =>
+    ipcRenderer.invoke('embedded-browser:open', url),
+
+  getEmbeddedBrowserState: (): Promise<EmbeddedBrowserState> =>
+    ipcRenderer.invoke('embedded-browser:get-state'),
+
+  closeEmbeddedBrowser: (): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:close'),
+
+  reloadEmbeddedBrowser: (): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:reload'),
+
+  setEmbeddedBrowserBounds: (bounds: EmbeddedBrowserBounds): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:set-bounds', bounds),
+
+  setEmbeddedBrowserSuppressed: (suppressed: boolean): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:set-suppressed', suppressed),
+
+  onEmbeddedBrowserState: (
+    listener: (state: EmbeddedBrowserState) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, state: EmbeddedBrowserState): void => {
+      listener(state)
+    }
+
+    ipcRenderer.on('embedded-browser:state', handler)
+
+    return () => {
+      ipcRenderer.removeListener('embedded-browser:state', handler)
+    }
+  },
 
   /**
    * 读取 IDE 配置。

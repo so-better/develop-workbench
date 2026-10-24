@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Spin } from 'antd'
 import AppFooter from './components/AppFooter'
+import EmbeddedBrowserPanel from './components/EmbeddedBrowserPanel'
 import LoginState from './components/LoginState'
 import RequirementWorkbench from './components/RequirementWorkbench'
 import SettingsModal from './components/SettingsModal'
@@ -81,6 +82,12 @@ export default function App(): JSX.Element {
    * 每次窗口显示时重新读取登录状态，避免外部登录或登出后界面过期。
    */
   useEffect(() => {
+    if (!authLoading && !larkUser) {
+      void window.electron.closeEmbeddedBrowser()
+    }
+  }, [authLoading, larkUser])
+
+  useEffect(() => {
     let mounted = true
 
     // 应用信息只需读取一次。
@@ -105,24 +112,28 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app-shell">
-      <main
-        className={`workspace-canvas${larkUser && !authLoading ? ' workspace-canvas--workbench' : ''}`}
-      >
-        {/* 鉴权完成后才展示未登录引导或需求工作台。 */}
-        {authLoading ? (
-          <div className="auth-loading">
-            <Spin />
-          </div>
-        ) : larkUser ? (
-          <RequirementWorkbench onOpenSettings={openSettings} />
-        ) : (
-          <LoginState
-            cliInfo={larkCliInfo}
-            onOpenSettings={() => openSettings('lark-cli')}
-            onLoggedIn={handleLoggedIn}
-          />
-        )}
-      </main>
+      <div className="app-body">
+        <main
+          className={`workspace-canvas${larkUser && !authLoading ? ' workspace-canvas--workbench' : ''}`}
+        >
+          {/* 鉴权完成后才展示未登录引导或需求工作台。 */}
+          {authLoading ? (
+            <div className="auth-loading">
+              <Spin />
+            </div>
+          ) : larkUser ? (
+            <RequirementWorkbench onOpenSettings={openSettings} />
+          ) : (
+            <LoginState
+              cliInfo={larkCliInfo}
+              onOpenSettings={() => openSettings('lark-cli')}
+              onLoggedIn={handleLoggedIn}
+            />
+          )}
+        </main>
+
+        {larkUser && !authLoading ? <EmbeddedBrowserPanel /> : null}
+      </div>
 
       {/* 未登录时 Footer 左侧为空，右侧始终保留设置入口和版本号。 */}
       <AppFooter

@@ -1,5 +1,6 @@
-import { app, BrowserWindow, screen, shell } from 'electron'
+import { app, BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
+import { openEmbeddedBrowser } from './embedded-browser'
 import { getThemeBackgroundColor } from './theme'
 
 let mainWindow: BrowserWindow | null = null
@@ -31,21 +32,6 @@ export const focusMainWindow = (): void => {
   if (mainWindow.isMinimized()) mainWindow.restore()
   mainWindow.show()
   mainWindow.focus()
-}
-
-/**
- * 使用系统默认浏览器打开外部链接。
- * 仅允许 http/https，避免 file:// 等本地协议被意外执行。
- */
-const openExternalUrl = (url: string): void => {
-  try {
-    const { protocol } = new URL(url)
-    if (protocol === 'https:' || protocol === 'http:') {
-      shell.openExternal(url)
-    }
-  } catch {
-    return
-  }
 }
 
 /**
@@ -95,17 +81,17 @@ export const createMainWindow = (): void => {
     }
   })
 
-  // 拦截 window.open 等新窗口请求，统一交给系统浏览器打开。
+  // 所有新窗口链接统一交给应用内浏览器。
   window.webContents.setWindowOpenHandler(({ url }) => {
-    openExternalUrl(url)
+    openEmbeddedBrowser(window, url)
     return { action: 'deny' }
   })
 
-  // 阻止应用内跳转到外部页面，例如误点链接时改为在系统浏览器中打开。
+  // 阻止应用页面直接跳走，改为在应用内浏览器打开。
   window.webContents.on('will-navigate', (event, url) => {
     if (url !== window.webContents.getURL()) {
       event.preventDefault()
-      openExternalUrl(url)
+      openEmbeddedBrowser(window, url)
     }
   })
 
