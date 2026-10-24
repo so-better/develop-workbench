@@ -14,9 +14,12 @@ import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { getPreferences, updatePreferences } from './preferences'
+import { backupCorruptStore } from './store-backup'
 import type {
   CloneRepositoryInput,
   Repository,
+  RepositoryBindingStatus,
+  RepositoryBranchList,
   RepositoryCloneProgress,
   RepositoryScanResult,
   RepositoryState,
@@ -44,6 +47,7 @@ const execFileAsync = promisify(execFile)
 // 优先使用显式配置的 Git 路径，否则依赖系统 PATH。
 const GIT_PATH = process.env.GIT_PATH?.trim() || 'git'
 const GIT_TIMEOUT_MS = 15_000
+const GIT_NETWORK_TIMEOUT_MS = 60_000
 const CLONE_TIMEOUT_MS = 300_000
 const MAX_BUFFER_BYTES = 2 * 1024 * 1024
 const MAX_SCAN_DEPTH = 4
@@ -103,16 +107,31 @@ const getStorePath = (): string => join(app.getPath('userData'), 'repositories.j
  * 文件不存在或内容损坏时返回空数组。
  */
 const readStore = async (): Promise<StoredRepository[]> => {
+  let raw: string
+
   try {
-    const raw = await readFile(getStorePath(), 'utf8')
-    const parsed = JSON.parse(raw) as Partial<RepositoryStore>
+    raw = await readFile(getStorePath(), 'utf8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []
 
-    if (!Array.isArray(parsed.repositories)) return []
+    throw error
+  }
 
-    return parsed.repositories.filter(isStoredRepository)
+  let parsed: Partial<RepositoryStore> | null
+
+  try {
+    parsed = JSON.parse(raw) as Partial<RepositoryStore> | null
   } catch {
+    await backupCorruptStore(getStorePath())
     return []
   }
+
+  if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.repositories)) {
+    await backupCorruptStore(getStorePath())
+    return []
+  }
+
+  return parsed.repositories.filter(isStoredRepository)
 }
 
 /**
@@ -467,6 +486,294 @@ export const getRepositoryState = async (): Promise<RepositoryState> => {
   }
 }
 
+const getGitErrorMessage = (error: unknown): string => {
+  const message =
+    error instanceof Error ? error.message.split(/\r?\n/)[0].trim() : 'Git 操作失败'
+
+  return message.replace(/(https?:\/\/)[^@\s/]+@/gi, '$1***@').slice(0, 200)
+}
+
+/**
+ * 读取仓库的本地与远程分支。
+ * 远程分支统一去掉 origin/ 前缀并去重。
+ */
+export const listRepositoryBranches = async (
+  repositoryId: string,
+  fetchRemote = false
+): Promise<RepositoryBranchList> => {
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) throw new Error('仓库不存在')
+
+  let fetchWarning: string | null = null
+
+  if (fetchRemote) {
+    const hasOrigin = await runGit(
+      ['remote', 'get-url', 'origin'],
+      { cwd: repository.localPath }
+    )
+      .then((output) => Boolean(output.trim()))
+      .catch(() => false)
+
+    if (hasOrigin) {
+      try {
+        await runGit(['fetch', '--prune', 'origin'], {
+          cwd: repository.localPath,
+          timeout: GIT_NETWORK_TIMEOUT_MS
+        })
+      } catch (error) {
+        fetchWarning = `远程分支刷新失败，已使用本地引用：${getGitErrorMessage(error)}`
+      }
+    }
+  }
+
+  const output = await runGit(
+    ['for-each-ref', '--format=%(refname:short)', 'refs/heads', 'refs/remotes/origin'],
+    { cwd: repository.localPath }
+  )
+  const branches = new Set<string>()
+
+  for (const line of output.split(/\r?\n/)) {
+    const name = line.trim()
+
+    if (!name) continue
+    if (name === 'origin/HEAD') continue
+    if (name.startsWith('origin/')) {
+      branches.add(name.slice('origin/'.length))
+    } else {
+      branches.add(name)
+    }
+  }
+
+  return {
+    branches: Array.from(branches).sort((left, right) =>
+      left.localeCompare(right, undefined, { numeric: true })
+    ),
+    fetchWarning
+  }
+}
+
+/**
+ * 读取仓库本地路径，并校验当前可访问。
+ */
+export const getRepositoryLocalPath = async (repositoryId: string): Promise<string> => {
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) throw new Error('仓库不存在')
+  if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
+
+  return repository.localPath
+}
+
+/**
+ * 为在 IDE 中打开仓库准备分支。
+ * 已在目标分支时直接打开；需要切换时要求工作区干净，并尝试快进拉取。
+ */
+export const prepareRepositoryForIde = async (
+  repositoryId: string,
+  branchName: string
+): Promise<{
+  localPath: string
+  switched: boolean
+  pulled: boolean
+  hasUpstream: boolean
+}> => {
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) throw new Error('仓库不存在')
+  if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
+
+  const { branches } = await listRepositoryBranches(repositoryId)
+
+  if (!branches.includes(branchName)) throw new Error(`分支不存在：${branchName}`)
+
+  const cwd = repository.localPath
+  const currentBranch = (
+    await runGit(['branch', '--show-current'], { cwd })
+  ).trim()
+
+  if (currentBranch === branchName) {
+    return {
+      localPath: cwd,
+      switched: false,
+      pulled: false,
+      hasUpstream: false
+    }
+  }
+
+  const status = (await runGit(['status', '--porcelain'], { cwd })).trim()
+
+  if (status) {
+    throw new Error('当前仓库有未提交改动，请先提交后再切换分支')
+  }
+
+  const previousHead = (await runGit(['rev-parse', 'HEAD'], { cwd })).trim()
+  const previousLabel = currentBranch || previousHead
+
+  await runGit(['switch', branchName], { cwd })
+
+  let hasUpstream = false
+
+  try {
+    const upstream = (
+      await runGit(
+        ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'],
+        { cwd }
+      )
+    ).trim()
+
+    hasUpstream = Boolean(upstream)
+  } catch {
+    hasUpstream = false
+  }
+
+  if (hasUpstream) {
+    try {
+      await runGit(['pull', '--ff-only'], {
+        cwd,
+        timeout: GIT_NETWORK_TIMEOUT_MS
+      })
+    } catch (error) {
+      const detail =
+        error instanceof Error
+          ? error.message.split(/\r?\n/)[0].trim().slice(0, 200)
+          : '未知错误'
+
+      try {
+        if (currentBranch) {
+          await runGit(['switch', currentBranch], { cwd })
+        } else if (previousHead) {
+          await runGit(['switch', '--detach', previousHead], { cwd })
+        } else {
+          throw new Error('没有可恢复的分支')
+        }
+      } catch (rollbackError) {
+        const rollbackDetail =
+          rollbackError instanceof Error
+            ? rollbackError.message.split(/\r?\n/)[0].trim().slice(0, 160)
+            : '未知错误'
+
+        throw new Error(
+          `拉取失败，且无法恢复到原分支 ${previousLabel || '未知'}：${rollbackDetail}`
+        )
+      }
+
+      throw new Error(
+        `拉取失败，已恢复到原分支 ${previousLabel || '未知'}。${detail}`
+      )
+    }
+  }
+
+  return {
+    localPath: cwd,
+    switched: true,
+    pulled: hasUpstream,
+    hasUpstream
+  }
+}
+
+/**
+ * 读取需求仓库绑定的实时状态。
+ */
+export const getRepositoryBindingStatus = async (
+  repositoryId: string,
+  branchName: string
+): Promise<RepositoryBindingStatus> => {
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) {
+    return {
+      available: false,
+      currentBranch: null,
+      branchExists: false
+    }
+  }
+
+  if (!(await pathExists(repository.localPath))) {
+    return {
+      available: false,
+      currentBranch: null,
+      branchExists: false
+    }
+  }
+
+  const currentBranch =
+    (await runGit(['branch', '--show-current'], { cwd: repository.localPath })).trim() ||
+    null
+  const { branches } = await listRepositoryBranches(repositoryId)
+
+  return {
+    available: true,
+    currentBranch,
+    branchExists: branches.includes(branchName)
+  }
+}
+
+/**
+ * 从基线分支创建本地开发分支。
+ * 只创建分支，不切换当前工作区。
+ */
+export const createRepositoryBranch = async (
+  repositoryId: string,
+  branchName: string,
+  baseBranch: string
+): Promise<void> => {
+  const normalizedBranch = branchName.trim()
+  const normalizedBase = baseBranch.trim()
+
+  if (!normalizedBranch) throw new Error('分支名不能为空')
+  if (!normalizedBase) throw new Error('请选择基线分支')
+
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) throw new Error('仓库不存在')
+
+  const { branches } = await listRepositoryBranches(repositoryId)
+
+  if (branches.includes(normalizedBranch)) throw new Error('分支已存在')
+  if (!branches.includes(normalizedBase)) throw new Error('基线分支不存在')
+
+  try {
+    await runGit(['check-ref-format', '--branch', normalizedBranch], {
+      cwd: repository.localPath
+    })
+  } catch {
+    throw new Error('分支名不合法')
+  }
+
+  const hasLocalBase = await runGit(
+    ['rev-parse', '--verify', `refs/heads/${normalizedBase}`],
+    { cwd: repository.localPath }
+  )
+    .then(() => true)
+    .catch(() => false)
+
+  if (hasLocalBase) {
+    await runGit(['branch', normalizedBranch, normalizedBase], {
+      cwd: repository.localPath
+    })
+    return
+  }
+
+  const hasRemoteBase = await runGit(
+    ['rev-parse', '--verify', `refs/remotes/origin/${normalizedBase}`],
+    { cwd: repository.localPath }
+  )
+    .then(() => true)
+    .catch(() => false)
+
+  if (!hasRemoteBase) throw new Error('基线分支没有可用的本地或远程引用')
+
+  await runGit(['branch', '--track', normalizedBranch, `origin/${normalizedBase}`], {
+    cwd: repository.localPath
+  })
+}
+
 /**
  * 扫描代码根目录。
  * 以当前根目录为唯一数据范围，新仓库自动加入，已有仓库更新 Git 信息，
@@ -610,7 +917,9 @@ export const clearRepositoryRoot = async (): Promise<RepositoryState> => {
   await writeStore([])
   stopRepositoryWatcher()
 
-  return getRepositoryState()
+  const state = await getRepositoryState()
+  broadcastRepositoryChanged(state)
+  return state
 }
 
 /**
@@ -860,7 +1169,10 @@ export const updateRepository = async (
   )
 
   await writeStore(next)
-  return getRepositoryState()
+
+  const state = await getRepositoryState()
+  broadcastRepositoryChanged(state)
+  return state
 }
 
 /**
@@ -871,7 +1183,9 @@ export const removeRepository = async (repositoryId: string): Promise<Repository
   const repositories = await readStore()
   await writeStore(repositories.filter((repository) => repository.id !== repositoryId))
 
-  return getRepositoryState()
+  const state = await getRepositoryState()
+  broadcastRepositoryChanged(state)
+  return state
 }
 
 /**
@@ -904,6 +1218,43 @@ export const selectDirectory = async (
 export const initializeRepositories = (): void => {
   // 读取根目录、仓库列表和实时可用状态。
   ipcMain.handle('repositories:get-state', () => getRepositoryState())
+
+  // 读取指定仓库的本地和远程分支。
+  ipcMain.handle(
+    'repositories:list-branches',
+    (_event, repositoryId: unknown, fetchRemote: unknown) => {
+      if (typeof repositoryId !== 'string') throw new Error('Invalid repository id')
+      return listRepositoryBranches(repositoryId, fetchRemote === true)
+    }
+  )
+
+  // 读取需求仓库绑定的实时状态。
+  ipcMain.handle(
+    'repositories:get-binding-status',
+    (_event, repositoryId: unknown, branchName: unknown) => {
+      if (typeof repositoryId !== 'string' || typeof branchName !== 'string') {
+        throw new Error('Invalid binding status input')
+      }
+
+      return getRepositoryBindingStatus(repositoryId, branchName)
+    }
+  )
+
+  // 从基线分支创建需求开发分支，不切换当前工作区。
+  ipcMain.handle(
+    'repositories:create-branch',
+    (_event, repositoryId: unknown, branchName: unknown, baseBranch: unknown) => {
+      if (
+        typeof repositoryId !== 'string' ||
+        typeof branchName !== 'string' ||
+        typeof baseBranch !== 'string'
+      ) {
+        throw new Error('Invalid branch input')
+      }
+
+      return createRepositoryBranch(repositoryId, branchName, baseBranch)
+    }
+  )
 
   // 刷新单个仓库的 Git 信息。
   ipcMain.handle('repositories:refresh-repository', (_event, repositoryId: unknown) => {

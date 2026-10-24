@@ -261,9 +261,9 @@ const readVersion = async (executablePath: string): Promise<string | null> => {
 
 /**
  * 执行 lark-cli。
- * 参数全部由应用内部构造，不包含用户输入。
+ * 导出给链接预览等只读业务复用。
  */
-const runLarkCli = async (args: string[]): Promise<string> => {
+export const runLarkCli = async (args: string[]): Promise<string> => {
   const resolved = await resolveLarkCli()
 
   if (!resolved?.available) {

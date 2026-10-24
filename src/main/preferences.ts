@@ -2,6 +2,8 @@ import { app } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ThemeMode } from '../types/theme'
+import { isIdePresetId } from '../types/ide'
+import type { IdeConfig } from '../types/ide'
 
 /**
  * 应用级偏好。
@@ -12,6 +14,7 @@ export interface AppPreferences {
   larkCliPath?: string
   meegleCliPath?: string
   repositoryRoot?: string
+  ide?: IdeConfig
 }
 
 const DEFAULT_PREFERENCES: AppPreferences = {
@@ -26,6 +29,23 @@ let cachedPreferences: AppPreferences | null = null
  */
 const isThemeMode = (value: unknown): value is ThemeMode =>
   value === 'system' || value === 'light' || value === 'dark'
+
+/**
+ * 校验持久化的 IDE 配置。
+ */
+const isIdeConfig = (value: unknown): value is IdeConfig => {
+  if (!value || typeof value !== 'object') return false
+
+  const config = value as Record<string, unknown>
+
+  return (
+    isIdePresetId(config.preset) &&
+    typeof config.name === 'string' &&
+    typeof config.command === 'string' &&
+    Array.isArray(config.args) &&
+    config.args.every((arg) => typeof arg === 'string')
+  )
+}
 
 /**
  * 标准化可选路径。
@@ -58,13 +78,15 @@ const readPreferences = (): AppPreferences => {
       larkCliPath?: unknown
       meegleCliPath?: unknown
       repositoryRoot?: unknown
+      ide?: unknown
     }
 
     cachedPreferences = {
       theme: isThemeMode(parsed.theme) ? parsed.theme : DEFAULT_PREFERENCES.theme,
       larkCliPath: normalizePath(parsed.larkCliPath),
       meegleCliPath: normalizePath(parsed.meegleCliPath),
-      repositoryRoot: normalizePath(parsed.repositoryRoot)
+      repositoryRoot: normalizePath(parsed.repositoryRoot),
+      ide: isIdeConfig(parsed.ide) ? parsed.ide : undefined
     }
   } catch {
     cachedPreferences = { ...DEFAULT_PREFERENCES }
@@ -91,6 +113,7 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
   next.larkCliPath = normalizePath(next.larkCliPath)
   next.meegleCliPath = normalizePath(next.meegleCliPath)
   next.repositoryRoot = normalizePath(next.repositoryRoot)
+  next.ide = isIdeConfig(next.ide) ? next.ide : undefined
   cachedPreferences = next
 
   try {

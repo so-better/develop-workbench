@@ -5,9 +5,12 @@
 import { app } from 'electron'
 import { join } from 'node:path'
 import { initializeAiConfig } from './ai-config'
+import { initializeIde } from './ide'
 import { initializeLark } from './lark'
+import { initializeLinkPreview } from './link-preview'
 import { initializeMeegle } from './meegle'
 import { initializeRepositories } from './repositories'
+import { initializeRequirementBindings } from './requirement-bindings'
 import { initializeRequirements } from './requirements'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
@@ -38,10 +41,13 @@ if (!hasSingleInstanceLock) {
     // 各业务模块自行注册 IPC；先恢复主题，再创建窗口，避免启动时主题闪烁。
     initializeTheme()
     initializeSystem()
+    initializeIde()
     initializeLark()
+    initializeLinkPreview()
     initializeMeegle()
     initializeRepositories()
     initializeRequirements()
+    initializeRequirementBindings()
     initializeAiConfig()
     createMainWindow()
 

@@ -42,6 +42,31 @@ export interface RepositoryState {
 }
 
 /**
+ * 仓库分支列表和远程刷新结果。
+ */
+export interface RepositoryBranchList {
+  /** 本地分支和 origin 远程分支合并去重后的列表。 */
+  branches: string[]
+
+  /** 有远程仓库但 fetch 失败时的提示；无远程或成功时为 null。 */
+  fetchWarning: string | null
+}
+
+/**
+ * 需求仓库绑定的实时状态。
+ */
+export interface RepositoryBindingStatus {
+  /** 仓库路径是否可访问。 */
+  available: boolean
+
+  /** 仓库当前检出的分支。 */
+  currentBranch: string | null
+
+  /** 绑定的目标分支是否存在。 */
+  branchExists: boolean
+}
+
+/**
  * 根目录扫描结果。
  * 在仓库状态之外附带本次扫描的统计信息。
  */

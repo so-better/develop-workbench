@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import dayjs from 'dayjs'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
   CheckCircleFilled,
+  BranchesOutlined,
   ClockCircleFilled,
+  CloseOutlined,
+  CodeOutlined,
+  DeleteOutlined,
   DownOutlined,
   EditOutlined,
   ExportOutlined,
+  FolderOpenOutlined,
   LinkOutlined,
   MinusCircleOutlined,
   NodeCollapseOutlined,
   NodeExpandOutlined,
+  PlusOutlined,
   ReloadOutlined,
   RollbackOutlined,
   SearchOutlined
@@ -27,15 +31,17 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Select,
   Skeleton,
   Tabs,
   Tag,
-  Tooltip,
-  Typography
+  Tooltip
 } from 'antd'
 import type { InputRef } from 'antd'
 import type { Dayjs } from 'dayjs'
+import type { RequirementRepoBinding } from '../../../types/bindings'
+import type { Repository, RepositoryBindingStatus } from '../../../types/repository'
 import type {
   MeegleMyRequirements,
   MeegleRequirement,
@@ -46,6 +52,7 @@ import type {
   MeegleRequirementOwner
 } from '../../../types/requirements'
 import type { SettingsSection } from '../../../types/settings'
+import MarkdownContent from './MarkdownContent'
 import RequirementFlowchart from './RequirementFlowchart'
 
 interface RequirementWorkbenchProps {
@@ -180,10 +187,25 @@ const formatWorkTime = (value: number | null): string =>
   value !== null ? `${value} 人天` : '未设置'
 
 /**
+ * 清理飞书内部 HTML 标记。
+ * 不能直接删除注释，否则裸 URL 会和后面的中文标点连在一起被自动链接吞掉。
+ */
+const stripFeishuMarkers = (content: string): string =>
+  content
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim()
+
+/**
  * 去掉评论里的隐藏提及信息，保留可读正文。
  */
 const formatCommentContent = (content: string): string =>
-  content.replace(/<!--[\s\S]*?-->/g, '').trim() || '（空白评论）'
+  stripFeishuMarkers(content) || '（空白评论）'
+
+/**
+ * 清理需求描述中的飞书内部标记。
+ */
+const cleanMarkdownContent = (content: string): string => stripFeishuMarkers(content)
 
 /**
  * 构造引用回复内容。
@@ -311,7 +333,7 @@ const formatNodeActualTime = (
 export default function RequirementWorkbench({
   onOpenSettings
 }: RequirementWorkbenchProps): JSX.Element {
-  const { message } = App.useApp()
+  const { message, notification } = App.useApp()
   const [data, setData] = useState<MeegleMyRequirements | null>(null)
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -377,6 +399,41 @@ export default function RequirementWorkbench({
 
   const [replyToComment, setReplyToComment] = useState<MeegleRequirementComment | null>(null)
 
+  // 需求描述折叠状态。
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+
+  // 需求描述编辑状态。
+  const [descriptionEditing, setDescriptionEditing] = useState(false)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [descriptionSaving, setDescriptionSaving] = useState(false)
+
+  // 需求仓库绑定。
+  const [repositories, setRepositories] = useState<Repository[]>([])
+  const [repositoriesLoading, setRepositoriesLoading] = useState(false)
+  const [bindings, setBindings] = useState<RequirementRepoBinding[]>([])
+  const [bindingsLoading, setBindingsLoading] = useState(false)
+  const [bindingsError, setBindingsError] = useState<string | null>(null)
+  const [bindingVersion, setBindingVersion] = useState(0)
+  const [repoBranches, setRepoBranches] = useState<Record<string, string[]>>({})
+  const [branchLoadingIds, setBranchLoadingIds] = useState<Set<string>>(() => new Set())
+  const [addBindingOpen, setAddBindingOpen] = useState(false)
+  const [newRepositoryId, setNewRepositoryId] = useState<string | null>(null)
+  const [newBranchName, setNewBranchName] = useState<string | null>(null)
+  const [bindingSaving, setBindingSaving] = useState(false)
+  const [updatingBindingId, setUpdatingBindingId] = useState<string | null>(null)
+  const [removingBindingId, setRemovingBindingId] = useState<string | null>(null)
+  const [createBranchOpen, setCreateBranchOpen] = useState(false)
+  const [createBranchBase, setCreateBranchBase] = useState<string | null>(null)
+  const [createBranchName, setCreateBranchName] = useState('')
+  const [createBranchSaving, setCreateBranchSaving] = useState(false)
+  const [openingIdeBindingId, setOpeningIdeBindingId] = useState<string | null>(null)
+  const openingIdeRef = useRef<string | null>(null)
+  const [bindingStatuses, setBindingStatuses] = useState<
+    Record<string, RepositoryBindingStatus>
+  >({})
+  const [bindingStatusVersion, setBindingStatusVersion] = useState(0)
+  const branchCacheRef = useRef(new Map<string, string[]>())
+
   /** 飞书需求详情页地址。 */
   const requirementUrl =
     selectedRequirement && data
@@ -384,6 +441,51 @@ export default function RequirementWorkbench({
           data.project.key
         )}/story/detail/${encodeURIComponent(selectedRequirement.id)}`
       : null
+
+  /** 仓库 ID 到仓库信息的映射。 */
+  const repositoryMap = useMemo(
+    () => new Map(repositories.map((repository) => [repository.id, repository])),
+    [repositories]
+  )
+
+  /** 已绑定的仓库 ID，用于过滤新增下拉框。 */
+  const boundRepositoryIds = useMemo(
+    () => new Set(bindings.map((binding) => binding.repositoryId)),
+    [bindings]
+  )
+
+  /** 新绑定可选的仓库。 */
+  const availableRepositories = useMemo(
+    () =>
+      repositories.filter(
+        (repository) => repository.available && !boundRepositoryIds.has(repository.id)
+      ),
+    [boundRepositoryIds, repositories]
+  )
+
+  /** 是否展示新增绑定表单。 */
+  const showAddBinding = bindings.length === 0 || addBindingOpen
+
+  /** 新增绑定时的分支选项。 */
+  const newRepositoryBranchOptions = newRepositoryId
+    ? (repoBranches[newRepositoryId] ?? []).map((branch) => ({
+        value: branch,
+        label: branch
+      }))
+    : []
+
+  /**
+   * 生成绑定行的分支选项，保留当前值避免历史分支不在列表中时显示为空。
+   */
+  const getBindingBranchOptions = (repositoryId: string, currentBranch: string) => {
+    const branches = new Set(repoBranches[repositoryId] ?? [])
+
+    branches.add(currentBranch)
+
+    return Array.from(branches)
+      .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }))
+      .map((branch) => ({ value: branch, label: branch }))
+  }
 
   /** 基本信息 Tab 的分组字段。 */
   const basicInfoGroups: BasicInfoGroup[] = selectedRequirement
@@ -676,6 +778,413 @@ export default function RequirementWorkbench({
   }, [activityVersion, selectedRequirementId])
 
   /**
+   * 读取本地仓库列表。
+   */
+  const loadRepositories = useCallback(async (): Promise<void> => {
+    setRepositoriesLoading(true)
+
+    try {
+      const state = await window.electron.getRepositoryState()
+      setRepositories(state.repositories)
+    } catch (loadError) {
+      setBindingsError(getErrorMessage(loadError))
+    } finally {
+      setRepositoriesLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadRepositories()
+  }, [loadRepositories])
+
+  useEffect(() => {
+    const unsubscribe = window.electron.onRepositoriesChanged((state) => {
+      setRepositories(state.repositories)
+      setBindingStatusVersion((value) => value + 1)
+    })
+
+    return unsubscribe
+  }, [])
+
+  /**
+   * 读取仓库分支并缓存。
+   */
+  const loadBranches = useCallback(
+    async (
+      repositoryId: string,
+      force = false,
+      fetchRemote = false
+    ): Promise<string[]> => {
+      const cached = branchCacheRef.current.get(repositoryId)
+
+      if (cached && !force && !fetchRemote) {
+        setRepoBranches((current) =>
+          current[repositoryId] ? current : { ...current, [repositoryId]: cached }
+        )
+        return cached
+      }
+
+      setBranchLoadingIds((current) => new Set(current).add(repositoryId))
+
+      try {
+        const result = await window.electron.listRepositoryBranches(
+          repositoryId,
+          fetchRemote
+        )
+
+        if (result.fetchWarning) {
+          message.warning({ content: result.fetchWarning, duration: 6 })
+        }
+
+        branchCacheRef.current.set(repositoryId, result.branches)
+        setRepoBranches((current) => ({
+          ...current,
+          [repositoryId]: result.branches
+        }))
+
+        return result.branches
+      } catch (branchError) {
+        if (force) message.error(getErrorMessage(branchError))
+        return []
+      } finally {
+        setBranchLoadingIds((current) => {
+          const next = new Set(current)
+          next.delete(repositoryId)
+          return next
+        })
+      }
+    },
+    [message]
+  )
+
+  /**
+   * 切换需求时重新读取仓库绑定。
+   */
+  useEffect(() => {
+    if (!selectedRequirementId) {
+      setBindings([])
+      setBindingsError(null)
+      setAddBindingOpen(false)
+      return
+    }
+
+    let cancelled = false
+    setBindingsLoading(true)
+    setBindingsError(null)
+    setNewRepositoryId(null)
+    setNewBranchName(null)
+    setCreateBranchOpen(false)
+
+    window.electron
+      .getRequirementBindings(selectedRequirementId)
+      .then((state) => {
+        if (cancelled) return
+
+        setBindings(state.bindings)
+        setAddBindingOpen(state.bindings.length === 0)
+
+        for (const binding of state.bindings) {
+          void loadBranches(binding.repositoryId)
+        }
+      })
+      .catch((bindingError) => {
+        if (!cancelled) setBindingsError(getErrorMessage(bindingError))
+      })
+      .finally(() => {
+        if (!cancelled) setBindingsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [bindingVersion, loadBranches, selectedRequirementId])
+
+  /**
+   * 读取每个绑定的目标分支和当前分支状态。
+   */
+  useEffect(() => {
+    if (bindings.length === 0) {
+      setBindingStatuses({})
+      return
+    }
+
+    let cancelled = false
+    setBindingStatuses({})
+
+    Promise.all(
+      bindings.map(async (binding) => {
+        try {
+          const status = await window.electron.getRepositoryBindingStatus(
+            binding.repositoryId,
+            binding.branchName
+          )
+
+          return [binding.id, status] as const
+        } catch {
+          return null
+        }
+      })
+    ).then((results) => {
+      if (cancelled) return
+
+      const next: Record<string, RepositoryBindingStatus> = {}
+
+      for (const result of results) {
+        if (result) next[result[0]] = result[1]
+      }
+
+      setBindingStatuses(next)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [bindingStatusVersion, bindings])
+
+  /**
+   * 新增仓库绑定。
+   */
+  const handleAddBinding = async (): Promise<void> => {
+    if (!selectedRequirementId || !newRepositoryId || !newBranchName) {
+      message.warning('请选择仓库和开发分支')
+      return
+    }
+
+    setBindingSaving(true)
+
+    try {
+      const state = await window.electron.addRequirementBinding(
+        selectedRequirementId,
+        newRepositoryId,
+        newBranchName
+      )
+      setBindings(state.bindings)
+      setNewRepositoryId(null)
+      setNewBranchName(null)
+      setAddBindingOpen(false)
+      message.success('仓库绑定已保存')
+    } catch (bindingError) {
+      message.error(getErrorMessage(bindingError))
+    } finally {
+      setBindingSaving(false)
+    }
+  }
+
+  /**
+   * 修改绑定仓库的开发分支。
+   */
+  const handleUpdateBinding = async (
+    bindingId: string,
+    branchName: string
+  ): Promise<void> => {
+    if (!selectedRequirementId) return
+
+    setUpdatingBindingId(bindingId)
+
+    try {
+      const state = await window.electron.updateRequirementBinding(
+        selectedRequirementId,
+        bindingId,
+        branchName
+      )
+      setBindings(state.bindings)
+      message.success('开发分支已更新')
+    } catch (bindingError) {
+      message.error(getErrorMessage(bindingError))
+    } finally {
+      setUpdatingBindingId(null)
+    }
+  }
+
+  /**
+   * 解除仓库绑定。
+   */
+  const handleRemoveBinding = async (bindingId: string): Promise<void> => {
+    if (!selectedRequirementId) return
+
+    setRemovingBindingId(bindingId)
+
+    try {
+      const state = await window.electron.removeRequirementBinding(
+        selectedRequirementId,
+        bindingId
+      )
+      setBindings(state.bindings)
+      setAddBindingOpen(state.bindings.length === 0)
+      message.success('仓库绑定已解除')
+    } catch (bindingError) {
+      message.error(getErrorMessage(bindingError))
+    } finally {
+      setRemovingBindingId(null)
+    }
+  }
+
+  /**
+   * 打开新建分支弹窗，默认使用仓库主分支作为基线。
+   */
+  const openCreateBranch = async (): Promise<void> => {
+    if (!newRepositoryId) return
+
+    const branches =
+      repoBranches[newRepositoryId]?.length > 0
+        ? repoBranches[newRepositoryId]
+        : await loadBranches(newRepositoryId, true)
+    const repository = repositoryMap.get(newRepositoryId)
+    const preferredBase =
+      repository?.defaultBranch && branches.includes(repository.defaultBranch)
+        ? repository.defaultBranch
+        : branches[0] ?? null
+
+    setCreateBranchBase(preferredBase)
+    setCreateBranchName(selectedRequirementId ? `feature/${selectedRequirementId}` : '')
+    setCreateBranchOpen(true)
+  }
+
+  /**
+   * 创建开发分支并自动绑定到当前需求。
+   */
+  const handleCreateBranch = async (): Promise<void> => {
+    if (
+      !selectedRequirementId ||
+      !newRepositoryId ||
+      !createBranchBase ||
+      !createBranchName.trim()
+    ) {
+      message.warning('请选择基线分支并填写新分支名')
+      return
+    }
+
+    setCreateBranchSaving(true)
+
+    try {
+      const branchName = createBranchName.trim()
+
+      await window.electron.createRepositoryBranch(
+        newRepositoryId,
+        branchName,
+        createBranchBase
+      )
+      branchCacheRef.current.delete(newRepositoryId)
+      await loadBranches(newRepositoryId, true)
+
+      try {
+        const state = await window.electron.addRequirementBinding(
+          selectedRequirementId,
+          newRepositoryId,
+          branchName
+        )
+
+        setBindings(state.bindings)
+        setNewRepositoryId(null)
+        setNewBranchName(null)
+        setAddBindingOpen(false)
+        setCreateBranchOpen(false)
+        message.success('分支已创建并绑定')
+      } catch (bindingError) {
+        setNewBranchName(branchName)
+        setAddBindingOpen(true)
+        setCreateBranchOpen(false)
+        message.warning({
+          content: `分支「${branchName}」已创建，但绑定失败：${getErrorMessage(
+            bindingError
+          )}。请直接点击“添加”完成绑定。`,
+          duration: 8
+        })
+      }
+    } catch (branchError) {
+      message.error(getErrorMessage(branchError))
+    } finally {
+      setCreateBranchSaving(false)
+    }
+  }
+
+  /**
+   * 在 IDE 中打开仓库。
+   */
+  const handleOpenInIde = async (binding: RequirementRepoBinding): Promise<void> => {
+    if (openingIdeRef.current !== null) return
+
+    openingIdeRef.current = binding.id
+    setOpeningIdeBindingId(binding.id)
+    let shouldRefreshStatus = false
+
+    try {
+      const ideState = await window.electron.getIdeConfig()
+
+      if (!ideState.config || !ideState.available) {
+        notification.warning({
+          key: 'ide-settings-required',
+          message: ideState.config ? 'IDE 当前不可用' : '还没有配置 IDE',
+          description: '请先在设置中选择 IDE，并确认可执行文件可用。',
+          duration: 6,
+          btn: (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => {
+                notification.destroy('ide-settings-required')
+                onOpenSettings('ide')
+              }}
+            >
+              去设置
+            </Button>
+          )
+        })
+        return
+      }
+
+      shouldRefreshStatus = true
+
+      const result = await window.electron.prepareRepositoryInIde(
+        binding.repositoryId,
+        binding.branchName
+      )
+
+      if (result.switched) {
+        message.success(
+          result.pulled
+            ? `已切换到 ${binding.branchName} 并拉取最新代码，即将打开 IDE`
+            : `已切换到 ${binding.branchName}，该分支没有远程上游，即将打开 IDE`
+        )
+      } else {
+        message.success('分支检查通过，即将打开 IDE')
+      }
+
+      // 留出时间让用户看到分支检查和拉取结果。
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await window.electron.launchRepositoryInIde(binding.repositoryId)
+    } catch (openError) {
+      message.error(getErrorMessage(openError))
+    } finally {
+      if (shouldRefreshStatus) {
+        setBindingStatusVersion((value) => value + 1)
+      }
+
+      openingIdeRef.current = null
+      setOpeningIdeBindingId(null)
+    }
+  }
+
+  /**
+   * 刷新仓库和绑定数据。
+   */
+  const refreshBindings = async (): Promise<void> => {
+    const repositoryIds = new Set(bindings.map((binding) => binding.repositoryId))
+
+    if (newRepositoryId) repositoryIds.add(newRepositoryId)
+
+    branchCacheRef.current.clear()
+    setRepoBranches({})
+    await loadRepositories()
+    await Promise.all(
+      Array.from(repositoryIds).map((repositoryId) =>
+        loadBranches(repositoryId, true, true)
+      )
+    )
+    setBindingVersion((value) => value + 1)
+  }
+
+  /**
    * 切换需求或节点时退出内联编辑，避免把上一个节点的值带到新节点。
    */
   useEffect(() => {
@@ -686,6 +1195,9 @@ export default function RequirementWorkbench({
   useEffect(() => {
     setCommentDraft('')
     setReplyToComment(null)
+    setDescriptionExpanded(false)
+    setDescriptionEditing(false)
+    setDescriptionDraft('')
   }, [selectedRequirementId])
 
   /**
@@ -774,6 +1286,47 @@ export default function RequirementWorkbench({
       message.error(getErrorMessage(rollbackError))
     } finally {
       setRollbackSubmitting(false)
+    }
+  }
+
+  /**
+   * 开始编辑需求描述。
+   */
+  const handleStartDescriptionEdit = (): void => {
+    setDescriptionDraft(selectedRequirement?.description ?? '')
+    setDescriptionEditing(true)
+    setDescriptionExpanded(true)
+  }
+
+  /**
+   * 取消编辑需求描述。
+   */
+  const handleCancelDescriptionEdit = (): void => {
+    setDescriptionEditing(false)
+    setDescriptionDraft('')
+  }
+
+  /**
+   * 保存需求描述到飞书。
+   */
+  const handleSaveDescription = async (): Promise<void> => {
+    if (!selectedRequirementId) return
+
+    setDescriptionSaving(true)
+
+    try {
+      await window.electron.updateRequirementDescription(
+        selectedRequirementId,
+        descriptionDraft
+      )
+      message.success('需求描述已更新')
+      setDescriptionEditing(false)
+      setDescriptionDraft('')
+      await loadRequirements()
+    } catch (saveError) {
+      message.error(getErrorMessage(saveError))
+    } finally {
+      setDescriptionSaving(false)
     }
   }
 
@@ -1332,6 +1885,255 @@ export default function RequirementWorkbench({
                 />
               ) : null}
 
+              <section className="requirement-repo-section">
+                <div className="requirement-repo-heading">
+                  <div className="requirement-repo-heading-title">
+                    <h2>关联代码仓库</h2>
+                    {bindings.length > 0 ? (
+                      <span className="requirement-repo-count">{bindings.length}</span>
+                    ) : null}
+                  </div>
+                  <div className="requirement-repo-heading-actions">
+                    <Tooltip title="刷新仓库和分支">
+                      <Button
+                        type="text"
+                        size="small"
+                        className="requirement-repo-refresh"
+                        icon={<ReloadOutlined />}
+                        loading={
+                          repositoriesLoading || bindingsLoading || branchLoadingIds.size > 0
+                        }
+                        aria-label="刷新仓库和分支"
+                        onClick={() => refreshBindings()}
+                      />
+                    </Tooltip>
+                    {bindings.length > 0 ? (
+                      <Button
+                        type="text"
+                        size="small"
+                        className="requirement-repo-add-toggle"
+                        icon={addBindingOpen ? <CloseOutlined /> : <PlusOutlined />}
+                        onClick={() => setAddBindingOpen((value) => !value)}
+                      >
+                        {addBindingOpen ? '取消' : '添加仓库'}
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+
+                {bindingsError ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="仓库绑定读取失败"
+                    description={bindingsError}
+                    className="requirement-repo-alert"
+                  />
+                ) : null}
+
+                {bindingsLoading && bindings.length === 0 ? (
+                  <Skeleton active paragraph={{ rows: 2 }} />
+                ) : (
+                  <>
+                    {bindings.length > 0 ? (
+                      <div className="requirement-repo-list">
+                        {bindings.map((binding) => {
+                          const repository = repositoryMap.get(binding.repositoryId)
+                          const branchesLoading = branchLoadingIds.has(binding.repositoryId)
+                          const openingThisBinding = openingIdeBindingId === binding.id
+                          const bindingStatus = bindingStatuses[binding.id]
+
+                          return (
+                            <div className="requirement-repo-row" key={binding.id}>
+                              <div className="requirement-repo-info">
+                                <span className="requirement-repo-icon">
+                                  <FolderOpenOutlined />
+                                </span>
+                                <div className="requirement-repo-copy">
+                                  <strong>{repository?.name ?? '仓库已移除'}</strong>
+                                  <span title={repository?.localPath}>
+                                    {repository?.localPath ?? binding.repositoryId}
+                                  </span>
+                                </div>
+                                {repository && !repository.available ? (
+                                  <Tag color="red" bordered={false}>
+                                    不可用
+                                  </Tag>
+                                ) : null}
+                              </div>
+
+                              <div className="requirement-repo-branch-field">
+                                <span className="requirement-repo-field-label">
+                                  <BranchesOutlined />
+                                  开发分支
+                                </span>
+                                <Select
+                                  size="small"
+                                  showSearch
+                                  className="requirement-repo-branch"
+                                  value={binding.branchName}
+                                  options={getBindingBranchOptions(
+                                    binding.repositoryId,
+                                    binding.branchName
+                                  )}
+                                  loading={
+                                    branchesLoading || updatingBindingId === binding.id
+                                  }
+                                  disabled={!repository?.available}
+                                  onChange={(value: string) =>
+                                    handleUpdateBinding(binding.id, value)
+                                  }
+                                />
+                                {bindingStatus && repository?.available ? (
+                                  <span className="requirement-repo-branch-state">
+                                    {!bindingStatus.branchExists ? (
+                                      <Tag color="red" bordered={false}>
+                                        分支不存在
+                                      </Tag>
+                                    ) : bindingStatus.currentBranch === binding.branchName ? (
+                                      <Tag color="green" bordered={false}>
+                                        已切换
+                                      </Tag>
+                                    ) : (
+                                      <span className="requirement-repo-branch-current">
+                                        当前 {bindingStatus.currentBranch ?? '未知'} · 未切换
+                                      </span>
+                                    )}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <div className="requirement-repo-row-actions">
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  className="requirement-repo-open-ide"
+                                  icon={<CodeOutlined />}
+                                  loading={openingThisBinding}
+                                  disabled={
+                                    !repository?.available ||
+                                    bindingStatus?.branchExists === false ||
+                                    (openingIdeBindingId !== null && !openingThisBinding)
+                                  }
+                                  onClick={() => handleOpenInIde(binding)}
+                                >
+                                  打开 IDE
+                                </Button>
+                                <Popconfirm
+                                  title="解除仓库绑定？"
+                                  description="只解除绑定，不会删除分支或本地代码。"
+                                  okText="解除"
+                                  cancelText="取消"
+                                  onConfirm={() => handleRemoveBinding(binding.id)}
+                                >
+                                  <Button
+                                    type="text"
+                                    danger
+                                    size="small"
+                                    className="requirement-repo-remove"
+                                    icon={<DeleteOutlined />}
+                                    loading={removingBindingId === binding.id}
+                                    aria-label={`解除 ${repository?.name ?? '仓库'} 绑定`}
+                                  />
+                                </Popconfirm>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+
+                    {showAddBinding ? (
+                      <div className="requirement-repo-add">
+                        <div className="requirement-repo-add-title">绑定新仓库</div>
+                        {repositoriesLoading ? (
+                          <Skeleton active paragraph={{ rows: 1 }} title={false} />
+                        ) : availableRepositories.length > 0 ? (
+                          <div className="requirement-repo-add-row">
+                            <div className="requirement-repo-add-field">
+                              <label>仓库</label>
+                              <Select
+                                size="small"
+                                showSearch
+                                optionFilterProp="label"
+                                className="requirement-repo-select"
+                                placeholder="选择仓库"
+                                value={newRepositoryId}
+                                options={availableRepositories.map((repository) => ({
+                                  value: repository.id,
+                                  label: repository.name
+                                }))}
+                                onChange={(value: string) => {
+                                  setNewRepositoryId(value)
+                                  setNewBranchName(null)
+                                  void loadBranches(value, true, true)
+                                }}
+                              />
+                            </div>
+                            <div className="requirement-repo-add-field">
+                              <label>开发分支</label>
+                              <Select
+                                size="small"
+                                showSearch
+                                className="requirement-repo-branch"
+                                placeholder="选择开发分支"
+                                value={newBranchName}
+                                disabled={!newRepositoryId}
+                                loading={
+                                  newRepositoryId
+                                    ? branchLoadingIds.has(newRepositoryId)
+                                    : false
+                                }
+                                options={newRepositoryBranchOptions}
+                                onChange={(value: string) => setNewBranchName(value)}
+                              />
+                            </div>
+                            <div className="requirement-repo-add-actions">
+                              <Button
+                                type="text"
+                                size="small"
+                                className="requirement-repo-create-branch"
+                                icon={<PlusOutlined />}
+                                disabled={!newRepositoryId}
+                                onClick={() => openCreateBranch()}
+                              >
+                                新建分支
+                              </Button>
+                              <Button
+                                type="primary"
+                                size="small"
+                                loading={bindingSaving}
+                                disabled={!newRepositoryId || !newBranchName}
+                                onClick={() => handleAddBinding()}
+                              >
+                                添加
+                              </Button>
+                            </div>
+                          </div>
+                        ) : repositories.length === 0 ? (
+                          <div className="requirement-repo-empty">
+                            <FolderOpenOutlined className="requirement-repo-empty-icon" />
+                            <div>
+                              <strong>还没有可用代码仓库</strong>
+                              <span>请先在设置中配置代码根目录和仓库。</span>
+                            </div>
+                            <Button
+                              type="link"
+                              size="small"
+                              onClick={() => onOpenSettings('repositories')}
+                            >
+                              去设置
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="requirement-repo-hint">没有可绑定的仓库</p>
+                        )}
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </section>
+
               <section className="requirement-flow-section">
                 {activityError ? (
                   <Alert
@@ -1579,17 +2381,85 @@ export default function RequirementWorkbench({
                           <div className="requirement-info-description">
                             <div className="requirement-info-description-head">
                               <h3>需求描述</h3>
+                              {descriptionEditing ? (
+                                <span className="requirement-info-description-actions">
+                                  <Button
+                                    size="small"
+                                    onClick={handleCancelDescriptionEdit}
+                                  >
+                                    取消
+                                  </Button>
+                                  <Button
+                                    type="primary"
+                                    size="small"
+                                    loading={descriptionSaving}
+                                    onClick={() => handleSaveDescription()}
+                                  >
+                                    保存
+                                  </Button>
+                                </span>
+                              ) : (
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  className="requirement-info-description-edit"
+                                  icon={<EditOutlined />}
+                                  onClick={handleStartDescriptionEdit}
+                                >
+                                  编辑
+                                </Button>
+                              )}
                             </div>
-                            <Typography.Paragraph
-                              className="requirement-description-text"
-                              ellipsis={{
-                                rows: 6,
-                                expandable: true,
-                                symbol: '展开'
-                              }}
-                            >
-                              {selectedRequirement.description || '暂无需求描述'}
-                            </Typography.Paragraph>
+                            {descriptionEditing ? (
+                              <>
+                                <Input.TextArea
+                                  className="requirement-description-editor"
+                                  rows={10}
+                                  value={descriptionDraft}
+                                  placeholder="支持 Markdown"
+                                  onChange={(event) =>
+                                    setDescriptionDraft(event.target.value)
+                                  }
+                                />
+                                <p className="requirement-description-edit-hint">
+                                  支持 Markdown，保存后会直接同步到飞书项目。
+                                </p>
+                              </>
+                            ) : (() => {
+                              const description = cleanMarkdownContent(selectedRequirement.description ?? '') || '暂无需求描述'
+                              const collapsed =
+                                !descriptionExpanded &&
+                                (description.length > 420 ||
+                                  description.split('\n').length > 12)
+
+                              return (
+                                <>
+                                  <div
+                                    className={`requirement-description-box${
+                                      collapsed ? ' is-collapsed' : ''
+                                    }`}
+                                  >
+                                    <MarkdownContent
+                                      content={description}
+                                      className="requirement-description-markdown"
+                                    />
+                                  </div>
+                                  {description.length > 420 ||
+                                  description.split('\n').length > 12 ? (
+                                    <Button
+                                      type="link"
+                                      size="small"
+                                      className="requirement-description-toggle"
+                                      onClick={() =>
+                                        setDescriptionExpanded((value) => !value)
+                                      }
+                                    >
+                                      {descriptionExpanded ? '收起' : '展开'}
+                                    </Button>
+                                  ) : null}
+                                </>
+                              )
+                            })()}
                           </div>
 
                           <div className="requirement-info-groups">
@@ -1678,24 +2548,10 @@ export default function RequirementWorkbench({
                                             </Button>
                                           </div>
                                         </div>
-                                        <div className="requirement-comment-markdown">
-                                          <ReactMarkdown
-                                            remarkPlugins={[remarkGfm]}
-                                            components={{
-                                              a: ({ href, children }) => (
-                                                <a
-                                                  href={href}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                >
-                                                  {children}
-                                                </a>
-                                              )
-                                            }}
-                                          >
-                                            {formatCommentContent(comment.content)}
-                                          </ReactMarkdown>
-                                        </div>
+                                        <MarkdownContent
+                                          content={formatCommentContent(comment.content)}
+                                          className="requirement-comment-markdown"
+                                        />
                                       </div>
                                     </article>
                                   ))
@@ -1779,6 +2635,45 @@ export default function RequirementWorkbench({
           </div>
         )}
       </section>
+
+      <Modal
+        title="新建开发分支"
+        open={createBranchOpen}
+        okText="创建并绑定"
+        cancelText="取消"
+        okButtonProps={{
+          disabled: !createBranchBase || !createBranchName.trim()
+        }}
+        confirmLoading={createBranchSaving}
+        destroyOnHidden
+        onOk={() => handleCreateBranch()}
+        onCancel={() => setCreateBranchOpen(false)}
+      >
+        <div className="requirement-branch-create-form">
+          <label>仓库</label>
+          <div className="requirement-branch-create-repo">
+            {newRepositoryId
+              ? repositoryMap.get(newRepositoryId)?.name ?? newRepositoryId
+              : '未选择仓库'}
+          </div>
+          <label>基线分支</label>
+          <Select
+            showSearch
+            value={createBranchBase}
+            options={newRepositoryBranchOptions}
+            placeholder="选择基线分支"
+            onChange={(value: string) => setCreateBranchBase(value)}
+          />
+          <label>新分支名</label>
+          <Input
+            value={createBranchName}
+            placeholder="feature/需求ID"
+            spellCheck={false}
+            onChange={(event) => setCreateBranchName(event.target.value)}
+          />
+          <p>会从基线分支创建本地分支，并自动绑定到当前需求。</p>
+        </div>
+      </Modal>
 
       <Modal
         title="回滚节点"

@@ -2,7 +2,10 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
+import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
+import type { RequirementBindingState } from '../types/bindings'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
+import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
   MeegleMyRequirements,
@@ -11,6 +14,8 @@ import type {
 } from '../types/requirements'
 import type {
   CloneRepositoryInput,
+  RepositoryBindingStatus,
+  RepositoryBranchList,
   RepositoryCloneProgress,
   RepositoryScanResult,
   RepositoryState,
@@ -26,6 +31,56 @@ const electronAPI = {
    * 获取应用版本及 Electron、Chromium、Node.js 运行时信息。
    */
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:get-info'),
+
+  /**
+   * 获取链接预览信息。
+   */
+  getLinkPreview: (url: string): Promise<LinkPreview> =>
+    ipcRenderer.invoke('link-preview:get', url),
+
+  /**
+   * 读取 IDE 配置。
+   */
+  getIdeConfig: (): Promise<IdeConfigState> => ipcRenderer.invoke('ide:get'),
+
+  /**
+   * 保存 IDE 配置。
+   */
+  setIdeConfig: (config: IdeConfig): Promise<IdeConfigState> =>
+    ipcRenderer.invoke('ide:set', config),
+
+  /**
+   * 自动检测 Qoder。
+   */
+  detectIdeConfig: (presetId: IdePresetId): Promise<IdeConfig> =>
+    ipcRenderer.invoke('ide:detect', presetId),
+
+  /**
+   * 检查 IDE 配置并准备仓库分支。
+   */
+  prepareRepositoryInIde: (
+    repositoryId: string,
+    branchName: string
+  ): Promise<{
+    switched: boolean
+    pulled: boolean
+    hasUpstream: boolean
+  }> => ipcRenderer.invoke('ide:prepare-repository', repositoryId, branchName),
+
+  /**
+   * 启动 IDE 打开仓库。
+   */
+  launchRepositoryInIde: (repositoryId: string): Promise<void> =>
+    ipcRenderer.invoke('ide:launch-repository', repositoryId),
+
+  /**
+   * 选择 IDE 可执行文件。
+   */
+  selectIdeCommand: (
+    currentPath?: string | null,
+    presetId?: IdePresetId
+  ): Promise<string | null> =>
+    ipcRenderer.invoke('ide:select-command', currentPath, presetId),
 
   /**
    * 将文本写入系统剪贴板。
@@ -151,6 +206,47 @@ const electronAPI = {
     ipcRenderer.invoke('requirements:get-my'),
 
   /**
+   * 更新需求描述。
+   */
+  updateRequirementDescription: (workItemId: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('requirements:update-description', workItemId, content),
+
+  /**
+   * 读取需求的代码仓库绑定。
+   */
+  getRequirementBindings: (requirementId: string): Promise<RequirementBindingState> =>
+    ipcRenderer.invoke('bindings:get', requirementId),
+
+  /**
+   * 新增需求仓库绑定。
+   */
+  addRequirementBinding: (
+    requirementId: string,
+    repositoryId: string,
+    branchName: string
+  ): Promise<RequirementBindingState> =>
+    ipcRenderer.invoke('bindings:add', requirementId, repositoryId, branchName),
+
+  /**
+   * 修改绑定分支。
+   */
+  updateRequirementBinding: (
+    requirementId: string,
+    bindingId: string,
+    branchName: string
+  ): Promise<RequirementBindingState> =>
+    ipcRenderer.invoke('bindings:update', requirementId, bindingId, branchName),
+
+  /**
+   * 解除需求仓库绑定。
+   */
+  removeRequirementBinding: (
+    requirementId: string,
+    bindingId: string
+  ): Promise<RequirementBindingState> =>
+    ipcRenderer.invoke('bindings:remove', requirementId, bindingId),
+
+  /**
    * 读取需求流程节点和评论。
    */
   getRequirementActivity: (workItemId: string): Promise<MeegleRequirementActivity> =>
@@ -203,6 +299,39 @@ const electronAPI = {
    */
   refreshRepository: (repositoryId: string): Promise<RepositoryState> =>
     ipcRenderer.invoke('repositories:refresh-repository', repositoryId),
+
+  /**
+   * 读取指定仓库的本地和远程分支。
+   */
+  listRepositoryBranches: (
+    repositoryId: string,
+    fetchRemote = false
+  ): Promise<RepositoryBranchList> =>
+    ipcRenderer.invoke('repositories:list-branches', repositoryId, fetchRemote),
+
+  /**
+   * 读取需求仓库绑定的实时状态。
+   */
+  getRepositoryBindingStatus: (
+    repositoryId: string,
+    branchName: string
+  ): Promise<RepositoryBindingStatus> =>
+    ipcRenderer.invoke('repositories:get-binding-status', repositoryId, branchName),
+
+  /**
+   * 从基线分支创建本地开发分支。
+   */
+  createRepositoryBranch: (
+    repositoryId: string,
+    branchName: string,
+    baseBranch: string
+  ): Promise<void> =>
+    ipcRenderer.invoke(
+      'repositories:create-branch',
+      repositoryId,
+      branchName,
+      baseBranch
+    ),
 
   /**
    * 重新扫描代码根目录，同步仓库增删和 Git 信息。

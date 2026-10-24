@@ -4,6 +4,7 @@ import { Alert, App, Button, Input, Modal, Spin } from 'antd'
 import type { AppInfo } from '../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../types/lark'
 import type { SettingsSection } from '../../../types/settings'
+import IdeSettings from './IdeSettings'
 import MeegleSettings from './MeegleSettings'
 import RepositorySettings from './RepositorySettings'
 
@@ -51,6 +52,8 @@ export default function SettingsModal({
   const [larkError, setLarkError] = useState<string | null>(null)
   const meegleSaveRef = useRef<(() => Promise<void>) | null>(null)
   const [meegleReady, setMeegleReady] = useState(false)
+  const ideSaveRef = useRef<(() => Promise<void>) | null>(null)
+  const [ideReady, setIdeReady] = useState(false)
 
   /**
    * 接收 Meegle 面板注册的配置保存函数。
@@ -58,6 +61,11 @@ export default function SettingsModal({
   const handleMeegleSaveReady = useCallback((handler: (() => Promise<void>) | null): void => {
     meegleSaveRef.current = handler
     setMeegleReady(Boolean(handler))
+  }, [])
+
+  const handleIdeSaveReady = useCallback((handler: (() => Promise<void>) | null): void => {
+    ideSaveRef.current = handler
+    setIdeReady(Boolean(handler))
   }, [])
 
   useEffect(() => {
@@ -217,6 +225,17 @@ export default function SettingsModal({
       } finally {
         setSaving(false)
       }
+      return
+    }
+
+    if (activeSection === 'ide') {
+      setSaving(true)
+
+      try {
+        await ideSaveRef.current?.()
+      } finally {
+        setSaving(false)
+      }
     }
   }
 
@@ -227,9 +246,14 @@ export default function SettingsModal({
         ? larkLoading || Boolean(larkError)
         : activeSection === 'meegle'
           ? !meegleReady
-          : false
+          : activeSection === 'ide'
+            ? !ideReady
+            : false
   const showSaveButton =
-    activeSection === 'ai' || activeSection === 'lark-cli' || activeSection === 'meegle'
+    activeSection === 'ai' ||
+    activeSection === 'lark-cli' ||
+    activeSection === 'meegle' ||
+    activeSection === 'ide'
   const appInfoItems = [
     {
       label: '应用版本',
@@ -317,6 +341,14 @@ export default function SettingsModal({
             onClick={() => setActiveSection('meegle')}
           >
             Meegle Cli
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item${activeSection === 'ide' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'ide' ? 'page' : undefined}
+            onClick={() => setActiveSection('ide')}
+          >
+            IDE
           </button>
           <button
             type="button"
@@ -441,6 +473,10 @@ export default function SettingsModal({
 
           {activeSection === 'meegle' ? (
             <MeegleSettings onSaveReady={handleMeegleSaveReady} />
+          ) : null}
+
+          {activeSection === 'ide' ? (
+            <IdeSettings onSaveReady={handleIdeSaveReady} />
           ) : null}
 
           {activeSection === 'app-info' ? (

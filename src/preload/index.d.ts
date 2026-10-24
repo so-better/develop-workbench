@@ -1,6 +1,9 @@
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
+import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
+import type { RequirementBindingState } from '../types/bindings'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
+import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
   MeegleMyRequirements,
@@ -9,6 +12,8 @@ import type {
 } from '../types/requirements'
 import type {
   CloneRepositoryInput,
+  RepositoryBindingStatus,
+  RepositoryBranchList,
   RepositoryCloneProgress,
   RepositoryScanResult,
   RepositoryState,
@@ -20,6 +25,30 @@ export interface ElectronAPI {
   platform: string
   /** 获取应用与运行时版本信息。 */
   getAppInfo: () => Promise<AppInfo>
+  /** 获取链接预览信息。 */
+  getLinkPreview: (url: string) => Promise<LinkPreview>
+  /** 读取 IDE 配置。 */
+  getIdeConfig: () => Promise<IdeConfigState>
+  /** 保存 IDE 配置。 */
+  setIdeConfig: (config: IdeConfig) => Promise<IdeConfigState>
+  /** 自动检测 Qoder。 */
+  detectIdeConfig: (presetId: IdePresetId) => Promise<IdeConfig>
+  /** 检查 IDE 配置并准备仓库分支。 */
+  prepareRepositoryInIde: (
+    repositoryId: string,
+    branchName: string
+  ) => Promise<{
+    switched: boolean
+    pulled: boolean
+    hasUpstream: boolean
+  }>
+  /** 启动 IDE 打开仓库。 */
+  launchRepositoryInIde: (repositoryId: string) => Promise<void>
+  /** 选择 IDE 可执行文件。 */
+  selectIdeCommand: (
+    currentPath?: string | null,
+    presetId?: IdePresetId
+  ) => Promise<string | null>
   /** 将文本写入系统剪贴板。 */
   copyText: (text: string) => Promise<void>
   /** 读取 lark-cli 当前登录用户，未登录时返回 null。 */
@@ -58,6 +87,27 @@ export interface ElectronAPI {
   onMeegleLoginEvent: (listener: (event: MeegleLoginEvent) => void) => () => void
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: () => Promise<MeegleMyRequirements>
+  /** 更新需求描述。 */
+  updateRequirementDescription: (workItemId: string, content: string) => Promise<void>
+  /** 读取需求的代码仓库绑定。 */
+  getRequirementBindings: (requirementId: string) => Promise<RequirementBindingState>
+  /** 新增需求仓库绑定。 */
+  addRequirementBinding: (
+    requirementId: string,
+    repositoryId: string,
+    branchName: string
+  ) => Promise<RequirementBindingState>
+  /** 修改绑定分支。 */
+  updateRequirementBinding: (
+    requirementId: string,
+    bindingId: string,
+    branchName: string
+  ) => Promise<RequirementBindingState>
+  /** 解除需求仓库绑定。 */
+  removeRequirementBinding: (
+    requirementId: string,
+    bindingId: string
+  ) => Promise<RequirementBindingState>
   /** 读取需求流程节点和评论。 */
   getRequirementActivity: (workItemId: string) => Promise<MeegleRequirementActivity>
   /** 发表需求评论。 */
@@ -83,6 +133,22 @@ export interface ElectronAPI {
   getRepositoryState: () => Promise<RepositoryState>
   /** 刷新单个仓库的 Git 信息。 */
   refreshRepository: (repositoryId: string) => Promise<RepositoryState>
+  /** 读取指定仓库的本地和远程分支。 */
+  listRepositoryBranches: (
+    repositoryId: string,
+    fetchRemote?: boolean
+  ) => Promise<RepositoryBranchList>
+  /** 读取需求仓库绑定的实时状态。 */
+  getRepositoryBindingStatus: (
+    repositoryId: string,
+    branchName: string
+  ) => Promise<RepositoryBindingStatus>
+  /** 从基线分支创建本地开发分支。 */
+  createRepositoryBranch: (
+    repositoryId: string,
+    branchName: string,
+    baseBranch: string
+  ) => Promise<void>
   /** 重新扫描代码根目录。 */
   refreshRootRepositories: () => Promise<RepositoryScanResult>
   /** 设置代码根目录。 */

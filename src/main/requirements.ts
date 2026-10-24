@@ -181,7 +181,7 @@ const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000
 
 /** MQL 单页固定 50 条，最多读取 20 页，避免异常分页导致死循环。 */
 const MQL_PAGE_SIZE = 50
-const MAX_MQL_PAGES = 20
+const MAX_MQL_PAGES = 200
 
 /** 最近访问的 Meegle 空间缓存。 */
 let cachedProject: { value: MeegleProject; expiresAt: number } | null = null
@@ -246,7 +246,7 @@ const ensureWriteSuccess = (result: CommandResult, action: string): void => {
  * 获取当前最近访问的 Meegle 空间。
  * 空间信息在进程内缓存，避免每次切换需求都重复查询。
  */
-const getProject = async (): Promise<MeegleProject> => {
+export const getProject = async (): Promise<MeegleProject> => {
   if (cachedProject && cachedProject.expiresAt > Date.now()) {
     return cachedProject.value
   }
@@ -594,7 +594,13 @@ const fetchMqlRows = async (project: MeegleProject, mql: string): Promise<MoqlRo
   const total = response.list?.[0]?.count ?? rows.length
   const sessionId = response.session_id
   const groupId = response.list?.[0]?.group_infos?.[0]?.group_id ?? '1'
-  const totalPages = Math.min(Math.ceil(total / MQL_PAGE_SIZE), MAX_MQL_PAGES)
+  const totalPages = Math.ceil(total / MQL_PAGE_SIZE)
+
+  if (totalPages > MAX_MQL_PAGES) {
+    throw new Error(
+      `需求数量超过 ${MAX_MQL_PAGES * MQL_PAGE_SIZE} 条，暂时无法全部加载`
+    )
+  }
 
   if (!sessionId || totalPages <= 1) return rows
 
@@ -1170,6 +1176,40 @@ export const addRequirementComment = async (
 }
 
 /**
+ * 更新需求描述。
+ */
+export const updateRequirementDescription = async (
+  workItemId: string,
+  content: string
+): Promise<void> => {
+  if (!/^\d+$/.test(workItemId)) throw new Error('需求 ID 不合法')
+
+  const project = await getProject()
+  const result = await runMeegle(
+    [
+      'workitem',
+      'update',
+      '--project-key',
+      project.key,
+      '--work-item-id',
+      workItemId,
+      '--fields',
+      JSON.stringify([
+        {
+          field_key: 'description',
+          field_value: content
+        }
+      ]),
+      '--format',
+      'json'
+    ],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+
+  ensureWriteSuccess(result, '更新需求描述')
+}
+
+/**
  * 完成或回滚流程节点。
  */
 export const transitionRequirementNode = async (
@@ -1319,8 +1359,7 @@ export const getMyRequirements = async (): Promise<MeegleMyRequirements> => {
               'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `提出时间`, `预计上线时间`, `完成日期`, `规划版本`, `实际上车版本`, `产品线`, `需求等级`, `需求性质`, `需求复杂度`, `研发难度估分`, `预估开发量`, `技术方案`, `应用`, `标签`, `是否涉及权限`, `是否涉及历史数据`, `是否涉及性能测试`, `备注`, risk_label(), `__产品经理`, `__产品负责人`, `__研发负责人`, `__前端负责人`, `__前端开发`, `__前端APP负责人`, `__前端APP开发`, `__后端负责人`, `__后端开发`, `__数仓开发`, `__QA`, `__QA负责人`, `__测试owner`, `__测试组长`, `__性能测试负责人`, `__UI&UX`, `__PMO项目经理`, `__技术专家`, `__研发总监`',
               `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
               `WHERE (${roleCondition}) AND \`状态\` != '结束'`,
-              'ORDER BY `更新时间` DESC',
-              'LIMIT 50'
+              'ORDER BY `更新时间` DESC'
             ].join(' ')
           )
         )
@@ -1347,6 +1386,16 @@ export const getMyRequirements = async (): Promise<MeegleMyRequirements> => {
  */
 export const initializeRequirements = (): void => {
   ipcMain.handle('requirements:get-my', () => getMyRequirements())
+  ipcMain.handle(
+    'requirements:update-description',
+    (_event, workItemId: unknown, content: unknown) => {
+      if (typeof workItemId !== 'string' || typeof content !== 'string') {
+        throw new Error('需求描述参数不合法')
+      }
+
+      return updateRequirementDescription(workItemId, content)
+    }
+  )
   ipcMain.handle('requirements:get-activity', (_event, workItemId: unknown) => {
     if (typeof workItemId !== 'string') throw new Error('需求 ID 不合法')
 
