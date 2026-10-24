@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CopyOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Input, Modal, Spin } from 'antd'
 import type { AppInfo } from '../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../types/lark'
 import type { SettingsSection } from '../../../types/settings'
 import GitSettings from './GitSettings'
+import LarkAuth from './LarkAuth'
 import IdeSettings from './IdeSettings'
 import MeegleSettings from './MeegleSettings'
 import RepositorySettings from './RepositorySettings'
@@ -44,40 +45,16 @@ export default function SettingsModal({
   const [activeSection, setActiveSection] = useState<SettingsSection>('ai')
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [aiSaveState, setAiSaveState] = useState<
+    'idle' | 'saving' | 'saved' | 'invalid' | 'error'
+  >('idle')
+  const lastSavedDraftRef = useRef('')
   const [larkInfo, setLarkInfo] = useState<LarkCliInfo | null>(null)
   const [larkPathDraft, setLarkPathDraft] = useState('')
-  const [larkPathDirty, setLarkPathDirty] = useState(false)
+  const [larkSaving, setLarkSaving] = useState(false)
   const [larkLoading, setLarkLoading] = useState(false)
   const [larkError, setLarkError] = useState<string | null>(null)
-  const meegleSaveRef = useRef<(() => Promise<void>) | null>(null)
-  const [meegleReady, setMeegleReady] = useState(false)
-  const ideSaveRef = useRef<(() => Promise<void>) | null>(null)
-  const [ideReady, setIdeReady] = useState(false)
-  const gitSaveRef = useRef<(() => Promise<void>) | null>(null)
-  const [gitReady, setGitReady] = useState(false)
-
-  /**
-   * 接收 Meegle 面板注册的配置保存函数。
-   */
-  const handleMeegleSaveReady = useCallback((handler: (() => Promise<void>) | null): void => {
-    meegleSaveRef.current = handler
-    setMeegleReady(Boolean(handler))
-  }, [])
-
-  const handleIdeSaveReady = useCallback((handler: (() => Promise<void>) | null): void => {
-    ideSaveRef.current = handler
-    setIdeReady(Boolean(handler))
-  }, [])
-
-  /**
-   * 接收 Git 面板注册的保存函数。
-   */
-  const handleGitSaveReady = useCallback((handler: (() => Promise<void>) | null): void => {
-    gitSaveRef.current = handler
-    setGitReady(Boolean(handler))
-  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -88,17 +65,19 @@ export default function SettingsModal({
     setLoading(true)
     setError(null)
     setDraft('')
+    setAiSaveState('idle')
+    lastSavedDraftRef.current = ''
     setLarkLoading(true)
     setLarkError(null)
     setLarkInfo(null)
     setLarkPathDraft('')
-    setLarkPathDirty(false)
 
     window.electron
       .readAiConfig()
       .then((document) => {
         if (!mounted) return
         setDraft(document.content)
+        lastSavedDraftRef.current = document.content
       })
       .catch(() => {
         if (mounted) setError('读取模型配置失败')
@@ -113,10 +92,9 @@ export default function SettingsModal({
         if (!mounted) return
         setLarkInfo(info)
         setLarkPathDraft(info.path ?? '')
-        setLarkPathDirty(false)
       })
       .catch(() => {
-        if (mounted) setLarkError('读取 lark-cli 配置失败')
+        if (mounted) setLarkError('读取 Lark Cli 配置失败')
       })
       .finally(() => {
         if (mounted) setLarkLoading(false)
@@ -128,35 +106,79 @@ export default function SettingsModal({
   }, [initialSection, open])
 
   /**
-   * 自动检测 lark-cli，但暂不写入偏好。
-   * 检测结果会填入输入框，并在统一保存时生效。
+   * 模型配置 JSON 合法时防抖自动保存。
+   */
+  useEffect(() => {
+    if (loading || error) return
+    if (draft === lastSavedDraftRef.current) {
+      setAiSaveState('idle')
+      return
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      try {
+        JSON.parse(draft)
+      } catch {
+        if (!cancelled) setAiSaveState('invalid')
+        return
+      }
+
+      if (cancelled) return
+      setAiSaveState('saving')
+
+      try {
+        const document = await window.electron.writeAiConfig(draft)
+
+        if (cancelled) return
+        lastSavedDraftRef.current = document.content
+        setAiSaveState('saved')
+      } catch {
+        if (!cancelled) setAiSaveState('error')
+      }
+    }, 700)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [draft, error, loading])
+
+  /**
+   * 自动检测 Lark Cli，检测成功后立即保存。
    */
   const handleAutoDetect = async (): Promise<void> => {
-    setSaving(true)
+    setLarkSaving(true)
 
     try {
       const info = await window.electron.detectLarkCliInfo()
       setLarkInfo(info)
       setLarkPathDraft(info.path ?? '')
-      setLarkPathDirty(false)
-      message.success(info.available ? '自动检测完成，保存后生效' : '未检测到 lark-cli')
+
+      if (info.available && info.path) {
+        await persistLarkPath(info.path)
+      } else {
+        message.warning('未检测到 Lark Cli')
+      }
     } catch {
       message.error('自动检测失败')
     } finally {
-      setSaving(false)
+      setLarkSaving(false)
     }
   }
 
   /**
-   * 打开系统文件选择器，将选中的路径填入输入框。
+   * 打开系统文件选择器，选择后立即保存。
    */
   const handleChooseLarkCli = async (): Promise<void> => {
     try {
-      const selectedPath = await window.electron.selectLarkCliPath(larkPathDraft.trim() || larkInfo?.path)
+      const selectedPath = await window.electron.selectLarkCliPath(
+        larkPathDraft.trim() || larkInfo?.path
+      )
 
       if (selectedPath) {
         setLarkPathDraft(selectedPath)
-        setLarkPathDirty(true)
+        await persistLarkPath(selectedPath)
       }
     } catch {
       message.error('无法打开文件选择器')
@@ -164,121 +186,29 @@ export default function SettingsModal({
   }
 
   /**
-   * 保存当前模型配置 JSON。
+   * 立即保存 Lark Cli 路径；空值恢复自动检测。
    */
-  const saveAiConfig = async (): Promise<void> => {
-    try {
-      JSON.parse(draft)
-    } catch {
-      message.error('模型配置不是有效的 JSON，请检查后再保存')
-      return
-    }
+  const persistLarkPath = async (value?: string | null): Promise<void> => {
+    const pathToSave =
+      value !== undefined ? value : larkPathDraft.trim() || null
 
-    setSaving(true)
+    if (value === undefined && pathToSave === (larkInfo?.path ?? null)) return
+
+    setLarkSaving(true)
 
     try {
-      const document = await window.electron.writeAiConfig(draft)
-      setDraft(document.content)
-      message.success('模型配置已保存')
-    } catch {
-      message.error('保存模型配置失败')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  /**
-   * 保存飞书登录所用的 lark-cli 路径。
-   * 自动检测结果未修改时继续保留自动模式，不固化为手动路径。
-   */
-  const saveLarkCliPath = async (): Promise<void> => {
-    const larkPathToSave =
-      larkPathDirty || larkInfo?.source === 'settings'
-        ? larkPathDraft.trim() || null
-        : null
-
-    setSaving(true)
-
-    try {
-      const info = await window.electron.setLarkCliPath(larkPathToSave)
+      const info = await window.electron.setLarkCliPath(pathToSave)
       setLarkInfo(info)
       setLarkPathDraft(info.path ?? '')
-      setLarkPathDirty(false)
       onLarkCliUpdated()
-      message.success('飞书登录配置已保存')
+      message.success('Lark Cli 配置已自动保存')
     } catch {
-      setActiveSection('lark-cli')
-      message.error('lark-cli 路径无法执行，请重新选择可执行文件')
+      message.error('Lark Cli 路径无法执行，请重新选择可执行文件')
     } finally {
-      setSaving(false)
+      setLarkSaving(false)
     }
   }
 
-  /**
-   * 根据当前栏目执行对应保存逻辑。
-   */
-  const handleSave = async (): Promise<void> => {
-    if (activeSection === 'ai') {
-      await saveAiConfig()
-      return
-    }
-
-    if (activeSection === 'lark-cli') {
-      await saveLarkCliPath()
-      return
-    }
-
-    if (activeSection === 'git') {
-      setSaving(true)
-
-      try {
-        await gitSaveRef.current?.()
-      } finally {
-        setSaving(false)
-      }
-      return
-    }
-
-    if (activeSection === 'meegle') {
-      setSaving(true)
-
-      try {
-        await meegleSaveRef.current?.()
-      } finally {
-        setSaving(false)
-      }
-      return
-    }
-
-    if (activeSection === 'ide') {
-      setSaving(true)
-
-      try {
-        await ideSaveRef.current?.()
-      } finally {
-        setSaving(false)
-      }
-    }
-  }
-
-  const saveDisabled =
-    activeSection === 'ai'
-      ? loading || Boolean(error)
-      : activeSection === 'lark-cli'
-        ? larkLoading || Boolean(larkError)
-        : activeSection === 'git'
-          ? !gitReady
-          : activeSection === 'meegle'
-            ? !meegleReady
-            : activeSection === 'ide'
-              ? !ideReady
-              : false
-  const showSaveButton =
-    activeSection === 'ai' ||
-    activeSection === 'lark-cli' ||
-    activeSection === 'git' ||
-    activeSection === 'meegle' ||
-    activeSection === 'ide'
   const appInfoItems = [
     {
       label: '应用版本',
@@ -321,25 +251,8 @@ export default function SettingsModal({
       centered
       open={open}
       onCancel={onClose}
-      maskClosable={!saving}
-      footer={[
-        <Button key="close" onClick={onClose}>
-          关闭
-        </Button>,
-        ...(showSaveButton
-          ? [
-              <Button
-                key="save"
-                type="primary"
-                loading={saving}
-                disabled={saveDisabled}
-                onClick={() => handleSave()}
-              >
-                保存
-              </Button>
-            ]
-          : [])
-      ]}
+      maskClosable
+      footer={null}
     >
       <div className="settings-dialog">
         <nav className="settings-nav" aria-label="设置分类">
@@ -406,7 +319,20 @@ export default function SettingsModal({
             <>
               <div className="settings-panel-header">
                 <h3>模型配置</h3>
-                <p>直接编辑 JSON 配置，保存后会更新本地配置。</p>
+                <p>直接编辑 JSON 配置，格式正确时自动保存。</p>
+                {aiSaveState !== 'idle' ? (
+                  <p
+                    className={`settings-autosave-status is-${aiSaveState}`}
+                  >
+                    {aiSaveState === 'saving'
+                      ? '正在自动保存...'
+                      : aiSaveState === 'saved'
+                        ? '已自动保存'
+                        : aiSaveState === 'invalid'
+                          ? 'JSON 格式错误，修正后会自动保存'
+                          : '自动保存失败'}
+                  </p>
+                ) : null}
               </div>
 
               {loading ? (
@@ -429,7 +355,7 @@ export default function SettingsModal({
             <>
               <div className="settings-panel-header">
                 <h3>Lark Cli</h3>
-                <p>应用通过 lark-cli 获取飞书登录状态。可以手动指定可执行文件，也可以使用自动检测结果。</p>
+                <p>连接飞书，用于读取飞书用户、文档和链接数据。</p>
               </div>
 
               {larkLoading ? (
@@ -453,7 +379,7 @@ export default function SettingsModal({
                     </div>
                     {larkInfo?.version ? (
                       <span className="lark-status-version">
-                        lark-cli {larkInfo.version}
+                        Lark Cli {larkInfo.version}
                         {larkInfo.source ? ` · ${larkCliSourceNames[larkInfo.source]}` : ''}
                       </span>
                     ) : null}
@@ -463,7 +389,7 @@ export default function SettingsModal({
                     <Alert
                       type="warning"
                       showIcon
-                      message="未检测到 lark-cli。请选择可执行文件，或安装后点击自动检测。"
+                      message="未检测到 Lark Cli。请选择可执行文件，或安装后点击自动检测。"
                     />
                   ) : null}
 
@@ -471,49 +397,58 @@ export default function SettingsModal({
                     <Alert
                       type="error"
                       showIcon
-                      message="当前路径不可用。请重新选择文件，或点击自动检测后保存。"
+                      message="当前路径不可用。请重新选择文件，或点击自动检测。"
                     />
                   ) : null}
 
                   <div className="lark-path-field">
-                    <label htmlFor="lark-cli-path">lark-cli 可执行文件</label>
+                    <label htmlFor="lark-cli-path">Lark Cli 可执行文件</label>
                     <div className="lark-path-controls">
                       <Input
                         id="lark-cli-path"
                         value={larkPathDraft}
                         onChange={(event) => {
                           setLarkPathDraft(event.target.value)
-                          setLarkPathDirty(true)
                         }}
+                        onBlur={() => void persistLarkPath()}
+                        onPressEnter={() => void persistLarkPath()}
                         placeholder="输入路径或选择文件"
                         spellCheck={false}
                       />
                       <Button variant="filled" onClick={() => handleChooseLarkCli()}>
                         选择文件
                       </Button>
-                      <Button variant="filled" onClick={() => handleAutoDetect()} disabled={saving}>
+                      <Button
+                        variant="filled"
+                        onClick={() => handleAutoDetect()}
+                        loading={larkSaving}
+                      >
                         自动检测
                       </Button>
                     </div>
-                    <p className="settings-help">自动检测只更新当前结果，点击保存后生效。</p>
+                    <p className="settings-help">
+                      选择文件、自动检测或输入后失焦会立即保存。
+                    </p>
                   </div>
+
+                  <LarkAuth available={Boolean(larkInfo?.available)} />
                 </>
               )}
             </>
           ) : null}
 
           {activeSection === 'git' ? (
-            <GitSettings onSaveReady={handleGitSaveReady} />
+            <GitSettings />
           ) : null}
 
           {activeSection === 'repositories' ? <RepositorySettings /> : null}
 
           {activeSection === 'meegle' ? (
-            <MeegleSettings onSaveReady={handleMeegleSaveReady} />
+            <MeegleSettings />
           ) : null}
 
           {activeSection === 'ide' ? (
-            <IdeSettings onSaveReady={handleIdeSaveReady} />
+            <IdeSettings />
           ) : null}
 
           {activeSection === 'app-info' ? (

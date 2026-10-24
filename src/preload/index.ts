@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
+import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
   EmbeddedBrowserBounds,
@@ -311,6 +312,21 @@ const electronAPI = {
 
     return () => {
       ipcRenderer.removeListener('meegle:login-event', handler)
+    }
+  },
+
+  /**
+   * 订阅 CLI 授权过期事件，返回取消订阅函数。
+   */
+  onAuthExpired: (listener: (event: AuthExpiredEvent) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, result: AuthExpiredEvent): void => {
+      listener(result)
+    }
+
+    ipcRenderer.on('auth:expired', handler)
+
+    return () => {
+      ipcRenderer.removeListener('auth:expired', handler)
     }
   },
 

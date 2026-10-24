@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { LogoutOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Input, Popconfirm, Spin, Tag } from 'antd'
 import type {
@@ -13,19 +13,11 @@ const CLI_SOURCE_NAMES: Record<MeegleCliPathSource, string> = {
   auto: '自动检测'
 }
 
-interface MeegleSettingsProps {
-  /**
-   * 向设置弹窗注册底部保存按钮的处理函数。
-   * 注册 null 表示当前组件已卸载。
-   */
-  onSaveReady: (handler: (() => Promise<void>) | null) => void
-}
-
 /**
  * Meegle 授权与配置。
  * CLI 配置和登录态都由 Meegle CLI 管理，应用只负责调用和展示。
  */
-export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JSX.Element {
+export default function MeegleSettings(): JSX.Element {
   const { message } = App.useApp()
   const [state, setState] = useState<MeegleState | null>(null)
   const [loading, setLoading] = useState(true)
@@ -39,7 +31,6 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
   const [loginStarting, setLoginStarting] = useState(false)
   const [loginError, setLoginError] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
-  const saveRef = useRef<() => Promise<void>>(async () => undefined)
 
   /**
    * 读取 Meegle CLI、登录用户和有效期。
@@ -68,7 +59,7 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
 
     const unsubscribe = window.electron.onMeegleLoginEvent(async (event) => {
       if (event.status === 'success') {
-        message.success('Meegle 登录成功')
+        message.success('Meegle Cli 授权成功')
         setLoginStarting(false)
         setLoginError(null)
         // 保留 session 直到状态刷新完成，避免自动登录逻辑重复触发。
@@ -89,16 +80,13 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
   }, [loadState, message])
 
   /**
-   * 保存 Meegle CLI 路径。
+   * 立即保存 Meegle CLI 路径。
    * 空路径表示清除手动设置并恢复自动检测。
    */
-  const saveConfig = async (): Promise<void> => {
+  const saveCliPath = async (value?: string | null): Promise<void> => {
     if (!state) return
 
-    const pathToSave =
-      cliPathDirty || state.cli.source === 'settings'
-        ? cliPathDraft.trim() || null
-        : null
+    const pathToSave = value !== undefined ? value : cliPathDraft.trim() || null
 
     setSavingPath(true)
 
@@ -106,34 +94,17 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
       const info = await window.electron.setMeegleCliPath(pathToSave)
       setCliPathDraft(info.path ?? '')
       setCliPathDirty(false)
-      setCliPathPending(false)
       setLoginSession(null)
       setLoginError(null)
       window.electron.cancelMeegleLogin().catch(() => undefined)
       await loadState(false)
-      message.success('Meegle CLI 路径已保存')
+      message.success('Meegle Cli 配置已自动保存')
     } catch {
-      message.error('Meegle CLI 路径不可用，请重新选择可执行文件')
+      message.error('Meegle Cli 路径不可用，请重新选择可执行文件')
     } finally {
       setSavingPath(false)
     }
   }
-
-  // 每次渲染更新保存函数，确保弹窗底部按钮拿到最新的配置草稿。
-  saveRef.current = saveConfig
-
-  useEffect(() => {
-    if (!state) {
-      onSaveReady(null)
-      return
-    }
-
-    onSaveReady(() => saveRef.current())
-
-    return () => {
-      onSaveReady(null)
-    }
-  }, [onSaveReady, state])
 
   /**
    * 打开系统文件选择器选择 Meegle CLI。
@@ -148,6 +119,7 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
         setCliPathDraft(selectedPath)
         setCliPathDirty(true)
         setCliPathPending(true)
+        await saveCliPath(selectedPath)
       }
     } catch {
       message.error('无法打开文件选择器')
@@ -155,7 +127,7 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
   }
 
   /**
-   * 自动检测 Meegle CLI，结果只更新输入框，点击底部保存后生效。
+   * 自动检测 Meegle CLI，检测成功后立即保存。
    */
   const detectCliPath = async (): Promise<void> => {
     setSavingPath(true)
@@ -166,7 +138,12 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
       setCliPathDraft(info.path ?? '')
       setCliPathDirty(false)
       setCliPathPending(true)
-      message.success(info.available ? '自动检测完成，保存后生效' : '未检测到 Meegle CLI')
+
+      if (info.available && info.path) {
+        await saveCliPath(info.path)
+      } else {
+        message.warning('未检测到 Meegle CLI')
+      }
     } catch {
       message.error('自动检测 Meegle CLI 失败')
     } finally {
@@ -185,7 +162,7 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
     try {
       setLoginSession(await window.electron.startMeegleLogin())
     } catch {
-      setLoginError('无法发起 Meegle 登录，请检查 Meegle CLI 配置。')
+      setLoginError('无法发起 Meegle Cli 授权，请检查 Meegle CLI 配置。')
     } finally {
       setLoginStarting(false)
     }
@@ -221,21 +198,21 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
       const next = await loadState(false)
 
       if (next?.authenticated) {
-        message.success('Meegle 登录成功')
+        message.success('Meegle Cli 授权成功')
         setLoginSession(null)
         return
       }
 
-      message.info('尚未检测到 Meegle 登录，请完成扫码后重试')
+      message.info('尚未检测到 Meegle Cli 授权，请完成扫码后重试')
     } catch {
-      message.error('检查 Meegle 登录状态失败')
+      message.error('检查 Meegle Cli 授权状态失败')
     } finally {
       setChecking(false)
     }
   }
 
   /**
-   * 退出 Meegle 登录。
+   * 退出 Meegle Cli 授权。
    */
   const handleLogout = async (): Promise<void> => {
     setLoggingOut(true)
@@ -244,9 +221,9 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
       const next = await window.electron.logoutMeegle()
       setState(next)
       setLoginSession(null)
-      message.success('已退出 Meegle 登录')
+      message.success('已退出 Meegle Cli 授权')
     } catch {
-      message.error('退出 Meegle 登录失败')
+      message.error('退出 Meegle Cli 授权失败')
     } finally {
       setLoggingOut(false)
     }
@@ -274,10 +251,6 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
         <h3>Meegle Cli</h3>
         <p>连接 Meegle，用于读取飞书项目、需求和工作项。</p>
       </div>
-      <p className="settings-help meegle-auth-note">
-        Meegle 使用独立的 OAuth 客户端和权限体系，lark-cli 的飞书登录态无法直接复用，因此需要单独授权一次。
-      </p>
-
       <div className="meegle-section">
         <div className="lark-status">
           <div className="lark-status-main">
@@ -310,6 +283,12 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
               setCliPathDirty(true)
               setCliPathPending(true)
             }}
+            onBlur={() => {
+              if (cliPathDirty) void saveCliPath()
+            }}
+            onPressEnter={() => {
+              if (cliPathDirty) void saveCliPath()
+            }}
             placeholder="选择或输入 Meegle CLI 路径"
             spellCheck={false}
           />
@@ -320,12 +299,15 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
             自动检测
           </Button>
         </div>
+        <p className="settings-help">
+          选择文件、自动检测或输入后失焦会立即保存。
+        </p>
         {!state.cli.available ? (
           <Alert
             type="warning"
             showIcon
             message="未检测到 Meegle CLI"
-            description="请安装 @lark-project/meegle，或手动选择可执行文件后保存。"
+            description="请安装 @lark-project/meegle，或手动选择可执行文件。"
           />
         ) : null}
       </div>
@@ -334,14 +316,14 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
         <>
           <div className="meegle-section">
             <div className="meegle-section-heading">
-              <div className="meegle-section-title">登录状态</div>
+              <div className="meegle-section-title">Meegle Cli 授权</div>
               {state.authenticated ? (
                 <div className="meegle-login-actions">
                   <Tag color="green" bordered={false}>
-                    已登录
+                    已授权
                   </Tag>
                   <Popconfirm
-                    title="退出 Meegle 登录？"
+                    title="退出 Meegle Cli 授权？"
                     okText="退出"
                     cancelText="取消"
                     placement="top"
@@ -352,8 +334,8 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
                       size="small"
                       className="meegle-logout"
                       icon={<LogoutOutlined />}
-                      aria-label="退出 Meegle 登录"
-                      title="退出 Meegle 登录"
+                      aria-label="退出 Meegle Cli 授权"
+                      title="退出 Meegle Cli 授权"
                       loading={loggingOut}
                     />
                   </Popconfirm>
@@ -365,7 +347,7 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
           <>
             {typeof state.expiresInMinutes === 'number' ? (
               <p className="settings-help">
-                当前登录有效期剩余约 {state.expiresInMinutes} 分钟，Meegle CLI 会自动刷新。
+                当前 Meegle Cli 授权有效期剩余约 {state.expiresInMinutes} 分钟，Meegle CLI 会自动刷新。
               </p>
             ) : null}
           </>
@@ -385,7 +367,7 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
         ) : loginSession ? (
           <div className="meegle-login">
             <div className="login-qr meegle-qr">
-              <img src={loginSession.qrCodeDataUrl} alt="Meegle 登录二维码" />
+              <img src={loginSession.qrCodeDataUrl} alt="Meegle Cli 授权二维码" />
             </div>
             <p className="settings-help">使用飞书或 Meegle 扫描二维码完成授权。</p>
             {loginSession.userCode ? (
@@ -396,7 +378,7 @@ export default function MeegleSettings({ onSaveReady }: MeegleSettingsProps): JS
                 刷新二维码
               </Button>
               <Button type="primary" loading={checking} onClick={() => checkLogin()}>
-                我已登录
+                我已授权
               </Button>
             </div>
           </div>

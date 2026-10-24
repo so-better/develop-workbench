@@ -1,32 +1,41 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Modal, Spin } from 'antd'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { App as AntdApp, Modal, Spin } from 'antd'
 import AppFooter from './components/AppFooter'
 import EmbeddedBrowserDownloads from './components/EmbeddedBrowserDownloads'
 import EmbeddedBrowserPanel from './components/EmbeddedBrowserPanel'
-import LoginState from './components/LoginState'
+import EnvironmentSetup from './components/EnvironmentSetup'
 import RequirementWorkbench from './components/RequirementWorkbench'
 import SettingsModal from './components/SettingsModal'
 import { useEmbeddedDownloads } from './hooks/useEmbeddedDownloads'
 import type { AppInfo } from '../../types/app'
+import type { AuthExpiredEvent } from '../../types/auth'
 import type { LarkCliInfo, LarkUser } from '../../types/lark'
+import type { MeegleState } from '../../types/meegle'
 import type { SettingsSection } from '../../types/settings'
+
+interface EnvironmentStatus {
+  meegleAuthenticated: boolean
+  larkAuthenticated: boolean
+  stale: boolean
+}
 
 /**
  * 应用根组件。
- * 未登录时展示扫码入口，登录后保留 Footer 用户状态和设置入口。
+ * 应用本身没有登录态；Meegle Cli 和 Lark Cli 都完成授权后才能进入工作台。
  */
 export default function App(): JSX.Element {
+  const { message } = AntdApp.useApp()
+
   // 应用版本及运行时信息，用于 Footer 和设置弹窗。
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
 
-  // 当前飞书用户；null 表示未登录或登录状态读取失败。
+  // 本地 CLI 的授权状态，不代表应用自身登录。
   const [larkUser, setLarkUser] = useState<LarkUser | null>(null)
-
-  // 未登录时读取 lark-cli 状态，用于区分“未登录”和“未检测到 CLI”。
   const [larkCliInfo, setLarkCliInfo] = useState<LarkCliInfo | null>(null)
-
-  // 首次鉴权检查期间显示加载态，避免未登录页面闪烁。
-  const [authLoading, setAuthLoading] = useState(true)
+  const [meegleState, setMeegleState] = useState<MeegleState | null>(null)
+  const [environmentLoading, setEnvironmentLoading] = useState(true)
+  const [authExpiredNotice, setAuthExpiredNotice] = useState<AuthExpiredEvent | null>(null)
+  const environmentRequestRef = useRef(0)
 
   // 设置弹窗开关状态及打开时定位到的设置分类。
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -39,43 +48,46 @@ export default function App(): JSX.Element {
   const [downloadsModalOpen, setDownloadsModalOpen] = useState(false)
 
   /**
-   * 刷新 lark 登录状态。
-   * 未登录时同时读取 lark-cli 信息，用于区分未登录和 CLI 不可用。
+   * 重新读取本地 CLI 安装和授权状态。
+   * 这里不做应用登录判断，只反映环境是否具备对应能力。
    */
-  const refreshLarkState = useCallback(async (showLoading = false): Promise<void> => {
-    if (showLoading) setAuthLoading(true)
+  const refreshEnvironment = useCallback(
+    async (showLoading = false): Promise<EnvironmentStatus> => {
+      const requestId = ++environmentRequestRef.current
 
-    try {
-      const user = await window.electron.getLarkUser()
-      setLarkUser(user)
+      if (showLoading) setEnvironmentLoading(true)
 
-      if (user) {
-        setLarkCliInfo(null)
-      } else {
-        setLarkCliInfo(await window.electron.getLarkCliInfo())
+      const [meegleResult, larkUserResult, larkCliResult] = await Promise.allSettled([
+        window.electron.getMeegleState(),
+        window.electron.getLarkUser(),
+        window.electron.getLarkCliInfo()
+      ])
+
+      const nextMeegle =
+        meegleResult.status === 'fulfilled' ? meegleResult.value : null
+      const nextLarkUser =
+        larkUserResult.status === 'fulfilled' ? larkUserResult.value : null
+      const status: EnvironmentStatus = {
+        meegleAuthenticated: nextMeegle?.authenticated ?? false,
+        larkAuthenticated: Boolean(nextLarkUser),
+        stale: requestId !== environmentRequestRef.current
       }
-    } catch {
-      setLarkUser(null)
-      setLarkCliInfo(null)
-    } finally {
-      if (showLoading) setAuthLoading(false)
-    }
-  }, [])
 
-  /**
-   * 扫码登录成功后刷新用户状态。
-   */
-  const handleLoggedIn = useCallback((): void => {
-    refreshLarkState(true)
-  }, [refreshLarkState])
+      // 旧请求晚返回时不能覆盖更新的登录/授权状态。
+      if (!status.stale) {
+        setMeegleState(nextMeegle)
+        setLarkUser(nextLarkUser)
+        setLarkCliInfo(
+          larkCliResult.status === 'fulfilled' ? larkCliResult.value : null
+        )
+      }
 
-  /**
-   * 退出 lark-cli 飞书登录态并刷新页面。
-   */
-  const handleLogout = useCallback(async (): Promise<void> => {
-    await window.electron.logoutLark()
-    await refreshLarkState(true)
-  }, [refreshLarkState])
+      if (showLoading) setEnvironmentLoading(false)
+
+      return status
+    },
+    []
+  )
 
   /**
    * 打开设置弹窗，并定位到指定分类。
@@ -84,18 +96,6 @@ export default function App(): JSX.Element {
     setSettingsSection(section)
     setSettingsOpen(true)
   }, [])
-
-  /**
-   * 初始化应用信息与登录状态，并监听窗口重新显示。
-   * 每次窗口显示时重新读取登录状态，避免外部登录或登出后界面过期。
-   */
-  useEffect(() => {
-    if (!authLoading && !larkUser) {
-      void window.electron.closeEmbeddedBrowser()
-      setDownloadsPanelOpen(false)
-      setDownloadsModalOpen(false)
-    }
-  }, [authLoading, larkUser])
 
   useEffect(() => {
     let mounted = true
@@ -136,17 +136,59 @@ export default function App(): JSX.Element {
       })
       .catch(() => undefined)
 
-    // 首次进入显示鉴权加载态；后续窗口显示时静默刷新。
-    refreshLarkState(true)
-    const unsubscribe = window.electron.onWindowShown(() => {
-      refreshLarkState()
+    // 首次进入读取环境状态；窗口重新显示时静默刷新。
+    refreshEnvironment(true)
+    const unsubscribeWindow = window.electron.onWindowShown(() => {
+      void refreshEnvironment()
+    })
+    const unsubscribeMeegle = window.electron.onMeegleLoginEvent((event) => {
+      if (event.status === 'success') {
+        setAuthExpiredNotice((current) =>
+          current?.provider === 'meegle' ? null : current
+        )
+      }
+      void refreshEnvironment()
+    })
+    const unsubscribeLark = window.electron.onLarkLoginEvent((event) => {
+      if (event.status === 'success') {
+        setAuthExpiredNotice((current) =>
+          current?.provider === 'lark' ? null : current
+        )
+      }
+      void refreshEnvironment()
+    })
+    const unsubscribeAuth = window.electron.onAuthExpired((event) => {
+      void refreshEnvironment().then((status) => {
+        if (status.stale) return
+
+        const expired =
+          event.provider === 'meegle'
+            ? !status.meegleAuthenticated
+            : !status.larkAuthenticated
+
+        if (!expired) {
+          setAuthExpiredNotice((current) =>
+            current?.provider === event.provider ? null : current
+          )
+          return
+        }
+
+        setAuthExpiredNotice(event)
+        message.warning({
+          content: event.message,
+          key: `auth-expired-${event.provider}`
+        })
+      })
     })
 
     return () => {
       mounted = false
-      unsubscribe()
+      unsubscribeWindow()
+      unsubscribeMeegle()
+      unsubscribeLark()
+      unsubscribeAuth()
     }
-  }, [refreshLarkState])
+  }, [message, refreshEnvironment])
 
   const handleOpenDownloads = (): void => {
     if (browserVisible) {
@@ -157,29 +199,49 @@ export default function App(): JSX.Element {
     setDownloadsModalOpen(true)
   }
 
+  const meegleAuthenticated = meegleState?.authenticated ?? false
+  const larkAuthenticated = Boolean(larkUser)
+  const environmentReady =
+    meegleAuthenticated && larkAuthenticated && Boolean(larkCliInfo?.available)
+
+  useEffect(() => {
+    if (environmentLoading) return
+
+    if (environmentReady) {
+      setAuthExpiredNotice(null)
+      return
+    }
+
+    // 原生浏览视图不会随 React 组件卸载，环境不可用时必须主动关闭。
+    void window.electron.closeEmbeddedBrowser()
+    setDownloadsPanelOpen(false)
+    setDownloadsModalOpen(false)
+  }, [environmentLoading, environmentReady])
+
   return (
     <div className="app-shell">
       <div className="app-body">
         <main
-          className={`workspace-canvas${larkUser && !authLoading ? ' workspace-canvas--workbench' : ''}`}
+          className={`workspace-canvas${environmentReady && !environmentLoading ? ' workspace-canvas--workbench' : ''}`}
         >
-          {/* 鉴权完成后才展示未登录引导或需求工作台。 */}
-          {authLoading ? (
+          {environmentLoading ? (
             <div className="auth-loading">
               <Spin />
             </div>
-          ) : larkUser ? (
+          ) : environmentReady ? (
             <RequirementWorkbench onOpenSettings={openSettings} />
           ) : (
-            <LoginState
-              cliInfo={larkCliInfo}
-              onOpenSettings={() => openSettings('lark-cli')}
-              onLoggedIn={handleLoggedIn}
+            <EnvironmentSetup
+              meegleState={meegleState}
+              larkCliInfo={larkCliInfo}
+              larkUser={larkUser}
+              authExpiredProvider={authExpiredNotice?.provider ?? null}
+              onOpenSettings={openSettings}
             />
           )}
         </main>
 
-        {larkUser && !authLoading ? (
+        {!environmentLoading ? (
           <EmbeddedBrowserPanel
             downloads={downloads}
             downloadsOpen={downloadsPanelOpen}
@@ -188,23 +250,22 @@ export default function App(): JSX.Element {
         ) : null}
       </div>
 
-      {/* 未登录时 Footer 左侧为空，右侧始终保留设置入口和版本号。 */}
       <AppFooter
-        user={larkUser}
         appInfo={appInfo}
         onOpenSettings={() => openSettings()}
-        onLogout={handleLogout}
         downloadCount={activeCount}
         onOpenDownloads={handleOpenDownloads}
       />
 
-      {/* lark-cli 路径修改后立即刷新登录状态。 */}
       <SettingsModal
         open={settingsOpen}
         initialSection={settingsSection}
         appInfo={appInfo}
-        onLarkCliUpdated={refreshLarkState}
-        onClose={() => setSettingsOpen(false)}
+        onLarkCliUpdated={() => void refreshEnvironment()}
+        onClose={() => {
+          setSettingsOpen(false)
+          void refreshEnvironment()
+        }}
       />
 
       <Modal

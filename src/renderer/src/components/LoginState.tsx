@@ -45,7 +45,7 @@ export default function LoginState({
     try {
       setSession(await window.electron.startLarkLogin())
     } catch {
-      setError('无法发起飞书登录，请检查 lark-cli 是否可用。')
+      setError('无法发起 Lark Cli 授权，请检查 Lark Cli 是否可用。')
     } finally {
       setStarting(false)
     }
@@ -64,7 +64,7 @@ export default function LoginState({
       if (!active) return
 
       if (event.status === 'success') {
-        message.success('飞书登录成功')
+        message.success('Lark Cli 授权成功')
         onLoggedIn()
         return
       }
@@ -97,12 +97,12 @@ export default function LoginState({
       const user = await window.electron.getLarkUser()
 
       if (user) {
-        message.success('飞书登录成功')
+        message.success('Lark Cli 授权成功')
         onLoggedIn()
         return
       }
 
-      message.info('尚未检测到飞书登录，请确认已在飞书中完成授权')
+      message.info('尚未检测到 Lark Cli 授权，请确认已在飞书中完成授权')
     } catch {
       message.error('检测登录状态失败')
     } finally {
@@ -116,8 +116,8 @@ export default function LoginState({
         <div className="login-state-icon">
           <SettingOutlined />
         </div>
-        <h2 id="login-state-title">未检测到 lark-cli</h2>
-        <p>应用通过本机 lark-cli 读取飞书登录状态。请先在设置中指定 lark-cli 可执行文件。</p>
+        <h2 id="login-state-title">未检测到 Lark Cli</h2>
+        <p>应用通过本机 Lark Cli 读取飞书授权状态。请先在设置中指定 Lark Cli 可执行文件。</p>
         <Button icon={<SettingOutlined />} onClick={onOpenSettings}>
           打开设置
         </Button>
@@ -130,8 +130,8 @@ export default function LoginState({
       <div className="login-state-icon">
         <QrcodeOutlined />
       </div>
-      <h2 id="login-state-title">尚未登录飞书</h2>
-      <p>应用通过本机 lark-cli 读取飞书登录状态。请使用飞书扫描二维码完成授权。</p>
+      <h2 id="login-state-title">尚未完成 Lark Cli 授权</h2>
+      <p>应用通过本机 Lark Cli 读取飞书授权状态。请使用飞书扫描二维码完成 Lark Cli 授权。</p>
 
       {starting ? (
         <div className="login-state-loading">
@@ -149,7 +149,7 @@ export default function LoginState({
       ) : session ? (
         <>
           <div className="login-qr">
-            <img src={session.qrCodeDataUrl} alt="飞书登录二维码" />
+            <img src={session.qrCodeDataUrl} alt="Lark Cli 授权二维码" />
           </div>
           <p className="login-state-hint">
             授权完成后会自动刷新；如未刷新，可点击“我已登录”。

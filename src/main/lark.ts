@@ -12,6 +12,7 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import { getPreferences, updatePreferences } from './preferences'
+import { broadcastAuthExpired, isAuthExpiredError } from './auth-events'
 import type {
   LarkCliInfo,
   LarkCliPathSource,
@@ -259,6 +260,29 @@ const readVersion = async (executablePath: string): Promise<string | null> => {
   }
 }
 
+const stringifyCommandOutput = (value: unknown): string => {
+  if (typeof value === 'string') return value
+  if (Buffer.isBuffer(value)) return value.toString('utf8')
+  return ''
+}
+
+/**
+ * 汇总 execFile 错误中的输出，用于识别授权过期。
+ */
+const getCommandErrorText = (error: unknown): string => {
+  const parts: string[] = []
+
+  if (error instanceof Error) parts.push(error.message)
+
+  if (error && typeof error === 'object') {
+    const record = error as { stdout?: unknown; stderr?: unknown }
+    parts.push(stringifyCommandOutput(record.stdout))
+    parts.push(stringifyCommandOutput(record.stderr))
+  }
+
+  return parts.filter(Boolean).join('\n')
+}
+
 /**
  * 执行 lark-cli。
  * 导出给链接预览等只读业务复用。
@@ -267,10 +291,29 @@ export const runLarkCli = async (args: string[]): Promise<string> => {
   const resolved = await resolveLarkCli()
 
   if (!resolved?.available) {
-    throw new Error('lark-cli not available')
+    throw new Error('Lark Cli 不可用')
   }
 
-  return runExecutable(resolved.path, args)
+  try {
+    return await runExecutable(resolved.path, args)
+  } catch (error) {
+    // 状态查询、退出登录和用户资料补全失败由各自流程处理，不算业务授权过期。
+    const isProfileCommand =
+      args[0] === 'api' &&
+      args[1] === 'GET' &&
+      Boolean(args[2]?.includes('/authen/v1/user_info'))
+    const isStatusCommand =
+      args[0] === 'whoami' ||
+      args[0] === '--version' ||
+      args[0] === 'auth' ||
+      isProfileCommand
+
+    if (!isStatusCommand && isAuthExpiredError(getCommandErrorText(error))) {
+      broadcastAuthExpired('lark')
+    }
+
+    throw error
+  }
 }
 
 /**
@@ -346,7 +389,7 @@ export const setLarkCliPath = async (cliPath: string | null): Promise<LarkCliInf
     const version = await readVersion(normalizedPath)
 
     if (!version) {
-      throw new Error('无法执行该 lark-cli 文件')
+      throw new Error('无法执行该 Lark Cli 文件')
     }
   }
 
@@ -365,7 +408,7 @@ export const setLarkCliPath = async (cliPath: string | null): Promise<LarkCliInf
  */
 export const selectLarkCliPath = async (currentPath?: string | null): Promise<string | null> => {
   const options: OpenDialogOptions = {
-    title: '选择 lark-cli 可执行文件',
+    title: '选择 Lark Cli 可执行文件',
     properties: ['openFile']
   }
   const normalizedPath = typeof currentPath === 'string' ? currentPath.trim() : ''
@@ -419,7 +462,7 @@ export const startLarkLogin = async (): Promise<LarkLoginSession> => {
   const resolved = await resolveLarkCli(true)
 
   if (!resolved?.available) {
-    throw new Error('lark-cli not available')
+    throw new Error('Lark Cli 不可用')
   }
 
   // 新登录会替换掉上一次尚未完成的会话。
@@ -618,7 +661,7 @@ export const initializeLark = (): void => {
   // 保存手动路径；null 表示恢复自动探测。
   ipcMain.handle('lark:set-cli-path', (_event, cliPath: unknown) => {
     if (cliPath !== null && typeof cliPath !== 'string') {
-      throw new Error('Invalid lark-cli path')
+      throw new Error('Lark Cli 路径不合法')
     }
 
     return setLarkCliPath(cliPath)
@@ -627,7 +670,7 @@ export const initializeLark = (): void => {
   // 打开系统文件选择器，优先定位到当前路径所在目录。
   ipcMain.handle('lark:select-cli-path', (_event, currentPath: unknown) => {
     if (currentPath !== null && currentPath !== undefined && typeof currentPath !== 'string') {
-      throw new Error('Invalid lark-cli path')
+      throw new Error('Lark Cli 路径不合法')
     }
 
     return selectLarkCliPath(currentPath)

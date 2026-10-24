@@ -1,6 +1,10 @@
-import { BrowserWindow, ipcMain, session, shell, WebContentsView } from 'electron'
+import { app, BrowserWindow, ipcMain, session, shell, WebContentsView } from 'electron'
 import type { DownloadItem, Rectangle } from 'electron'
 import { randomUUID } from 'node:crypto'
+import { open, rename, rm } from 'node:fs/promises'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { backupCorruptStoreSync } from './store-backup'
 import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserDownload,
@@ -23,11 +27,15 @@ interface BrowserEntry {
   closing: boolean
 }
 
+interface DownloadEntry {
+  item: DownloadItem | null
+  state: EmbeddedBrowserDownload
+}
+
+const DOWNLOADS_FILE = 'downloads.json'
+const MAX_DOWNLOADS = 200
 const entries = new Map<number, BrowserEntry>()
-const downloads = new Map<
-  string,
-  { item: DownloadItem; state: EmbeddedBrowserDownload }
->()
+const downloads = new Map<string, DownloadEntry>()
 const retryWindows = new Map<
   number,
   { window: BrowserWindow; timer: NodeJS.Timeout }
@@ -41,6 +49,143 @@ const getEmptyState = (): EmbeddedBrowserState => ({
   loading: false,
   error: null
 })
+
+const getDownloadsPath = (): string => join(app.getPath('userData'), DOWNLOADS_FILE)
+
+const getDownloadStates = (): EmbeddedBrowserDownload[] =>
+  Array.from(downloads.values())
+    .map((entry) => entry.state)
+    .sort((left, right) => right.startedAt - left.startedAt)
+    .slice(0, MAX_DOWNLOADS)
+
+let persistTimer: NodeJS.Timeout | null = null
+let persistQueue: Promise<void> = Promise.resolve()
+
+const persistDownloadsNow = (): Promise<void> => {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+
+  const targetPath = getDownloadsPath()
+  const tempPath = `${targetPath}.${randomUUID()}.tmp`
+  const content = JSON.stringify({ downloads: getDownloadStates() }, null, 2)
+
+  persistQueue = persistQueue.then(async () => {
+    try {
+      const handle = await open(tempPath, 'w')
+
+      try {
+        await handle.writeFile(content, 'utf8')
+        await handle.sync()
+      } finally {
+        await handle.close()
+      }
+
+      await rename(tempPath, targetPath)
+    } catch {
+      await rm(tempPath, { force: true }).catch(() => undefined)
+    }
+  })
+
+  return persistQueue
+}
+
+const schedulePersistDownloads = (): void => {
+  if (persistTimer) return
+
+  persistTimer = setTimeout(() => {
+    persistTimer = null
+    void persistDownloadsNow()
+  }, 400)
+}
+
+const persistDownloadsSync = (): void => {
+  try {
+    writeFileSync(
+      getDownloadsPath(),
+      JSON.stringify({ downloads: getDownloadStates() }, null, 2),
+      'utf8'
+    )
+  } catch {
+    // 退出阶段写入失败不阻塞应用关闭。
+  }
+}
+
+const parseDownloadRecord = (value: unknown): EmbeddedBrowserDownload | null => {
+  if (!value || typeof value !== 'object') return null
+
+  const item = value as Record<string, unknown>
+
+  if (
+    typeof item.id !== 'string' ||
+    typeof item.filename !== 'string' ||
+    typeof item.url !== 'string' ||
+    (item.savePath !== null && typeof item.savePath !== 'string') ||
+    typeof item.totalBytes !== 'number' ||
+    typeof item.receivedBytes !== 'number' ||
+    typeof item.bytesPerSecond !== 'number' ||
+    typeof item.status !== 'string' ||
+    typeof item.startedAt !== 'number' ||
+    typeof item.canResume !== 'boolean' ||
+    typeof item.paused !== 'boolean'
+  ) {
+    return null
+  }
+
+  if (
+    item.status !== 'completed' &&
+    item.status !== 'cancelled' &&
+    item.status !== 'interrupted' &&
+    item.status !== 'progressing'
+  ) {
+    return null
+  }
+
+  return {
+    id: item.id,
+    filename: item.filename,
+    url: item.url,
+    savePath: item.savePath ?? null,
+    totalBytes: item.totalBytes,
+    receivedBytes: item.receivedBytes,
+    bytesPerSecond: 0,
+    status: item.status === 'progressing' ? 'interrupted' : item.status,
+    startedAt: item.startedAt,
+    canResume: item.canResume,
+    paused: false
+  }
+}
+
+const loadPersistedDownloads = (): void => {
+  let raw: string
+
+  try {
+    raw = readFileSync(getDownloadsPath(), 'utf8')
+  } catch {
+    return
+  }
+
+  let parsed: { downloads?: unknown } | null
+
+  try {
+    parsed = JSON.parse(raw) as { downloads?: unknown } | null
+  } catch {
+    backupCorruptStoreSync(getDownloadsPath())
+    return
+  }
+
+  if (!parsed || !Array.isArray(parsed.downloads)) {
+    backupCorruptStoreSync(getDownloadsPath())
+    return
+  }
+
+  for (const value of parsed.downloads.slice(0, MAX_DOWNLOADS)) {
+    const state = parseDownloadRecord(value)
+
+    if (state) downloads.set(state.id, { item: null, state })
+  }
+}
 
 const closeRetryWindow = (webContentsId: number): void => {
   const retry = retryWindows.get(webContentsId)
@@ -57,14 +202,14 @@ const closeRetryWindow = (webContentsId: number): void => {
  * 向所有窗口广播下载列表，面板关闭后重新打开也能恢复记录。
  */
 const broadcastDownloads = (): void => {
-  const state = Array.from(downloads.values())
-    .map((entry) => entry.state)
-    .sort((left, right) => right.startedAt - left.startedAt)
+  const state = getDownloadStates()
 
   for (const window of BrowserWindow.getAllWindows()) {
     if (window.isDestroyed()) continue
     window.webContents.send('embedded-browser:downloads', state)
   }
+
+  schedulePersistDownloads()
 }
 
 const syncDownloadState = (
@@ -126,6 +271,7 @@ const configureBrowserSession = (): void => {
       state.status = result
       state.savePath = item.getSavePath() || state.savePath
       broadcastDownloads()
+      void persistDownloadsNow()
       closeRetryWindow(webContents.id)
     })
   })
@@ -504,6 +650,9 @@ const retryDownload = (downloadId: string): void => {
 }
 
 export const initializeEmbeddedBrowser = (): void => {
+  loadPersistedDownloads()
+  app.on('before-quit', persistDownloadsSync)
+
   ipcMain.handle('embedded-browser:open', (event, rawUrl: unknown) => {
     if (typeof rawUrl !== 'string') throw new Error('链接格式不合法')
 
@@ -626,16 +775,12 @@ export const initializeEmbeddedBrowser = (): void => {
     applyVisibility(entry)
   })
 
-  ipcMain.handle('embedded-browser:get-downloads', () =>
-    Array.from(downloads.values())
-      .map((entry) => entry.state)
-      .sort((left, right) => right.startedAt - left.startedAt)
-  )
+  ipcMain.handle('embedded-browser:get-downloads', () => getDownloadStates())
 
   ipcMain.handle('embedded-browser:cancel-download', (_event, downloadId: unknown) => {
     if (typeof downloadId !== 'string') throw new Error('下载 ID 不合法')
 
-    downloads.get(downloadId)?.item.cancel()
+    downloads.get(downloadId)?.item?.cancel()
   })
 
   ipcMain.handle('embedded-browser:open-download', async (_event, downloadId: unknown) => {
@@ -671,6 +816,7 @@ export const initializeEmbeddedBrowser = (): void => {
     }
 
     broadcastDownloads()
+    void persistDownloadsNow()
   })
 
   ipcMain.handle('embedded-browser:pause-download', (_event, downloadId: unknown) => {
@@ -678,7 +824,7 @@ export const initializeEmbeddedBrowser = (): void => {
 
     const entry = downloads.get(downloadId)
 
-    if (!entry || entry.state.status !== 'progressing') {
+    if (!entry?.item || entry.state.status !== 'progressing') {
       throw new Error('当前下载不能暂停')
     }
 
@@ -686,6 +832,7 @@ export const initializeEmbeddedBrowser = (): void => {
     syncDownloadState(entry.item, entry.state)
     entry.state.paused = true
     broadcastDownloads()
+    void persistDownloadsNow()
   })
 
   ipcMain.handle('embedded-browser:resume-download', (_event, downloadId: unknown) => {
@@ -693,7 +840,7 @@ export const initializeEmbeddedBrowser = (): void => {
 
     const entry = downloads.get(downloadId)
 
-    if (!entry || entry.state.status !== 'progressing') {
+    if (!entry?.item || entry.state.status !== 'progressing') {
       throw new Error('当前下载不能继续')
     }
 
@@ -701,6 +848,7 @@ export const initializeEmbeddedBrowser = (): void => {
     syncDownloadState(entry.item, entry.state)
     entry.state.paused = false
     broadcastDownloads()
+    void persistDownloadsNow()
   })
 
   ipcMain.handle('embedded-browser:retry-download', (_event, downloadId: unknown) => {

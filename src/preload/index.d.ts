@@ -1,5 +1,6 @@
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
+import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
   EmbeddedBrowserBounds,
@@ -139,6 +140,8 @@ export interface ElectronAPI {
   logoutMeegle: () => Promise<MeegleState>
   /** 订阅 Meegle 扫码登录结果，返回取消订阅函数。 */
   onMeegleLoginEvent: (listener: (event: MeegleLoginEvent) => void) => () => void
+  /** 订阅 CLI 授权过期事件，返回取消订阅函数。 */
+  onAuthExpired: (listener: (event: AuthExpiredEvent) => void) => () => void
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: () => Promise<MeegleMyRequirements>
   /** 读取用户可访问的 Meegle 空间。 */

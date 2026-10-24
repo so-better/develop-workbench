@@ -1,11 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Alert, App, Button, Input, Spin } from 'antd'
 import type { GitInfo, GitPathSource } from '../../../types/git'
-
-interface GitSettingsProps {
-  /** 向设置弹窗注册底部保存按钮的处理函数。 */
-  onSaveReady: (handler: (() => Promise<void>) | null) => void
-}
 
 const gitSourceNames: Record<GitPathSource, string> = {
   settings: '应用设置',
@@ -17,7 +12,7 @@ const gitSourceNames: Record<GitPathSource, string> = {
  * Git 可执行文件配置。
  * 支持手动选择、自动检测和清除配置恢复自动模式。
  */
-export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Element {
+export default function GitSettings(): JSX.Element {
   const { message } = App.useApp()
   const [info, setInfo] = useState<GitInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -25,7 +20,6 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
   const [error, setError] = useState<string | null>(null)
   const [pathDraft, setPathDraft] = useState('')
   const [pathDirty, setPathDirty] = useState(false)
-  const saveRef = useRef<() => Promise<void>>(async () => undefined)
 
   /**
    * 读取当前生效的 Git 路径和版本。
@@ -51,7 +45,7 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
   }, [])
 
   /**
-   * 选择 Git 可执行文件，暂存路径，点击保存后生效。
+   * 选择 Git 可执行文件后立即保存。
    */
   const handleChooseFile = async (): Promise<void> => {
     try {
@@ -64,6 +58,7 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
       setPathDraft(selected)
       setPathDirty(true)
       setError(null)
+      await savePath(selected)
     } catch {
       message.error('无法打开文件选择器')
     }
@@ -71,7 +66,7 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
 
   /**
    * 只执行自动检测，并把检测结果填入输入框。
-   * 仍然需要点击保存才写入偏好。
+   * 检测成功后立即写入偏好。
    */
   const handleAutoDetect = async (): Promise<void> => {
     setDetecting(true)
@@ -83,10 +78,8 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
       setPathDraft(detected.path ?? '')
       setPathDirty(false)
 
-      if (detected.available) {
-        message.success(
-          `已检测到 Git ${detected.version ?? ''}，保存后生效`
-        )
+      if (detected.available && detected.path) {
+        await savePath(detected.path)
       } else {
         message.warning('未检测到可用的 Git')
       }
@@ -98,32 +91,24 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
   }
 
   /**
-   * 保存当前 Git 路径；空值恢复自动检测。
+   * 立即保存 Git 路径；空值恢复自动检测。
    */
-  const saveConfig = async (): Promise<void> => {
+  const savePath = async (value?: string | null): Promise<void> => {
     try {
       const next = await window.electron.setGitPath(
-        pathDraft.trim() || null
+        value !== undefined ? value : pathDraft.trim() || null
       )
 
       setInfo(next)
       setPathDraft(next.path ?? '')
       setPathDirty(false)
-      message.success('Git 配置已保存')
+      message.success('Git 配置已自动保存')
     } catch (saveError) {
       message.error(
         saveError instanceof Error ? saveError.message : '保存 Git 配置失败'
       )
     }
   }
-
-  // 每次渲染更新引用，避免父组件保存回调持有旧状态。
-  saveRef.current = saveConfig
-
-  useEffect(() => {
-    onSaveReady(() => saveRef.current())
-    return () => onSaveReady(null)
-  }, [onSaveReady])
 
   return (
     <>
@@ -173,7 +158,7 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
             <Alert
               type="error"
               showIcon
-              message="当前 Git 路径不可用。请重新选择文件，或点击自动检测后保存。"
+              message="当前 Git 路径不可用。请重新选择文件，或点击自动检测。"
             />
           ) : null}
 
@@ -186,6 +171,12 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
                 onChange={(event) => {
                   setPathDraft(event.target.value)
                   setPathDirty(true)
+                }}
+                onBlur={() => {
+                  if (pathDirty) void savePath()
+                }}
+                onPressEnter={() => {
+                  if (pathDirty) void savePath()
                 }}
                 placeholder="输入路径或选择文件"
                 spellCheck={false}
@@ -202,9 +193,7 @@ export default function GitSettings({ onSaveReady }: GitSettingsProps): JSX.Elem
               </Button>
             </div>
             <p className="settings-help">
-              {pathDirty
-                ? '修改将在点击保存后生效。'
-                : '自动检测只更新当前结果，点击保存后生效。清空路径并保存可恢复自动检测。'}
+              选择文件、自动检测或输入后失焦会立即保存。清空路径可恢复自动检测。
             </p>
           </div>
         </>

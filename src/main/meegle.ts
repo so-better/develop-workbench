@@ -11,6 +11,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import QRCode from 'qrcode'
 import { getPreferences, updatePreferences } from './preferences'
+import { broadcastAuthExpired, isAuthExpiredError } from './auth-events'
 import type {
   MeegleCliInfo,
   MeegleCliPathSource,
@@ -226,6 +227,26 @@ const runExecutable = (
   })
 
 /**
+ * 提取可能表示授权失效的错误文本。
+ * 退出码为 0 时只检查 JSON 中的 error.message，避免把业务数据误判为认证错误。
+ */
+const getAuthErrorText = (result: CommandResult): string => {
+  if (result.code !== 0) return `${result.stdout}\n${result.stderr}`
+
+  if (!result.stdout.includes('"error"')) return ''
+
+  try {
+    const parsed = JSON.parse(result.stdout) as {
+      error?: { message?: unknown }
+    }
+
+    return typeof parsed?.error?.message === 'string' ? parsed.error.message : ''
+  } catch {
+    return ''
+  }
+}
+
+/**
  * 执行 Meegle CLI 命令。
  * 导出给需求等业务模块复用，统一处理 CLI 路径解析和进程超时。
  */
@@ -239,7 +260,18 @@ export const runMeegle = async (
     throw new Error('Meegle CLI not found')
   }
 
-  return runExecutable(resolved.path, args, timeoutMs)
+  const result = await runExecutable(resolved.path, args, timeoutMs)
+
+  // auth/config 命令用于查询或修复环境，失败时不在业务层重复广播。
+  if (
+    args[0] !== 'auth' &&
+    args[0] !== 'config' &&
+    isAuthExpiredError(getAuthErrorText(result))
+  ) {
+    broadcastAuthExpired('meegle')
+  }
+
+  return result
 }
 
 /**

@@ -3,22 +3,16 @@ import { Alert, App, Button, Input, Select, Spin } from 'antd'
 import { IDE_PRESETS } from '../../../types/ide'
 import type { IdeConfigState, IdePresetId } from '../../../types/ide'
 
-interface IdeSettingsProps {
-  /** 向设置弹窗注册底部保存按钮的处理函数。 */
-  onSaveReady: (handler: (() => Promise<void>) | null) => void
-}
-
 /**
  * 内置 IDE 启动配置。
  */
-export default function IdeSettings({ onSaveReady }: IdeSettingsProps): JSX.Element {
+export default function IdeSettings(): JSX.Element {
   const { message } = App.useApp()
   const [state, setState] = useState<IdeConfigState | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [preset, setPreset] = useState<IdePresetId | null>(null)
   const [command, setCommand] = useState('')
-  const saveRef = useRef<() => Promise<void>>(async () => undefined)
   const detectRequestRef = useRef(0)
 
   const selectedPreset = preset
@@ -67,7 +61,7 @@ export default function IdeSettings({ onSaveReady }: IdeSettingsProps): JSX.Elem
       if (detectRequestRef.current !== requestId) return
 
       setCommand(config.command)
-      message.success(`已检测到 ${config.name}，保存后生效`)
+      await saveConfig(config.command, value)
     } catch {
       if (detectRequestRef.current !== requestId) return
 
@@ -93,7 +87,7 @@ export default function IdeSettings({ onSaveReady }: IdeSettingsProps): JSX.Elem
       if (detectRequestRef.current !== requestId) return
 
       setCommand(config.command)
-      message.success(`已检测到 ${config.name}，保存后生效`)
+      await saveConfig(config.command)
     } catch (detectError) {
       if (detectRequestRef.current !== requestId) return
 
@@ -117,6 +111,7 @@ export default function IdeSettings({ onSaveReady }: IdeSettingsProps): JSX.Elem
         detectRequestRef.current += 1
         setCommand(selected)
         setError(null)
+        await saveConfig(selected)
       }
     } catch {
       message.error('无法打开文件选择器')
@@ -126,47 +121,39 @@ export default function IdeSettings({ onSaveReady }: IdeSettingsProps): JSX.Elem
   /**
    * 保存当前内置 IDE 和可执行文件。
    */
-  const saveConfig = async (): Promise<void> => {
-    if (!selectedPreset) {
-      message.error('请选择 IDE')
-      return
-    }
+  const saveConfig = async (
+    commandOverride?: string,
+    presetOverride?: IdePresetId
+  ): Promise<void> => {
+    const nextCommand = (commandOverride ?? command).trim()
+    const targetPreset = presetOverride
+      ? IDE_PRESETS.find((item) => item.id === presetOverride) ?? null
+      : selectedPreset
 
-    if (!command.trim()) {
-      message.error('请选择或自动检测 IDE 可执行文件')
-      return
-    }
+    if (!targetPreset || !nextCommand) return
 
     try {
       const next = await window.electron.setIdeConfig({
-        preset: selectedPreset.id,
-        name: selectedPreset.name,
-        command,
-        args: selectedPreset.args
+        preset: targetPreset.id,
+        name: targetPreset.name,
+        command: nextCommand,
+        args: targetPreset.args
       })
 
       detectRequestRef.current += 1
       setState(next)
-      setCommand(next.config?.command ?? command)
-      message.success('IDE 配置已保存')
+      setCommand(next.config?.command ?? nextCommand)
+      message.success('IDE 配置已自动保存')
     } catch (saveError) {
       message.error(saveError instanceof Error ? saveError.message : '保存 IDE 配置失败')
     }
   }
 
-  // 每次渲染更新引用，只在父组件回调变化时重新注册，避免状态循环。
-  saveRef.current = saveConfig
-
-  useEffect(() => {
-    onSaveReady(() => saveRef.current())
-    return () => onSaveReady(null)
-  }, [onSaveReady])
-
   return (
     <>
       <div className="settings-panel-header">
         <h3>IDE</h3>
-        <p>选择内置 IDE。名称和启动参数由预设固定，可执行文件支持自动检测或手动选择。</p>
+        <p>选择内置 IDE。名称和启动参数由预设固定，检测或选择可执行文件后会自动保存。</p>
       </div>
 
       {loading ? (
@@ -212,6 +199,8 @@ export default function IdeSettings({ onSaveReady }: IdeSettingsProps): JSX.Elem
                 spellCheck={false}
                 disabled={!preset}
                 onChange={(event) => setCommand(event.target.value)}
+                onBlur={() => void saveConfig()}
+                onPressEnter={() => void saveConfig()}
               />
               <Button
                 variant="filled"
