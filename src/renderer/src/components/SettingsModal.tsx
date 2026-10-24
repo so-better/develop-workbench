@@ -4,6 +4,7 @@ import { Alert, App, Button, Input, Modal, Spin } from 'antd'
 import type { AppInfo } from '../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../types/lark'
 import type { SettingsSection } from '../../../types/settings'
+import GitSettings from './GitSettings'
 import IdeSettings from './IdeSettings'
 import MeegleSettings from './MeegleSettings'
 import RepositorySettings from './RepositorySettings'
@@ -54,6 +55,8 @@ export default function SettingsModal({
   const [meegleReady, setMeegleReady] = useState(false)
   const ideSaveRef = useRef<(() => Promise<void>) | null>(null)
   const [ideReady, setIdeReady] = useState(false)
+  const gitSaveRef = useRef<(() => Promise<void>) | null>(null)
+  const [gitReady, setGitReady] = useState(false)
 
   /**
    * 接收 Meegle 面板注册的配置保存函数。
@@ -66,6 +69,14 @@ export default function SettingsModal({
   const handleIdeSaveReady = useCallback((handler: (() => Promise<void>) | null): void => {
     ideSaveRef.current = handler
     setIdeReady(Boolean(handler))
+  }, [])
+
+  /**
+   * 接收 Git 面板注册的保存函数。
+   */
+  const handleGitSaveReady = useCallback((handler: (() => Promise<void>) | null): void => {
+    gitSaveRef.current = handler
+    setGitReady(Boolean(handler))
   }, [])
 
   useEffect(() => {
@@ -217,6 +228,17 @@ export default function SettingsModal({
       return
     }
 
+    if (activeSection === 'git') {
+      setSaving(true)
+
+      try {
+        await gitSaveRef.current?.()
+      } finally {
+        setSaving(false)
+      }
+      return
+    }
+
     if (activeSection === 'meegle') {
       setSaving(true)
 
@@ -244,14 +266,17 @@ export default function SettingsModal({
       ? loading || Boolean(error)
       : activeSection === 'lark-cli'
         ? larkLoading || Boolean(larkError)
-        : activeSection === 'meegle'
-          ? !meegleReady
-          : activeSection === 'ide'
-            ? !ideReady
-            : false
+        : activeSection === 'git'
+          ? !gitReady
+          : activeSection === 'meegle'
+            ? !meegleReady
+            : activeSection === 'ide'
+              ? !ideReady
+              : false
   const showSaveButton =
     activeSection === 'ai' ||
     activeSection === 'lark-cli' ||
+    activeSection === 'git' ||
     activeSection === 'meegle' ||
     activeSection === 'ide'
   const appInfoItems = [
@@ -320,14 +345,6 @@ export default function SettingsModal({
         <nav className="settings-nav" aria-label="设置分类">
           <button
             type="button"
-            className={`settings-nav-item${activeSection === 'ai' ? ' is-active' : ''}`}
-            aria-current={activeSection === 'ai' ? 'page' : undefined}
-            onClick={() => setActiveSection('ai')}
-          >
-            模型配置
-          </button>
-          <button
-            type="button"
             className={`settings-nav-item${activeSection === 'lark-cli' ? ' is-active' : ''}`}
             aria-current={activeSection === 'lark-cli' ? 'page' : undefined}
             onClick={() => setActiveSection('lark-cli')}
@@ -344,6 +361,14 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
+            className={`settings-nav-item${activeSection === 'git' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'git' ? 'page' : undefined}
+            onClick={() => setActiveSection('git')}
+          >
+            Git
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item${activeSection === 'ide' ? ' is-active' : ''}`}
             aria-current={activeSection === 'ide' ? 'page' : undefined}
             onClick={() => setActiveSection('ide')}
@@ -357,6 +382,14 @@ export default function SettingsModal({
             onClick={() => setActiveSection('repositories')}
           >
             代码仓库
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item${activeSection === 'ai' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'ai' ? 'page' : undefined}
+            onClick={() => setActiveSection('ai')}
+          >
+            模型配置
           </button>
           <button
             type="button"
@@ -467,6 +500,10 @@ export default function SettingsModal({
                 </>
               )}
             </>
+          ) : null}
+
+          {activeSection === 'git' ? (
+            <GitSettings onSaveReady={handleGitSaveReady} />
           ) : null}
 
           {activeSection === 'repositories' ? <RepositorySettings /> : null}

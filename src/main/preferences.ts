@@ -15,6 +15,7 @@ export interface AppPreferences {
   larkCliPath?: string
   meegleCliPath?: string
   repositoryRoot?: string
+  gitPath?: string
   ide?: IdeConfig
 }
 
@@ -106,6 +107,7 @@ const readPreferences = (): AppPreferences => {
     larkCliPath?: unknown
     meegleCliPath?: unknown
     repositoryRoot?: unknown
+    gitPath?: unknown
     ide?: unknown
   }
 
@@ -114,6 +116,7 @@ const readPreferences = (): AppPreferences => {
     larkCliPath: normalizePath(value.larkCliPath),
     meegleCliPath: normalizePath(value.meegleCliPath),
     repositoryRoot: normalizePath(value.repositoryRoot),
+    gitPath: normalizePath(value.gitPath),
     ide: isIdeConfig(value.ide) ? value.ide : undefined
   }
 
@@ -138,6 +141,7 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
   next.larkCliPath = normalizePath(next.larkCliPath)
   next.meegleCliPath = normalizePath(next.meegleCliPath)
   next.repositoryRoot = normalizePath(next.repositoryRoot)
+  next.gitPath = normalizePath(next.gitPath)
   next.ide = isIdeConfig(next.ide) ? next.ide : undefined
   cachedPreferences = next
 

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
+import type { GitInfo } from '../types/git'
 import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserState
@@ -130,6 +131,28 @@ const electronAPI = {
     presetId?: IdePresetId
   ): Promise<string | null> =>
     ipcRenderer.invoke('ide:select-command', currentPath, presetId),
+
+  /**
+   * 读取 Git 路径、来源和版本。
+   */
+  getGitInfo: (): Promise<GitInfo> => ipcRenderer.invoke('git:get-info'),
+
+  /**
+   * 只执行 Git 自动检测，不修改已保存路径。
+   */
+  detectGitInfo: (): Promise<GitInfo> => ipcRenderer.invoke('git:detect-info'),
+
+  /**
+   * 保存 Git 路径；传 null 恢复自动检测。
+   */
+  setGitPath: (gitPath: string | null): Promise<GitInfo> =>
+    ipcRenderer.invoke('git:set-path', gitPath),
+
+  /**
+   * 选择 Git 可执行文件。
+   */
+  selectGitPath: (currentPath?: string | null): Promise<string | null> =>
+    ipcRenderer.invoke('git:select-path', currentPath),
 
   /**
    * 将文本写入系统剪贴板。

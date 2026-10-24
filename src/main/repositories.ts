@@ -14,6 +14,7 @@ import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { getPreferences, updatePreferences } from './preferences'
+import { resolveGitPath } from './git'
 import { backupCorruptStore } from './store-backup'
 import type {
   CloneRepositoryInput,
@@ -44,8 +45,6 @@ interface RepositoryStore {
 
 const execFileAsync = promisify(execFile)
 
-// 优先使用显式配置的 Git 路径，否则依赖系统 PATH。
-const GIT_PATH = process.env.GIT_PATH?.trim() || 'git'
 const GIT_TIMEOUT_MS = 15_000
 const GIT_NETWORK_TIMEOUT_MS = 60_000
 const CLONE_TIMEOUT_MS = 300_000
@@ -205,7 +204,8 @@ const runGit = async (
   args: string[],
   options: { cwd?: string; timeout?: number } = {}
 ): Promise<string> => {
-  const { stdout } = await execFileAsync(GIT_PATH, args, {
+  const gitPath = await resolveGitPath()
+  const { stdout } = await execFileAsync(gitPath, args, {
     cwd: options.cwd,
     timeout: options.timeout ?? GIT_TIMEOUT_MS,
     maxBuffer: MAX_BUFFER_BYTES,
@@ -493,6 +493,9 @@ const getGitErrorMessage = (error: unknown): string => {
   return message.replace(/(https?:\/\/)[^@\s/]+@/gi, '$1***@').slice(0, 200)
 }
 
+/**
+ * 判断当前分支是否配置了上游分支。
+ */
 const hasUpstreamBranch = async (cwd: string): Promise<boolean> => {
   try {
     const upstream = (
@@ -983,7 +986,8 @@ const sanitizeCloneOutput = (value: string): string =>
  * Git 在非 TTY 环境下默认不输出进度，因此显式加上 --progress。
  */
 const runGitClone = async (url: string, targetPath: string): Promise<void> => {
-  const child = spawn(GIT_PATH, ['clone', '--progress', '--', url, targetPath], {
+  const gitPath = await resolveGitPath()
+  const child = spawn(gitPath, ['clone', '--progress', '--', url, targetPath], {
     env: {
       ...process.env,
       GIT_TERMINAL_PROMPT: '0'

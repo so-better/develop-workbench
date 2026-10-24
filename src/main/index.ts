@@ -6,6 +6,7 @@ import { app } from 'electron'
 import { join } from 'node:path'
 import { initializeAiConfig } from './ai-config'
 import { initializeEmbeddedBrowser } from './embedded-browser'
+import { initializeGit } from './git'
 import { initializeIde } from './ide'
 import { initializeLark } from './lark'
 import { initializeLinkPreview } from './link-preview'
@@ -43,6 +44,7 @@ if (!hasSingleInstanceLock) {
     initializeTheme()
     initializeSystem()
     initializeEmbeddedBrowser()
+    initializeGit()
     initializeIde()
     initializeLark()
     initializeLinkPreview()

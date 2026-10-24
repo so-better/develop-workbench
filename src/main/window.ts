@@ -66,8 +66,11 @@ export const createMainWindow = (): void => {
 
   mainWindow = window
 
-  // 页面准备完成后显示窗口；开发模式不主动抢占焦点。
-  window.once('ready-to-show', showMainWindow)
+  // 首次打开时最大化到屏幕工作区，随后再显示窗口。
+  window.once('ready-to-show', () => {
+    window.maximize()
+    showMainWindow()
+  })
 
   // 每次窗口重新显示时通知渲染进程刷新 lark 登录状态。
   window.on('show', () => {

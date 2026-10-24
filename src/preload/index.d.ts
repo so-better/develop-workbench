@@ -1,5 +1,6 @@
 import type { AiConfigDocument } from '../types/ai-config'
 import type { AppInfo } from '../types/app'
+import type { GitInfo } from '../types/git'
 import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserState
@@ -74,6 +75,14 @@ export interface ElectronAPI {
   ) => Promise<string | null>
   /** 将文本写入系统剪贴板。 */
   copyText: (text: string) => Promise<void>
+  /** 读取 Git 路径、来源和版本。 */
+  getGitInfo: () => Promise<GitInfo>
+  /** 只执行 Git 自动检测。 */
+  detectGitInfo: () => Promise<GitInfo>
+  /** 保存 Git 路径，传 null 恢复自动检测。 */
+  setGitPath: (gitPath: string | null) => Promise<GitInfo>
+  /** 打开系统文件选择器选择 Git。 */
+  selectGitPath: (currentPath?: string | null) => Promise<string | null>
   /** 读取 lark-cli 当前登录用户，未登录时返回 null。 */
   getLarkUser: () => Promise<LarkUser | null>
   /** 查询 lark-cli 路径、来源和版本。 */
