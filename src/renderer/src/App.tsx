@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { App as AntdApp, Modal, Spin } from 'antd'
 import AppFooter from './components/AppFooter'
 import AppNavigation from './components/AppNavigation'
+import LinkContextMenu from './components/LinkContextMenu'
 import { APP_PAGES } from './navigation'
 import type { AppPage } from './navigation'
 import EmbeddedBrowserDownloads from './components/EmbeddedBrowserDownloads'
@@ -297,6 +298,8 @@ export default function App(): JSX.Element {
           void refreshEnvironment()
         }}
       />
+
+      <LinkContextMenu />
 
       <Modal
         title="下载管理"

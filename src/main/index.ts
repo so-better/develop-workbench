@@ -15,6 +15,7 @@ import { initializeMeegle } from './meegle'
 import { initializeRepositories } from './repositories'
 import { initializeRequirementBindings } from './requirement-bindings'
 import { initializeRequirements } from './requirements'
+import { initializeSites } from './sites'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
 import { initializeWeeklyReport } from './weekly-report'
@@ -55,6 +56,7 @@ if (!hasSingleInstanceLock) {
     initializeRepositories()
     initializeRequirements()
     initializeRequirementBindings()
+    initializeSites()
     initializeWeeklyReport()
     initializeAiConfig()
     createMainWindow()

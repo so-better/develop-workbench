@@ -10,6 +10,7 @@ import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import type { IncomingMessage } from 'node:http'
 import { runLarkCli } from './lark'
+import { runMeegle } from './meegle'
 import type { LinkPreview } from '../types/link-preview'
 
 interface CacheEntry {
@@ -371,6 +372,85 @@ const parseHtmlPreview = (
   }
 }
 
+interface MeegleStoryResponse {
+  work_item_attribute?: {
+    work_item_name?: string
+    work_item_status?: {
+      name?: string
+    }
+    work_item_type?: {
+      name?: string
+    }
+  }
+}
+
+/** 判断是否是飞书项目需求详情 URL。 */
+const getMeegleStoryUrlParts = (
+  url: URL
+): { projectKey: string; workItemId: string } | null => {
+  const isProjectHost =
+    url.hostname === 'project.feishu.cn' ||
+    url.hostname.endsWith('.project.feishu.cn') ||
+    url.hostname === 'project.larksuite.com' ||
+    url.hostname.endsWith('.project.larksuite.com')
+
+  if (!isProjectHost) return null
+
+  const match = url.pathname.match(/^\/([^/]+)\/story\/detail\/([^/]+)\/?$/)
+
+  if (!match) return null
+
+  return {
+    projectKey: decodeURIComponent(match[1]),
+    workItemId: decodeURIComponent(match[2])
+  }
+}
+
+/**
+ * 飞书项目链接不能通过 lark-cli 文档接口解析，改用 Meegle 工作项接口读取标题。
+ */
+const inspectMeegleStoryLink = async (url: URL): Promise<LinkPreview | null> => {
+  const parts = getMeegleStoryUrlParts(url)
+
+  if (!parts) return null
+
+  try {
+    const result = await runMeegle([
+      'workitem',
+      'get',
+      '--project-key',
+      parts.projectKey,
+      '--work-item-id',
+      parts.workItemId,
+      '--format',
+      'json'
+    ])
+
+    if (result.code !== 0) return null
+
+    const response = JSON.parse(result.stdout) as MeegleStoryResponse
+    const attribute = response.work_item_attribute
+    const title = attribute?.work_item_name?.trim()
+
+    if (!title) return null
+
+    const status = attribute?.work_item_status?.name?.trim()
+    const type = attribute?.work_item_type?.name?.trim() || '飞书需求'
+
+    return {
+      url: url.toString(),
+      title,
+      description: status ? `状态：${status}` : null,
+      siteName: '飞书项目',
+      type,
+      host: url.hostname,
+      isFeishu: true
+    }
+  } catch {
+    return null
+  }
+}
+
 /**
  * 通过 lark-cli 解析飞书文档标题。
  */
@@ -479,7 +559,10 @@ export const getLinkPreview = async (rawUrl: string): Promise<LinkPreview> => {
   const request = withRequestSlot(async () => {
     let preview: LinkPreview
 
-    if (isFeishuHost(url.hostname)) {
+    if (getMeegleStoryUrlParts(url)) {
+      preview =
+        (await inspectMeegleStoryLink(url)) ?? (await inspectFeishuLink(url))
+    } else if (isFeishuHost(url.hostname)) {
       preview = await inspectFeishuLink(url)
     } else {
       try {

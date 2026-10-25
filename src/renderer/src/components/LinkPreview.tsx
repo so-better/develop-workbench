@@ -33,8 +33,12 @@ export default function LinkPreview({ href, fallback }: LinkPreviewProps): JSX.E
     }
   }, [href])
 
+  const fallbackText =
+    typeof fallback === 'string' || typeof fallback === 'number'
+      ? String(fallback).trim()
+      : ''
   const title = preview?.title || fallback || href
-  const host = preview?.host || href
+  const accessibleTitle = preview?.title?.trim() || fallbackText || href
 
   return (
     <a
@@ -42,7 +46,8 @@ export default function LinkPreview({ href, fallback }: LinkPreviewProps): JSX.E
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      title={host}
+      aria-label={accessibleTitle}
+      title={accessibleTitle}
     >
       <span className="link-preview-inline-icon">
         {preview?.isFeishu ? <FileTextOutlined /> : <LinkOutlined />}

@@ -31,6 +31,7 @@ import type {
   UpdateRepositoryInput
 } from '../types/repository'
 import type { ThemeMode, ThemeState } from '../types/theme'
+import type { SiteInput, SiteState } from '../types/sites'
 import type {
   SubmitWeeklyReportInput,
   WeeklyReportState
@@ -339,6 +340,39 @@ const electronAPI = {
       ipcRenderer.removeListener('auth:expired', handler)
     }
   },
+
+  /**
+   * 读取站点快捷入口。
+   */
+  getSiteState: (): Promise<SiteState> => ipcRenderer.invoke('sites:get-state'),
+
+  /**
+   * 新增站点快捷入口。
+   */
+  addSite: (input: SiteInput): Promise<SiteState> => ipcRenderer.invoke('sites:add', input),
+
+  /**
+   * 更新站点快捷入口。
+   */
+  updateSite: (id: string, input: SiteInput): Promise<SiteState> =>
+    ipcRenderer.invoke('sites:update', id, input),
+
+  /**
+   * 记录一次站点打开，用于计算常用站点。
+   */
+  recordSiteOpen: (id: string): Promise<SiteState> =>
+    ipcRenderer.invoke('sites:open', id),
+
+  /**
+   * 保存站点拖拽排序。
+   */
+  reorderSites: (ids: string[]): Promise<SiteState> =>
+    ipcRenderer.invoke('sites:reorder', ids),
+
+  /**
+   * 删除站点快捷入口。
+   */
+  removeSite: (id: string): Promise<SiteState> => ipcRenderer.invoke('sites:remove', id),
 
   /**
    * 读取飞书个人工作周报。

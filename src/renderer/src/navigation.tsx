@@ -1,7 +1,12 @@
-import { FileTextOutlined, ProjectOutlined } from '@ant-design/icons'
+import {
+  FileTextOutlined,
+  GlobalOutlined,
+  ProjectOutlined
+} from '@ant-design/icons'
 import type { SettingsSection } from '../../types/settings'
 import RequirementWorkbench from './components/RequirementWorkbench'
 import WeeklyReport from './components/WeeklyReport'
+import SitesPage from './components/SitesPage'
 
 interface PageRenderContext {
   onOpenSettings: (section: SettingsSection) => void
@@ -31,6 +36,12 @@ export const APP_PAGES = [
     label: '周报',
     icon: <FileTextOutlined />,
     render: () => <WeeklyReport />
+  },
+  {
+    key: 'sites',
+    label: '站点',
+    icon: <GlobalOutlined />,
+    render: () => <SitesPage />
   }
 ] as const satisfies ReadonlyArray<AppPageDefinition & { key: string }>
 
