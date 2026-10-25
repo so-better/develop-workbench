@@ -80,16 +80,16 @@ export default function App(): JSX.Element {
         stale: requestId !== environmentRequestRef.current
       }
 
-      // 旧请求晚返回时不能覆盖更新的登录/授权状态。
-      if (!status.stale) {
-        setMeegleState(nextMeegle)
-        setLarkUser(nextLarkUser)
-        setLarkCliInfo(
-          larkCliResult.status === 'fulfilled' ? larkCliResult.value : null
-        )
-      }
+      // 旧请求不能覆盖新的登录状态，也不能提前结束初始 loading，
+      // 否则会短暂渲染出未授权的环境准备页。
+      if (status.stale) return status
 
-      if (showLoading) setEnvironmentLoading(false)
+      setMeegleState(nextMeegle)
+      setLarkUser(nextLarkUser)
+      setLarkCliInfo(
+        larkCliResult.status === 'fulfilled' ? larkCliResult.value : null
+      )
+      setEnvironmentLoading(false)
 
       return status
     },
