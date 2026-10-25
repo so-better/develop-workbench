@@ -4,9 +4,9 @@ import {
   ProjectOutlined
 } from '@ant-design/icons'
 import type { SettingsSection } from '../../types/settings'
-import RequirementWorkbench from './components/RequirementWorkbench'
-import WeeklyReport from './components/WeeklyReport'
-import SitesPage from './components/SitesPage'
+import RequirementWorkbench from './pages/RequirementWorkbench/RequirementWorkbench'
+import WeeklyReport from './pages/WeeklyReport/WeeklyReport'
+import SitesPage from './pages/SitesPage/SitesPage'
 
 interface PageRenderContext {
   onOpenSettings: (section: SettingsSection) => void
