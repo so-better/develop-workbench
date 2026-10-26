@@ -288,6 +288,12 @@ export default function App(): JSX.Element {
             autoStart: false
           })
         }
+        onOpenCloudDocs={() =>
+          window.electron.openEmbeddedBrowser(
+            'https://www.feishu.cn/drive/home/',
+            { navigation: true }
+          )
+        }
       />
 
       <SettingsModal

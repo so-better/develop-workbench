@@ -1,4 +1,8 @@
-import { DownloadOutlined, SettingOutlined } from '@ant-design/icons'
+import {
+  CloudOutlined,
+  DownloadOutlined,
+  SettingOutlined
+} from '@ant-design/icons'
 import { Badge, Button, Tag, Tooltip } from 'antd'
 import RobotMark from '../RobotMark/RobotMark'
 import ThemeSwitcher from '../ThemeSwitcher/ThemeSwitcher'
@@ -10,6 +14,7 @@ interface AppFooterProps {
   downloadCount: number
   onOpenDownloads: () => void
   onOpenAi: () => void
+  onOpenCloudDocs: () => void
 }
 
 /**
@@ -21,49 +26,57 @@ export default function AppFooter({
   onOpenSettings,
   downloadCount,
   onOpenDownloads,
-  onOpenAi
+  onOpenAi,
+  onOpenCloudDocs
 }: AppFooterProps): JSX.Element {
   return (
     <footer className="app-footer">
-      {appInfo ? (
-        <span className="footer-version">
-          <span>当前版本：</span>
-          <Tag bordered={false}>v{appInfo.appVersion}</Tag>
-        </span>
-      ) : null}
-
-      <div className="footer-actions">
-        <Tooltip title="AI 助手">
+      <div className="footer-leading">
+        {appInfo ? (
+          <span className="footer-version">
+            <span>当前版本：</span>
+            <Tag bordered={false}>v{appInfo.appVersion}</Tag>
+          </span>
+        ) : null}
+        <Badge count={downloadCount} size="small">
           <Button
             type="text"
             size="small"
-            className="footer-ai"
+            icon={<DownloadOutlined />}
+            onClick={onOpenDownloads}
+          >
+            下载管理
+          </Button>
+        </Badge>
+      </div>
+
+      <div className="footer-actions">
+        <Tooltip title="飞书云文档">
+          <Button
+            type="text"
+            size="middle"
+            icon={<CloudOutlined />}
+            aria-label="打开飞书云文档"
+            onClick={onOpenCloudDocs}
+          />
+        </Tooltip>
+        <Tooltip title="AI 助手">
+          <Button
+            type="text"
+            size="middle"
             icon={<RobotMark />}
             aria-label="打开 AI 助手"
             onClick={onOpenAi}
           />
         </Tooltip>
-        <Badge count={downloadCount} size="small">
-          <Tooltip title="下载管理">
-            <Button
-              type="text"
-              size="small"
-              className="footer-download"
-              icon={<DownloadOutlined />}
-              aria-label="下载管理"
-              onClick={onOpenDownloads}
-            />
-          </Tooltip>
-        </Badge>
         <Tooltip title="设置">
-          <button
-            type="button"
-            className="footer-settings"
+          <Button
+            type="text"
+            size="middle"
+            icon={<SettingOutlined />}
             aria-label="设置"
             onClick={onOpenSettings}
-          >
-            <SettingOutlined />
-          </button>
+          />
         </Tooltip>
         <ThemeSwitcher />
       </div>

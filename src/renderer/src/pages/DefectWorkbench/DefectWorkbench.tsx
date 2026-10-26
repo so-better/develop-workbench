@@ -541,7 +541,7 @@ export default function DefectWorkbench({
   }
 
   const handleRefresh = (): void => {
-    void load()
+    load()
   }
 
   const buildReplyContent = (
@@ -1202,7 +1202,7 @@ export default function DefectWorkbench({
                                             type="primary"
                                             size="small"
                                             loading={assigneesSaving}
-                                            onClick={() => void handleSaveAssignees()}
+                                            onClick={() => handleSaveAssignees()}
                                           >
                                             保存
                                           </Button>
@@ -1470,7 +1470,7 @@ export default function DefectWorkbench({
                               type="primary"
                               size="small"
                               loading={commentSubmitting}
-                              onClick={() => void handleAddComment()}
+                              onClick={() => handleAddComment()}
                             >
                               {replyToComment ? '发表回复' : '发表评论'}
                             </Button>
@@ -1504,7 +1504,7 @@ export default function DefectWorkbench({
           disabled: !selectedTransition || missingTransitionRoles.length > 0
         }}
         confirmLoading={transitionSubmitting}
-        onOk={() => void handleSubmitTransition()}
+        onOk={() => handleSubmitTransition()}
         onCancel={() => {
           if (!transitionSubmitting) setTransitionOpen(false)
         }}

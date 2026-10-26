@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import {
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
   CloseOutlined,
   CompressOutlined,
   DownloadOutlined,
@@ -304,6 +306,28 @@ export default function EmbeddedBrowserPanel({
 
       <div className="embedded-browser-toolbar">
         <div className="embedded-browser-nav">
+          {state.showNavigation ? (
+            <>
+              <Button
+                type="text"
+                size="small"
+                icon={<ArrowLeftOutlined />}
+                disabled={!state.canGoBack}
+                title="后退"
+                aria-label="后退"
+                onClick={() => window.electron.goBackEmbeddedBrowser()}
+              />
+              <Button
+                type="text"
+                size="small"
+                icon={<ArrowRightOutlined />}
+                disabled={!state.canGoForward}
+                title="前进"
+                aria-label="前进"
+                onClick={() => window.electron.goForwardEmbeddedBrowser()}
+              />
+            </>
+          ) : null}
           <Button
             type="text"
             size="small"

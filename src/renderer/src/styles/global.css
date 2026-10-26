@@ -417,123 +417,40 @@ body {
   margin-top: 14px;
 }
 
-.theme-trigger-wrapper {
-  display: inline-flex;
-}
-
-.theme-trigger {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--footer-ink) !important;
-  line-height: 1;
-}
-
-.theme-trigger:hover {
-  color: var(--app-text) !important;
-  background: var(--control-hover) !important;
-}
-
 .app-footer {
   display: flex;
-  flex: 0 0 44px;
+  flex: 0 0 48px;
   align-items: center;
   justify-content: space-between;
-  height: 44px;
+  height: 48px;
   padding: 0 14px;
   line-height: 1;
-  background: var(--app-bg);
+  background: var(--workbench-panel);
   border-top: 1px solid var(--control-border);
 }
 
-.footer-user {
+.footer-leading {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   min-width: 0;
-  height: 100%;
 }
 
-.footer-avatar {
-  flex-shrink: 0;
-  font-size: 10px !important;
-}
-
-.footer-avatar:not(.ant-avatar-image) {
-  color: #1677ff !important;
-  background: #e6f4ff !important;
-}
-
-.footer-avatar.ant-avatar-image {
-  background: transparent !important;
-}
-
-.footer-user-name {
-  overflow: hidden;
-  color: var(--app-text);
+.footer-leading .ant-btn {
   font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.footer-logout {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  color: var(--app-muted) !important;
-}
-
-.footer-logout:hover {
-  color: var(--app-text) !important;
-  background: var(--control-hover) !important;
-}
-
-.footer-ai {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--footer-ink) !important;
-  font-size: 14px;
-}
-
-.footer-ai:hover {
-  color: #1677ff !important;
-  background: var(--control-hover) !important;
-}
-
-.footer-download {
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--footer-ink) !important;
-  font-size: 14px;
-}
-
-.footer-download:hover {
-  color: var(--app-text) !important;
-  background: var(--control-hover) !important;
 }
 
 .footer-actions {
   display: flex;
-  gap: 3px;
+  flex-shrink: 0;
+  gap: 6px;
   align-items: center;
-  height: 100%;
   margin-left: auto;
 }
 
 .footer-version {
   display: inline-flex;
-  gap: 5px;
+  gap: 0;
   align-items: center;
   color: var(--app-muted);
   font-size: 11px;
@@ -548,32 +465,6 @@ body {
   font-variant-numeric: tabular-nums;
   line-height: 17px;
   border-radius: 5px;
-}
-
-.footer-settings {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--footer-ink);
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  background: transparent;
-  border: 0;
-  border-radius: 7px;
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-
-.footer-settings:hover {
-  color: var(--app-text);
-  background: var(--control-hover);
 }
 
 .settings-dialog {
@@ -851,10 +742,6 @@ body {
   opacity: 0.35;
 }
 
-.settings-help.meegle-auth-note {
-  margin-bottom: 20px;
-}
-
 .meegle-section {
   margin-bottom: 20px;
 }
@@ -929,55 +816,6 @@ body {
   padding-top: 16px;
   margin-top: 18px;
   border-top: 1px solid var(--workbench-divider);
-}
-
-.lark-auth-heading {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.lark-auth-heading strong {
-  color: var(--app-text);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.lark-auth-heading .ant-tag {
-  margin-inline-end: 0;
-}
-
-.lark-auth-user {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  min-width: 0;
-  color: var(--app-text);
-  font-size: 12px;
-}
-
-.lark-auth-user .ant-btn {
-  margin-left: auto;
-}
-
-.lark-auth-modal {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-items: center;
-  padding: 4px 0;
-}
-
-.lark-auth-modal-error {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  align-items: center;
-  padding: 20px 0;
-  color: var(--app-muted);
-  font-size: 12px;
-  text-align: center;
 }
 
 .settings-help {
@@ -1507,12 +1345,6 @@ body {
   margin-left: auto;
   color: var(--workbench-secondary);
   font-size: 11px;
-}
-
-.embedded-browser-download-panel-actions {
-  display: flex;
-  gap: 2px;
-  align-items: center;
 }
 
 .embedded-browser-download-panel .ant-empty,
@@ -4772,20 +4604,6 @@ body {
   margin-bottom: 14px;
 }
 
-.workbench-empty {
-  display: grid;
-  min-height: 300px;
-  background: var(--workbench-panel);
-  border: 1px solid var(--workbench-divider);
-  border-radius: 12px;
-  place-items: center;
-}
-
-.workbench-empty .ant-empty-description {
-  color: var(--workbench-secondary);
-  font-size: 13px;
-}
-
 /* 窄窗口下压缩导航和内容边距，保证需求标题仍有足够宽度。 */
 @media (max-width: 1200px) {
   .requirement-repo-row {
@@ -4876,8 +4694,7 @@ body {
 .requirement-node-summary-block strong,
 .requirement-node-workhour-row strong,
 .markdown-content,
-.requirement-remark-block p,
-.workbench-empty .ant-empty-description {
+.requirement-remark-block p {
   font-size: 14px;
 }
 
@@ -6955,16 +6772,6 @@ body {
 
 .ai-chat-dialog-title .ai-robot-mark {
   color: #1677ff;
-}
-
-.ai-message-role .ai-robot-mark {
-  color: #1677ff;
-}
-
-.footer-ai .ai-robot-mark {
-  width: 17px;
-  height: 17px;
-  font-size: 17px;
 }
 
 /* 缺陷工作台：复用需求工作台的侧栏、列表和标题结构。 */

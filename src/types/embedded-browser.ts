@@ -26,6 +26,15 @@ export interface EmbeddedBrowserState {
 
   /** 最近一次加载失败信息。 */
   error: string | null
+
+  /** 是否显示前进/后退。 */
+  showNavigation: boolean
+
+  /** 是否可以后退。 */
+  canGoBack: boolean
+
+  /** 是否可以前进。 */
+  canGoForward: boolean
 }
 
 /**

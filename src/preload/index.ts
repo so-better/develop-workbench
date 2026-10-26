@@ -76,8 +76,11 @@ const electronAPI = {
   getMarkdownImage: (url: string): Promise<string | null> =>
     ipcRenderer.invoke('markdown:get-image', url),
 
-  openEmbeddedBrowser: (url: string): Promise<boolean> =>
-    ipcRenderer.invoke('embedded-browser:open', url),
+  openEmbeddedBrowser: (
+    url: string,
+    options?: { navigation?: boolean }
+  ): Promise<boolean> =>
+    ipcRenderer.invoke('embedded-browser:open', url, options),
 
   getEmbeddedBrowserState: (): Promise<EmbeddedBrowserState> =>
     ipcRenderer.invoke('embedded-browser:get-state'),
@@ -87,6 +90,12 @@ const electronAPI = {
 
   reloadEmbeddedBrowser: (): Promise<void> =>
     ipcRenderer.invoke('embedded-browser:reload'),
+
+  goBackEmbeddedBrowser: (): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:go-back'),
+
+  goForwardEmbeddedBrowser: (): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:go-forward'),
 
   setEmbeddedBrowserBounds: (bounds: EmbeddedBrowserBounds): Promise<void> =>
     ipcRenderer.invoke('embedded-browser:set-bounds', bounds),

@@ -2545,7 +2545,7 @@ export default function RequirementWorkbench({
                             placeholder="标记当前进展"
                             aria-label="个人标记"
                             onChange={(event) => setPersonalStatusDraft(event.target.value)}
-                            onBlur={() => void handleSavePersonalStatus()}
+                            onBlur={() => handleSavePersonalStatus()}
                             onPressEnter={(event) => {
                               event.preventDefault()
                               event.currentTarget.blur()

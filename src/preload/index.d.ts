@@ -62,13 +62,20 @@ export interface ElectronAPI {
   /** 通过应用内浏览器登录态获取飞书 Markdown 图片。 */
   getMarkdownImage: (url: string) => Promise<string | null>
   /** 在应用内浏览器打开链接。 */
-  openEmbeddedBrowser: (url: string) => Promise<boolean>
+  openEmbeddedBrowser: (
+    url: string,
+    options?: { navigation?: boolean }
+  ) => Promise<boolean>
   /** 读取内嵌浏览器状态。 */
   getEmbeddedBrowserState: () => Promise<EmbeddedBrowserState>
   /** 关闭内嵌浏览器面板。 */
   closeEmbeddedBrowser: () => Promise<void>
   /** 内嵌浏览器刷新。 */
   reloadEmbeddedBrowser: () => Promise<void>
+  /** 内嵌浏览器后退。 */
+  goBackEmbeddedBrowser: () => Promise<void>
+  /** 内嵌浏览器前进。 */
+  goForwardEmbeddedBrowser: () => Promise<void>
   /** 更新内嵌浏览器视图位置。 */
   setEmbeddedBrowserBounds: (bounds: EmbeddedBrowserBounds) => Promise<void>
   /** 临时隐藏/恢复内嵌浏览器，用于覆盖层和弹窗。 */

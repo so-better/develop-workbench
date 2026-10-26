@@ -368,7 +368,7 @@ export default function SitesPage(): JSX.Element {
     const next = arrayMove(sites, fromIndex, targetIndex)
     setSites(next)
 
-    void window.electron
+    window.electron
       .reorderSites(next.map((site) => site.id))
       .then((state) => setSites(state.sites))
       .catch(async (saveError: unknown) => {
@@ -556,7 +556,7 @@ export default function SitesPage(): JSX.Element {
                 <Button
                   icon={<ReloadOutlined />}
                   loading={refreshing}
-                  onClick={() => void handleRefreshSites()}
+                  onClick={() => handleRefreshSites()}
                 >
                   刷新
                 </Button>
