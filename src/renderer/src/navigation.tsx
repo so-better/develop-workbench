@@ -32,16 +32,16 @@ export const APP_PAGES = [
     )
   },
   {
-    key: 'weekly-report',
-    label: '周报',
-    icon: <FileTextOutlined />,
-    render: () => <WeeklyReport />
-  },
-  {
     key: 'sites',
     label: '站点',
     icon: <GlobalOutlined />,
     render: () => <SitesPage />
+  },
+  {
+    key: 'weekly-report',
+    label: '周报',
+    icon: <FileTextOutlined />,
+    render: () => <WeeklyReport />
   }
 ] as const satisfies ReadonlyArray<AppPageDefinition & { key: string }>
 
