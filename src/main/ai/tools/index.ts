@@ -1,6 +1,7 @@
 import type { ToolSet } from 'ai'
 import { fileTools } from './files'
 import { shellTools } from './shell'
+import { siteTools } from './sites'
 import { skillTools } from './skills'
 import { weeklyTools } from './weekly'
 
@@ -10,6 +11,7 @@ export { getToolArtifact } from './files'
 export const localTools: ToolSet = {
   ...skillTools,
   ...shellTools,
+  ...siteTools,
   ...weeklyTools,
   ...fileTools
 }

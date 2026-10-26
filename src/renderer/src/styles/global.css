@@ -5900,13 +5900,21 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   max-width: 1200px;
   margin: 0 auto 18px;
 }
 
 .sites-search {
   width: min(360px, 100%);
+}
+
+.sites-toolbar-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+  margin-left: 0;
 }
 
 .sites-no-results {

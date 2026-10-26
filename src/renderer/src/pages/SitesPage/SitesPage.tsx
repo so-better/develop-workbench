@@ -8,6 +8,7 @@ import {
   HolderOutlined,
   LinkOutlined,
   PlusOutlined,
+  ReloadOutlined,
   SearchOutlined,
   StarOutlined
 } from '@ant-design/icons'
@@ -43,6 +44,8 @@ import {
 } from 'antd'
 import type { InputRef } from 'antd'
 import type { SiteInput, SiteLink } from '../../../../types/sites'
+import RobotMark from '../../components/RobotMark/RobotMark'
+import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import { getErrorMessage, normalizeHttpUrl } from '../../../../utils'
 
 interface SiteFormValues {
@@ -225,6 +228,7 @@ function SortableSiteCard({
  */
 export default function SitesPage(): JSX.Element {
   const { message } = App.useApp()
+  const { openAiDialog } = useAiChatDialog()
   const [form] = Form.useForm<SiteFormValues>()
   const [sites, setSites] = useState<SiteLink[]>([])
   const [loading, setLoading] = useState(true)
@@ -233,6 +237,7 @@ export default function SitesPage(): JSX.Element {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSite, setEditingSite] = useState<SiteLink | null>(null)
   const [search, setSearch] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
   const searchInputRef = useRef<InputRef>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeWidth, setActiveWidth] = useState<number | undefined>()
@@ -458,6 +463,36 @@ export default function SitesPage(): JSX.Element {
     }
   }
 
+  const handleRefreshSites = async (): Promise<void> => {
+    setRefreshing(true)
+
+    try {
+      await loadSites(false)
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const handleAiAnalyze = (): void => {
+    openAiDialog({
+      title: 'AI 分析站点',
+      autoStart: true,
+      prompt: [
+        '请先调用 listSites 工具读取我保存的全部站点，再基于工具实际返回的数据进行分析。',
+        '',
+        '分析要求：',
+        '- 按用途归类，说明每类包含哪些站点',
+        '- 找出可能重复、命名不清晰或 URL 异常的站点',
+        '- 给出标签优化建议',
+        '- 可以建议补充的工具类型，但不要编造具体链接',
+        '',
+        '分析完成后，请先询问我是否需要执行新增、删除或更新站点，并列出建议的变更。',
+        '不要直接调用 addSite、updateSite 或 deleteSite。只有我明确确认后，才根据我的确认调用对应工具。',
+        '没有确认时只输出分析结果和建议。'
+      ].join('\n')
+    })
+  }
+
   return (
     <div className="sites-page">
       <header className="sites-header">
@@ -466,14 +501,6 @@ export default function SitesPage(): JSX.Element {
           <h1>站点</h1>
           <p>把日常使用的系统、文档和工具集中到一个地方。</p>
         </div>
-        <Button
-          type="primary"
-          size="small"
-          icon={<PlusOutlined />}
-          onClick={openCreate}
-        >
-          新增站点
-        </Button>
       </header>
 
       <main className="sites-content">
@@ -525,6 +552,30 @@ export default function SitesPage(): JSX.Element {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
+              <div className="sites-toolbar-actions">
+                <Button
+                  icon={<ReloadOutlined />}
+                  loading={refreshing}
+                  onClick={() => void handleRefreshSites()}
+                >
+                  刷新
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={openCreate}
+                >
+                  新增站点
+                </Button>
+                <Button
+                  type="primary"
+                  ghost
+                  icon={<RobotMark />}
+                  onClick={handleAiAnalyze}
+                >
+                  AI 分析
+                </Button>
+              </div>
             </div>
 
             {filteredSites.length === 0 ? (
