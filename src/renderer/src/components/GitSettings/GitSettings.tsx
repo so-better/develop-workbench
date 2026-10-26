@@ -173,10 +173,10 @@ export default function GitSettings(): JSX.Element {
                   setPathDirty(true)
                 }}
                 onBlur={() => {
-                  if (pathDirty) void savePath()
+                  if (pathDirty) savePath()
                 }}
                 onPressEnter={() => {
-                  if (pathDirty) void savePath()
+                  if (pathDirty) savePath()
                 }}
                 placeholder="输入路径或选择文件"
                 spellCheck={false}

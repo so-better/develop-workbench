@@ -47,6 +47,7 @@ import {
 import type { InputRef } from 'antd'
 import type { Dayjs } from 'dayjs'
 import type { RequirementRepoBinding } from '../../../../types/bindings'
+import { getErrorMessage } from '../../../../utils'
 import type { Repository, RepositoryBindingStatus } from '../../../../types/repository'
 import type {
   MeegleMyRequirements,
@@ -134,15 +135,6 @@ const BranchRow = ({
 
 /** 记住上次选择需求的 localStorage key。 */
 const SELECTED_REQUIREMENT_KEY = 'develop-workbench:selected-requirement'
-
-/**
- * 将异常转换为适合界面展示的简短文本。
- */
-const getErrorMessage = (error: unknown): string => {
-  const message = error instanceof Error ? error.message : String(error)
-
-  return message.replace(/\s+/g, ' ').trim().slice(0, 280) || '未知错误'
-}
 
 /**
  * 将 Git 远程地址转换为不包含 .git 的仓库根地址。
@@ -1514,12 +1506,12 @@ export default function RequirementWorkbench({
     }
 
     if (canUseRequirement) {
-      void handleOpenInIde(binding, requirementBranch as string)
+      handleOpenInIde(binding, requirementBranch as string)
       return
     }
 
     if (canUseIteration) {
-      void handleOpenInIde(binding, iterationBranch as string)
+      handleOpenInIde(binding, iterationBranch as string)
       return
     }
 
@@ -1543,7 +1535,7 @@ export default function RequirementWorkbench({
     setBranchChoiceOpen(false)
     setBranchChoiceBinding(null)
 
-    if (branchName) void handleOpenInIde(binding, branchName)
+    if (branchName) handleOpenInIde(binding, branchName)
   }
 
   /**
@@ -2252,7 +2244,7 @@ export default function RequirementWorkbench({
               disabled={projectSwitching}
               optionFilterProp="label"
               popupMatchSelectWidth={220}
-              onChange={(value: string) => void handleProjectChange(value)}
+              onChange={(value: string) => handleProjectChange(value)}
             />
           </div>
         </div>
@@ -2641,7 +2633,7 @@ export default function RequirementWorkbench({
                                             type="button"
                                             className="requirement-repo-qingzhou-link requirement-repo-mr-link"
                                             onClick={() =>
-                                              void handleOpenCreateMergeRequest(binding)
+                                              handleOpenCreateMergeRequest(binding)
                                             }
                                           >
                                             <PullRequestOutlined />
@@ -2733,7 +2725,7 @@ export default function RequirementWorkbench({
                                             icon={<CopyOutlined />}
                                             aria-label="复制开发分支"
                                             onClick={() =>
-                                              void handleCopyBranchName(
+                                              handleCopyBranchName(
                                                 binding.branchName as string
                                               )
                                             }
@@ -2764,7 +2756,7 @@ export default function RequirementWorkbench({
                                     loading={syncingBindingId === binding.id}
                                     disabled={!repository?.available}
                                     onClick={() =>
-                                      void handleSyncQingzhouBinding(binding.id)
+                                      handleSyncQingzhouBinding(binding.id)
                                     }
                                   >
                                     同步
@@ -2840,7 +2832,7 @@ export default function RequirementWorkbench({
                                   setNewBranchName(null)
 
                                   if (!repository?.qingzhouEnabled) {
-                                    void loadBranches(value, true, true)
+                                    loadBranches(value, true, true)
                                   }
                                 }}
                               />
@@ -3527,7 +3519,7 @@ export default function RequirementWorkbench({
 
           const url = mergeRequestUrl
           setMergeRequestBinding(null)
-          void window.electron.openEmbeddedBrowser(url)
+          window.electron.openEmbeddedBrowser(url)
         }}
         onCancel={() => {
           setMergeRequestBinding(null)

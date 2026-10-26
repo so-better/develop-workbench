@@ -148,10 +148,20 @@ export default function EmbeddedBrowserDownloads({
   return (
     <div className="embedded-browser-downloads">
       {downloads.map((download) => {
-        const status =
+        const isAiArtifact = download.origin === 'ai'
+        const baseStatus =
           download.status === 'progressing' && download.paused
             ? pausedStatusMeta
             : downloadStatusMeta[download.status]
+        const status = isAiArtifact
+          ? download.status === 'progressing'
+            ? { ...baseStatus, label: '保存中' }
+            : download.status === 'completed'
+              ? { ...baseStatus, label: '已保存' }
+              : download.status === 'interrupted'
+                ? { ...baseStatus, label: '保存失败' }
+                : baseStatus
+          : baseStatus
         const percent =
           download.totalBytes > 0
             ? Math.min(
@@ -216,7 +226,7 @@ export default function EmbeddedBrowserDownloads({
                 />
               ) : null}
               <div className="embedded-browser-download-actions">
-                {download.status === 'progressing' ? (
+                {download.status === 'progressing' && !isAiArtifact ? (
                   <>
                     {download.paused ? (
                       <Button
@@ -224,7 +234,7 @@ export default function EmbeddedBrowserDownloads({
                         size="small"
                         className="embedded-browser-download-resume"
                         icon={<PlayCircleOutlined />}
-                        onClick={() => void handleResume(download.id)}
+                        onClick={() => handleResume(download.id)}
                       >
                         继续下载
                       </Button>
@@ -234,7 +244,7 @@ export default function EmbeddedBrowserDownloads({
                         size="small"
                         className="embedded-browser-download-pause"
                         icon={<PauseCircleOutlined />}
-                        onClick={() => void handlePause(download.id)}
+                        onClick={() => handlePause(download.id)}
                       >
                         暂停
                       </Button>
@@ -245,19 +255,19 @@ export default function EmbeddedBrowserDownloads({
                       size="small"
                       className="embedded-browser-download-cancel"
                       icon={<StopOutlined />}
-                      onClick={() => void handleCancel(download.id)}
+                      onClick={() => handleCancel(download.id)}
                     >
                       取消下载
                     </Button>
                   </>
                 ) : null}
-                {download.status === 'interrupted' ? (
+                {download.status === 'interrupted' && !isAiArtifact ? (
                   <Button
                     type="text"
                     size="small"
                     className="embedded-browser-download-retry"
                     icon={<RedoOutlined />}
-                    onClick={() => void handleRetry(download.id)}
+                    onClick={() => handleRetry(download.id)}
                   >
                     重试下载
                   </Button>
@@ -268,7 +278,7 @@ export default function EmbeddedBrowserDownloads({
                       size="small"
                       type="primary"
                       className="embedded-browser-download-open"
-                      onClick={() => void handleOpen(download.id)}
+                      onClick={() => handleOpen(download.id)}
                     >
                       打开文件
                     </Button>
@@ -277,7 +287,7 @@ export default function EmbeddedBrowserDownloads({
                       size="small"
                       className="embedded-browser-download-show"
                       icon={<FolderOpenOutlined />}
-                      onClick={() => void handleShow(download.id)}
+                      onClick={() => handleShow(download.id)}
                     >
                       所在文件夹
                     </Button>
@@ -296,7 +306,7 @@ export default function EmbeddedBrowserDownloads({
           className="embedded-browser-download-clear"
           icon={<DeleteOutlined />}
           disabled={!downloads.some((item) => item.status !== 'progressing')}
-          onClick={() => void handleClear()}
+          onClick={() => handleClear()}
         >
           清除已结束
         </Button>

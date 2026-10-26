@@ -115,9 +115,25 @@ export default function ThemeProvider({ children }: ThemeProviderProps): JSX.Ele
         colorError: '#ef4444',
         borderRadius: 10,
         controlHeight: 36,
-        colorBgLayout: themeState.isDark ? '#0b0f19' : '#f5f7fb',
+        colorBgLayout: themeState.isDark ? '#101114' : '#f5f7fb',
         fontFamily:
-          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif'
+          '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif',
+        ...(themeState.isDark
+          ? {
+              colorBgContainer: '#18191c',
+              colorBgElevated: '#26272c',
+              colorBgSpotlight: '#26272c',
+              colorBorder: '#303238',
+              colorBorderSecondary: '#2e3035',
+              boxShadowSecondary: '0 10px 30px rgba(0, 0, 0, 0.42)'
+            }
+          : {})
+      },
+      components: {
+        Modal: {
+          contentBg: themeState.isDark ? '#1f2024' : '#ffffff',
+          headerBg: themeState.isDark ? '#1f2024' : '#ffffff'
+        }
       }
     }),
     [themeState.isDark]

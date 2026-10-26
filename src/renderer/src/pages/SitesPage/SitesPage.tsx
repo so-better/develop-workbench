@@ -43,6 +43,7 @@ import {
 } from 'antd'
 import type { InputRef } from 'antd'
 import type { SiteInput, SiteLink } from '../../../../types/sites'
+import { getErrorMessage, normalizeHttpUrl } from '../../../../utils'
 
 interface SiteFormValues {
   name: string
@@ -74,33 +75,6 @@ const FREQUENT_CLICK_THRESHOLD = 2
 const FREQUENT_SITE_LIMIT = 8
 const getSiteTimestamp = (value: string | null): number =>
   value ? new Date(value).getTime() : 0
-
-const normalizeUrl = (value: string): string => {
-  let normalized = value.trim()
-
-  if (!normalized) throw new Error('站点 URL 不能为空')
-
-  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(normalized)) {
-    normalized = `https://${normalized}`
-  }
-
-  let url: URL
-
-  try {
-    url = new URL(normalized)
-  } catch {
-    throw new Error('站点 URL 格式不正确')
-  }
-
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('站点只支持 http/https 地址')
-  }
-
-  return url.toString()
-}
-
-const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : '站点加载失败'
 
 const getSiteDisplayUrl = (url: string): string =>
   url.replace(/^https?:\/\//i, '').replace(/\/$/, '')
@@ -280,19 +254,19 @@ export default function SitesPage(): JSX.Element {
       const state = await window.electron.getSiteState()
       setSites(state.sites)
     } catch (loadError) {
-      setError(getErrorMessage(loadError))
+      setError(getErrorMessage(loadError, '站点加载失败'))
     } finally {
       if (showLoading) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void loadSites()
+    loadSites()
   }, [loadSites])
 
   useEffect(() => {
     const handleSitesChanged = (): void => {
-      void loadSites(false)
+      loadSites(false)
     }
 
     window.addEventListener('sites:changed', handleSitesChanged)
@@ -393,7 +367,7 @@ export default function SitesPage(): JSX.Element {
       .reorderSites(next.map((site) => site.id))
       .then((state) => setSites(state.sites))
       .catch(async (saveError: unknown) => {
-        message.error(getErrorMessage(saveError))
+        message.error(getErrorMessage(saveError, '保存站点失败'))
         await loadSites(false)
       })
   }
@@ -453,7 +427,7 @@ export default function SitesPage(): JSX.Element {
 
     const input: SiteInput = {
       name: values.name.trim(),
-      url: normalizeUrl(values.url),
+      url: normalizeHttpUrl(values.url, '站点 URL'),
       tags: values.tags ?? []
     }
 
@@ -468,7 +442,7 @@ export default function SitesPage(): JSX.Element {
       closeModal()
       message.success(editingSite ? '站点已更新' : '站点已添加')
     } catch (saveError) {
-      message.error(getErrorMessage(saveError))
+      message.error(getErrorMessage(saveError, '保存站点失败'))
     } finally {
       setSaving(false)
     }
@@ -480,7 +454,7 @@ export default function SitesPage(): JSX.Element {
       setSites(next.sites)
       message.success('站点已删除')
     } catch (removeError) {
-      message.error(getErrorMessage(removeError))
+      message.error(getErrorMessage(removeError, '删除站点失败'))
     }
   }
 
@@ -511,7 +485,7 @@ export default function SitesPage(): JSX.Element {
             message="无法读取站点配置"
             description={error}
             action={
-              <Button size="small" onClick={() => void loadSites()}>
+              <Button size="small" onClick={() => loadSites()}>
                 重试
               </Button>
             }
@@ -580,9 +554,9 @@ export default function SitesPage(): JSX.Element {
                         <SiteCard
                           key={`frequent-${site.id}`}
                           site={site}
-                          onOpen={() => void handleOpenSite(site)}
+                          onOpen={() => handleOpenSite(site)}
                           onEdit={() => openEdit(site)}
-                          onRemove={() => void handleRemove(site)}
+                          onRemove={() => handleRemove(site)}
                         />
                       ))}
                     </div>
@@ -618,9 +592,9 @@ export default function SitesPage(): JSX.Element {
                             <SortableSiteCard
                               key={site.id}
                               site={site}
-                              onOpen={() => void handleOpenSite(site)}
+                              onOpen={() => handleOpenSite(site)}
                               onEdit={() => openEdit(site)}
-                              onRemove={() => void handleRemove(site)}
+                              onRemove={() => handleRemove(site)}
                             />
                           ))}
                         </div>
@@ -647,9 +621,9 @@ export default function SitesPage(): JSX.Element {
                         <SiteCard
                           key={site.id}
                           site={site}
-                          onOpen={() => void handleOpenSite(site)}
+                          onOpen={() => handleOpenSite(site)}
                           onEdit={() => openEdit(site)}
-                          onRemove={() => void handleRemove(site)}
+                          onRemove={() => handleRemove(site)}
                         />
                       ))}
                     </div>
@@ -668,7 +642,7 @@ export default function SitesPage(): JSX.Element {
         cancelText="取消"
         confirmLoading={saving}
         forceRender
-        onOk={() => void handleSave()}
+        onOk={() => handleSave()}
         onCancel={closeModal}
       >
         <Form form={form} layout="vertical" className="site-form">
@@ -692,7 +666,7 @@ export default function SitesPage(): JSX.Element {
                   if (!value?.trim()) return
 
                   try {
-                    normalizeUrl(value)
+                    normalizeHttpUrl(value, '站点 URL')
                   } catch (urlError) {
                     throw new Error(getErrorMessage(urlError))
                   }

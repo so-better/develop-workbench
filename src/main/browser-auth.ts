@@ -3,6 +3,7 @@
  * 统一处理“打开登录页 → 轮询授权 → 关闭面板 → 重试操作”。
  */
 import type { BrowserWindow } from 'electron'
+import { delay } from '../utils'
 import {
   isEmbeddedBrowserVisible,
   openEmbeddedBrowser,
@@ -34,9 +35,6 @@ export interface BrowserAuthOptions<T> {
   timeoutMs?: number
   pollIntervalMs?: number
 }
-
-const delay = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
  * 执行带内嵌浏览器授权的操作。

@@ -49,7 +49,7 @@ export default function LarkAuth({ available }: LarkAuthProps): JSX.Element {
         setStarting(true)
         setError(null)
         message.success('Lark Cli 授权成功')
-        void loadUser(false).finally(() => {
+        loadUser(false).finally(() => {
           setSession(null)
           setStarting(false)
         })
@@ -159,7 +159,7 @@ export default function LarkAuth({ available }: LarkAuthProps): JSX.Element {
               okText="退出"
               cancelText="取消"
               placement="top"
-              onConfirm={() => void logout()}
+              onConfirm={() => logout()}
             >
               <Button
                 type="text"
@@ -197,7 +197,7 @@ export default function LarkAuth({ available }: LarkAuthProps): JSX.Element {
         <>
           <Alert type="error" showIcon message={error} />
           <div className="login-state-actions">
-            <Button type="primary" onClick={() => void startLogin()}>
+            <Button type="primary" onClick={() => startLogin()}>
               重新生成二维码
             </Button>
           </div>
@@ -209,13 +209,13 @@ export default function LarkAuth({ available }: LarkAuthProps): JSX.Element {
           </div>
           <p className="settings-help">使用飞书扫描二维码完成 Lark Cli 授权。</p>
           <div className="login-state-actions">
-            <Button variant="filled" onClick={() => void startLogin()}>
+            <Button variant="filled" onClick={() => startLogin()}>
               刷新二维码
             </Button>
             <Button
               type="primary"
               loading={checking}
-              onClick={() => void checkAuth()}
+              onClick={() => checkAuth()}
             >
               我已授权
             </Button>

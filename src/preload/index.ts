@@ -1,6 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AiConfigDocument } from '../types/ai-config'
+import type {
+  AiChatEvent,
+  AiChatStartInput,
+  AiAttachmentFilePayload,
+  AiChatAttachment,
+  AiChatStartResult,
+  AiConfigStatus,
+  AiArtifactStats
+} from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
@@ -641,7 +650,72 @@ const electronAPI = {
    * 校验并保存 AI 配置文件。
    */
   writeAiConfig: (content: string): Promise<AiConfigDocument> => ipcRenderer.invoke('ai-config:write', content),
+  /**
+   * 读取 AI 配置是否可用，不返回密钥。
+   */
+  getAiConfigStatus: (): Promise<AiConfigStatus> =>
+    ipcRenderer.invoke('ai:config:get-status'),
 
+  /**
+   * 将应用内 AI 产物通过下载管理保存到本机。
+   */
+  downloadAiArtifact: (
+    artifactId: string
+  ): Promise<{ path: string; downloadId: string } | null> =>
+    ipcRenderer.invoke('ai:artifact:download', artifactId),
+
+  /**
+   * 统计应用内 AI 产物。
+   */
+  getAiArtifactStats: (): Promise<AiArtifactStats> =>
+    ipcRenderer.invoke('ai:artifacts:stats'),
+
+  /**
+   * 清空应用内 AI 产物。
+   */
+  clearAiArtifacts: (): Promise<AiArtifactStats> =>
+    ipcRenderer.invoke('ai:artifacts:clear'),
+
+  /**
+   * 解析剪贴板粘贴的附件文件。
+   */
+  parseAiAttachmentFiles: (
+    files: AiAttachmentFilePayload[]
+  ): Promise<AiChatAttachment[]> =>
+    ipcRenderer.invoke('ai:attachments:parse', files),
+
+  /**
+   * 选择并解析 AI 附件。
+   */
+  pickAiAttachments: (): Promise<AiChatAttachment[]> =>
+    ipcRenderer.invoke('ai:attachments:pick'),
+
+  /**
+   * 启动一次无状态流式对话。
+   */
+  startAiChat: (input: AiChatStartInput): Promise<AiChatStartResult> =>
+    ipcRenderer.invoke('ai:chat:start', input),
+
+  /**
+   * 中止指定聊天请求。
+   */
+  abortAiChat: (requestId: string): Promise<void> =>
+    ipcRenderer.invoke('ai:chat:abort', requestId),
+
+  /**
+   * 订阅 AI 流式事件。调用方应在 startAiChat 之前订阅。
+   */
+  onAiChatEvent: (listener: (event: AiChatEvent) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, payload: AiChatEvent): void => {
+      listener(payload)
+    }
+
+    ipcRenderer.on('ai:chat:event', handler)
+
+    return () => {
+      ipcRenderer.removeListener('ai:chat:event', handler)
+    }
+  },
   /**
    * 从主进程读取当前主题模式和实际明暗状态。
    */

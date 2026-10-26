@@ -11,10 +11,8 @@ import type {
   WeeklyReportField,
   WeeklyReportState
 } from '../../../../types/weekly-report'
+import { getErrorMessage } from '../../../../utils'
 import RichTextEditor from '../../components/RichTextEditor/RichTextEditor'
-
-const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : '周报加载失败'
 
 const toDraft = (field: WeeklyReportField): RichTextContent => ({
   html: field.html,
@@ -50,14 +48,14 @@ export default function WeeklyReport(): JSX.Element {
         )
       )
     } catch (loadError) {
-      setError(getErrorMessage(loadError))
+      setError(getErrorMessage(loadError, '周报加载失败'))
     } finally {
       if (showLoading) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    void load()
+    load()
   }, [load])
 
   const textFields =
@@ -118,7 +116,7 @@ export default function WeeklyReport(): JSX.Element {
           )
           message.success('周报已提交到飞书')
         } catch (submitError) {
-          message.error(getErrorMessage(submitError))
+          message.error(getErrorMessage(submitError, '提交周报失败'))
           throw submitError
         } finally {
           setSubmitting(false)
@@ -160,7 +158,7 @@ export default function WeeklyReport(): JSX.Element {
               size="small"
               className="weekly-report-header-link"
               icon={<LinkOutlined />}
-              onClick={() => void window.electron.openEmbeddedBrowser(reportUrl)}
+              onClick={() => window.electron.openEmbeddedBrowser(reportUrl)}
             >
               飞书周报
             </Button>
@@ -171,7 +169,7 @@ export default function WeeklyReport(): JSX.Element {
             className="weekly-report-header-refresh"
             icon={<ReloadOutlined />}
             loading={loading}
-            onClick={() => void load()}
+            onClick={() => load()}
           >
             刷新
           </Button>
@@ -190,7 +188,7 @@ export default function WeeklyReport(): JSX.Element {
               <Button
                 size="small"
                 onClick={() =>
-                  void window.electron.openEmbeddedBrowser(
+                  window.electron.openEmbeddedBrowser(
                     'https://oa.feishu.cn/report/record/entry'
                   )
                 }

@@ -1,4 +1,13 @@
 import type { AiConfigDocument } from '../types/ai-config'
+import type {
+  AiChatEvent,
+  AiChatStartInput,
+  AiAttachmentFilePayload,
+  AiChatAttachment,
+  AiChatStartResult,
+  AiConfigStatus,
+  AiArtifactStats
+} from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
@@ -264,6 +273,28 @@ export interface ElectronAPI {
   readAiConfig: () => Promise<AiConfigDocument>
   /** 校验并写入 AI 配置文件。 */
   writeAiConfig: (content: string) => Promise<AiConfigDocument>
+  /** 读取 AI 配置是否可用，不返回密钥。 */
+  getAiConfigStatus: () => Promise<AiConfigStatus>
+  /** 将应用内 AI 产物通过下载管理保存到本机。 */
+  downloadAiArtifact: (
+    artifactId: string
+  ) => Promise<{ path: string; downloadId: string } | null>
+  /** 统计应用内 AI 产物。 */
+  getAiArtifactStats: () => Promise<AiArtifactStats>
+  /** 清空应用内 AI 产物。 */
+  clearAiArtifacts: () => Promise<AiArtifactStats>
+  /** 解析剪贴板粘贴的附件文件。 */
+  parseAiAttachmentFiles: (
+    files: AiAttachmentFilePayload[]
+  ) => Promise<AiChatAttachment[]>
+  /** 选择并解析 AI 附件。 */
+  pickAiAttachments: () => Promise<AiChatAttachment[]>
+  /** 启动一次无状态流式对话。 */
+  startAiChat: (input: AiChatStartInput) => Promise<AiChatStartResult>
+  /** 中止指定聊天请求。 */
+  abortAiChat: (requestId: string) => Promise<void>
+  /** 订阅 AI 流式事件，返回取消订阅函数。 */
+  onAiChatEvent: (listener: (event: AiChatEvent) => void) => () => void
   /** 读取当前主题模式和实际明暗状态。 */
   getTheme: () => Promise<ThemeState>
   /** 切换主题模式并返回最新状态。 */

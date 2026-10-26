@@ -3,9 +3,14 @@ import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import type { Options as SanitizeSchema } from 'rehype-sanitize'
 import type { Element, Root } from 'hast'
+import rehypeKatex from 'rehype-katex'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
 import LinkPreview from '../LinkPreview/LinkPreview'
 import MarkdownImage from '../MarkdownImage/MarkdownImage'
+import CodeBlock from './CodeBlock'
+import EChartBlock from './EChartBlock'
+import MermaidDiagram from './MermaidDiagram'
 
 /**
  * 飞书导出的图片地址可能包含换行，导致 Markdown 图片语法失效。
@@ -85,7 +90,10 @@ const markdownSanitizeSchema: SanitizeSchema = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
-    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'style']
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'style'],
+    // remark-math 先产出 math-inline / math-display，rehype-katex 再转换。
+    code: [...(defaultSchema.attributes?.code ?? []), ['className', /^(?:language-|math-)/]],
+    span: [...(defaultSchema.attributes?.span ?? []), ['className', /^(?:language-|math-)/]]
   }
 }
 
@@ -95,6 +103,9 @@ interface MarkdownContentProps {
 
   /** 额外样式类。 */
   className?: string
+
+  /** 流式输出期间先展示图表源码，避免不完整配置反复报错。 */
+  streaming?: boolean
 }
 
 /**
@@ -103,18 +114,47 @@ interface MarkdownContentProps {
  */
 export default function MarkdownContent({
   content,
-  className
+  className,
+  streaming = false
 }: MarkdownContentProps): JSX.Element {
   return (
     <div className={`markdown-content${className ? ` ${className}` : ''}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[
           rehypeRaw,
+          [rehypeSanitize, markdownSanitizeSchema],
           rehypeSafeStyles,
-          [rehypeSanitize, markdownSanitizeSchema]
+          rehypeKatex
         ]}
         components={{
+          pre: ({ children }) => <>{children}</>,
+          code: ({ className, children }) => {
+            const language = /^language-([\w-]+)/.exec(className ?? '')?.[1]
+            const normalizedLanguage = language?.toLowerCase()
+            const text = String(children).replace(/\n$/, '')
+
+            if (normalizedLanguage === 'mermaid' && !streaming) {
+              return <MermaidDiagram chart={text} />
+            }
+            const looksLikeECharts =
+              normalizedLanguage === 'json' && /"series"\s*:/.test(text)
+
+            if (
+              (normalizedLanguage === 'echarts' ||
+                normalizedLanguage === 'echart' ||
+                normalizedLanguage === 'chart' ||
+                looksLikeECharts) &&
+              !streaming
+            ) {
+              return <EChartBlock optionText={text} />
+            }
+            if (language || text.includes('\n')) {
+              return <CodeBlock code={text} language={language ?? 'text'} />
+            }
+
+            return <code className={className}>{children}</code>
+          },
           a: ({ href, children }) => {
             if (href && /^https?:\/\//i.test(href)) {
               return <LinkPreview href={href} fallback={children} />

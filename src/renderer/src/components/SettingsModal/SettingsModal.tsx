@@ -1,9 +1,14 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { CopyOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Input, Modal, Spin } from 'antd'
+import { CopyOutlined, DeleteOutlined, FileTextOutlined } from '@ant-design/icons'
+import { Alert, App, Button, Input, Modal, Popconfirm, Spin } from 'antd'
+import type { AiArtifactStats } from '../../../../types/ai'
 import type { AppInfo } from '../../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../../types/lark'
+import {
+  DEFAULT_SETTINGS_SECTION
+} from '../../../../types/settings'
 import type { SettingsSection } from '../../../../types/settings'
+import { getErrorMessage } from '../../../../utils'
 import GitSettings from '../GitSettings/GitSettings'
 import LarkAuth from '../LarkAuth/LarkAuth'
 import IdeSettings from '../IdeSettings/IdeSettings'
@@ -20,6 +25,14 @@ interface SettingsModalProps {
   onClose: () => void
 }
 
+/** 把字节数格式化为设置页可读文本。 */
+const formatBytes = (bytes: number): string => {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
+
+  return `${Math.max(0, Math.round(bytes))} B`
+}
+
 const platformNames: Record<string, string> = {
   darwin: 'macOS',
   win32: 'Windows',
@@ -32,31 +45,65 @@ const larkCliSourceNames: Record<LarkCliPathSource, string> = {
   auto: '自动检测'
 }
 
+/** 模型配置示例，复制后替换 API Key 即可使用。 */
+const AI_CONFIG_EXAMPLE = `{
+  "name": "DeepSeek Flash（思考）",
+  "model": "deepseek-flash",
+  "baseUrl": "https://api.deepseek.com",
+  "apiKey": "sk-...",
+  "headers": {},
+  "options": {
+    "thinking": {
+      "type": "enabled"
+    },
+    "reasoning_effort": "high"
+  }
+}
+`
+
+/** 单模型配置字段说明。 */
+const AI_CONFIG_FIELDS = [
+  ['name', '界面显示的模型名称，可自定义。'],
+  ['model', '真实 API 模型名，例如 deepseek-flash。'],
+  ['baseUrl', 'OpenAI 兼容接口根地址，程序会自动拼接 /chat/completions。'],
+  ['apiKey', '接口 API Key，仅保存在本机配置，由主进程调用。'],
+  ['headers', '附加 HTTP 请求头，无特殊要求时填写 {}。'],
+  [
+    'options',
+    '请求体参数，例如 temperature、thinking、reasoning_effort；无特殊要求时填写 {}。'
+  ]
+] as const
+
 /**
  * 设置弹窗。
  * 当前包含模型配置和 lark-cli 路径，并在底部展示真实的应用运行信息。
  */
 export default function SettingsModal({
   open,
-  initialSection = 'ai',
+  initialSection = DEFAULT_SETTINGS_SECTION,
   appInfo,
   onLarkCliUpdated,
   onClose
 }: SettingsModalProps): JSX.Element {
   const { message } = App.useApp()
-  const [activeSection, setActiveSection] = useState<SettingsSection>('ai')
+  const [activeSection, setActiveSection] = useState<SettingsSection>(DEFAULT_SETTINGS_SECTION)
   const [draft, setDraft] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [aiSaveState, setAiSaveState] = useState<
     'idle' | 'saving' | 'saved' | 'invalid' | 'error'
   >('idle')
+  const [aiSaveError, setAiSaveError] = useState<string | null>(null)
   const lastSavedDraftRef = useRef('')
   const [larkInfo, setLarkInfo] = useState<LarkCliInfo | null>(null)
   const [larkPathDraft, setLarkPathDraft] = useState('')
   const [larkSaving, setLarkSaving] = useState(false)
   const [larkLoading, setLarkLoading] = useState(false)
   const [larkError, setLarkError] = useState<string | null>(null)
+  const [artifactStats, setArtifactStats] = useState<AiArtifactStats | null>(null)
+  const [artifactLoading, setArtifactLoading] = useState(false)
+  const [artifactClearing, setArtifactClearing] = useState(false)
+  const [artifactError, setArtifactError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -68,6 +115,7 @@ export default function SettingsModal({
     setError(null)
     setDraft('')
     setAiSaveState('idle')
+    setAiSaveError(null)
     lastSavedDraftRef.current = ''
     setLarkLoading(true)
     setLarkError(null)
@@ -107,6 +155,33 @@ export default function SettingsModal({
     }
   }, [initialSection, open])
 
+  useEffect(() => {
+    if (!open || activeSection !== 'cleanup') return
+
+    let mounted = true
+
+    setArtifactLoading(true)
+    setArtifactError(null)
+
+    window.electron
+      .getAiArtifactStats()
+      .then((stats) => {
+        if (mounted) setArtifactStats(stats)
+      })
+      .catch((statsError) => {
+        if (mounted) {
+          setArtifactError(getErrorMessage(statsError, '读取 AI 产物统计失败'))
+        }
+      })
+      .finally(() => {
+        if (mounted) setArtifactLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [activeSection, open])
+
   /**
    * 模型配置 JSON 合法时防抖自动保存。
    */
@@ -122,7 +197,10 @@ export default function SettingsModal({
       try {
         JSON.parse(draft)
       } catch {
-        if (!cancelled) setAiSaveState('invalid')
+        if (!cancelled) {
+          setAiSaveState('invalid')
+          setAiSaveError('JSON 格式错误，请检查括号、引号和逗号')
+        }
         return
       }
 
@@ -135,8 +213,12 @@ export default function SettingsModal({
         if (cancelled) return
         lastSavedDraftRef.current = document.content
         setAiSaveState('saved')
-      } catch {
-        if (!cancelled) setAiSaveState('error')
+        setAiSaveError(null)
+      } catch (saveError) {
+        if (!cancelled) {
+          setAiSaveState('error')
+          setAiSaveError(getErrorMessage(saveError, '自动保存失败'))
+        }
       }
     }, 700)
 
@@ -246,6 +328,21 @@ export default function SettingsModal({
     }
   }
 
+  const handleClearArtifacts = async (): Promise<void> => {
+    setArtifactClearing(true)
+    setArtifactError(null)
+
+    try {
+      const removed = await window.electron.clearAiArtifacts()
+      setArtifactStats({ count: 0, bytes: 0 })
+      message.success(`已清理 ${removed.count} 个 AI 产物`)
+    } catch (clearError) {
+      setArtifactError(getErrorMessage(clearError, '清理 AI 产物失败'))
+    } finally {
+      setArtifactClearing(false)
+    }
+  }
+
   return (
     <Modal
       title="设置"
@@ -308,6 +405,14 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
+            className={`settings-nav-item${activeSection === 'cleanup' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'cleanup' ? 'page' : undefined}
+            onClick={() => setActiveSection('cleanup')}
+          >
+            内存清理
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item${activeSection === 'app-info' ? ' is-active' : ''}`}
             aria-current={activeSection === 'app-info' ? 'page' : undefined}
             onClick={() => setActiveSection('app-info')}
@@ -321,18 +426,22 @@ export default function SettingsModal({
             <>
               <div className="settings-panel-header">
                 <h3>模型配置</h3>
-                <p>直接编辑 JSON 配置，格式正确时自动保存。</p>
+                <p>
+                  仅支持 OpenAI Chat Completions 接口。按字段说明填写，格式正确时自动保存。
+                </p>
                 {aiSaveState !== 'idle' ? (
                   <p
                     className={`settings-autosave-status is-${aiSaveState}`}
+                    role="status"
+                    aria-live="polite"
                   >
                     {aiSaveState === 'saving'
                       ? '正在自动保存...'
                       : aiSaveState === 'saved'
                         ? '已自动保存'
                         : aiSaveState === 'invalid'
-                          ? 'JSON 格式错误，修正后会自动保存'
-                          : '自动保存失败'}
+                          ? (aiSaveError ?? 'JSON 格式错误，修正后会自动保存')
+                          : (aiSaveError ?? '自动保存失败')}
                   </p>
                 ) : null}
               </div>
@@ -344,21 +453,59 @@ export default function SettingsModal({
               ) : error ? (
                 <Alert type="error" showIcon message={error} />
               ) : (
-                <Suspense
-                  fallback={
-                    <div className="settings-loading">
-                      <Spin />
+                <div className="ai-config-layout">
+                  <div className="ai-config-editor">
+                    <Suspense
+                      fallback={
+                        <div className="settings-loading">
+                          <Spin />
+                        </div>
+                      }
+                    >
+                      <CodeEditor
+                        className="config-editor"
+                        language="json"
+                        height={360}
+                        value={draft}
+                        onChange={setDraft}
+                      />
+                    </Suspense>
+                  </div>
+
+                  <aside
+                    className="ai-config-guide"
+                    aria-label="模型配置字段说明"
+                  >
+                    <div className="ai-config-guide-heading">
+                      <div>
+                        <strong>字段说明</strong>
+                        <span>复制示例后替换 API Key 即可使用</span>
+                      </div>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={() => copyValue(AI_CONFIG_EXAMPLE)}
+                      >
+                        复制示例
+                      </Button>
                     </div>
-                  }
-                >
-                  <CodeEditor
-                    className="config-editor"
-                    language="json"
-                    height={360}
-                    value={draft}
-                    onChange={setDraft}
-                  />
-                </Suspense>
+
+                    <div className="ai-config-guide-body">
+                      <section className="ai-config-guide-section">
+                        <h4>模型字段</h4>
+                        <dl>
+                          {AI_CONFIG_FIELDS.map(([name, description]) => (
+                            <div className="ai-config-field" key={name}>
+                              <dt><code>{name}</code></dt>
+                              <dd>{description}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </section>
+                    </div>
+                  </aside>
+                </div>
               )}
             </>
           ) : activeSection === 'lark-cli' ? (
@@ -420,8 +567,8 @@ export default function SettingsModal({
                         onChange={(event) => {
                           setLarkPathDraft(event.target.value)
                         }}
-                        onBlur={() => void persistLarkPath()}
-                        onPressEnter={() => void persistLarkPath()}
+                        onBlur={() => persistLarkPath()}
+                        onPressEnter={() => persistLarkPath()}
                         placeholder="输入路径或选择文件"
                         spellCheck={false}
                       />
@@ -459,6 +606,61 @@ export default function SettingsModal({
 
           {activeSection === 'ide' ? (
             <IdeSettings />
+          ) : null}
+
+          {activeSection === 'cleanup' ? (
+            <>
+              <div className="settings-panel-header">
+                <h3>内存清理</h3>
+                <p>清理应用内部生成的临时文件，不会删除已经保存到本机的文件。</p>
+              </div>
+
+              {artifactLoading ? (
+                <div className="settings-loading">
+                  <Spin />
+                </div>
+              ) : artifactError ? (
+                <Alert type="error" showIcon message={artifactError} />
+              ) : (
+                <div className="storage-cleanup-card">
+                  <div className="storage-cleanup-main">
+                    <span className="storage-cleanup-icon">
+                      <FileTextOutlined />
+                    </span>
+                    <div className="storage-cleanup-copy">
+                      <strong>AI 产物</strong>
+                      <span>
+                        {artifactStats?.count ?? 0} 个文件
+                        {artifactStats
+                          ? ` · ${formatBytes(artifactStats.bytes)}`
+                          : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <Popconfirm
+                    title="清理 AI 产物？"
+                    description="将删除对话中生成的内部缓存文件，已经保存到本机的文件不受影响。"
+                    okText="清理"
+                    cancelText="取消"
+                    onConfirm={handleClearArtifacts}
+                  >
+                    <Button
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      loading={artifactClearing}
+                      disabled={!artifactStats?.count || artifactClearing}
+                    >
+                      清理
+                    </Button>
+                  </Popconfirm>
+                </div>
+              )}
+
+              <p className="settings-help">
+                清理后，当前对话里尚未下载的产物将无法再次打开。
+              </p>
+            </>
           ) : null}
 
           {activeSection === 'app-info' ? (

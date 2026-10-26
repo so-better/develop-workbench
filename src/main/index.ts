@@ -4,7 +4,10 @@
  */
 import { app } from 'electron'
 import { join } from 'node:path'
-import { initializeAiConfig } from './ai-config'
+import { initializeAiArtifacts } from './ai/artifacts'
+import { initializeAiAttachments } from './ai/attachments'
+import { initializeAiChat } from './ai/chat'
+import { initializeAiConfig } from './ai/config'
 import { initializeEmbeddedBrowser } from './embedded-browser'
 import { initializeGit } from './git'
 import { initializeIde } from './ide'
@@ -59,6 +62,9 @@ if (!hasSingleInstanceLock) {
     initializeSites()
     initializeWeeklyReport()
     initializeAiConfig()
+    initializeAiAttachments()
+    initializeAiArtifacts()
+    initializeAiChat()
     createMainWindow()
 
     // macOS 点击 Dock 图标时恢复或聚焦窗口，这是用户主动操作，需要正常聚焦。

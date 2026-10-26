@@ -4,7 +4,7 @@ import type { ThemeMode, ThemeState } from '../types/theme'
 
 // 窗口底色与页面背景保持一致，用于避免加载和主题切换时的闪屏。
 const LIGHT_BACKGROUND = '#f5f7fb'
-const DARK_BACKGROUND = '#0b0f19'
+const DARK_BACKGROUND = '#101114'
 
 /**
  * 校验外部传入的值是否为合法的主题模式。

@@ -9,12 +9,13 @@ import EmbeddedBrowserDownloads from './components/EmbeddedBrowserDownloads/Embe
 import EmbeddedBrowserPanel from './components/EmbeddedBrowserPanel/EmbeddedBrowserPanel'
 import EnvironmentSetup from './pages/EnvironmentSetup/EnvironmentSetup'
 import SettingsModal from './components/SettingsModal/SettingsModal'
+import { useSettingsDialog } from './components/SettingsModal/SettingsDialogProvider'
+import { useAiChatDialog } from './hooks/useAiChatDialog'
 import { useEmbeddedDownloads } from './hooks/useEmbeddedDownloads'
 import type { AppInfo } from '../../types/app'
 import type { AuthExpiredEvent } from '../../types/auth'
 import type { LarkCliInfo, LarkUser } from '../../types/lark'
 import type { MeegleState } from '../../types/meegle'
-import type { SettingsSection } from '../../types/settings'
 
 interface EnvironmentStatus {
   meegleAuthenticated: boolean
@@ -41,8 +42,6 @@ export default function App(): JSX.Element {
   const environmentRequestRef = useRef(0)
 
   // 设置弹窗开关状态及打开时定位到的设置分类。
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>('ai')
   const [workspace, setWorkspace] = useState<AppPage>('requirements')
   const [visitedPages, setVisitedPages] = useState<Set<AppPage>>(
     () => new Set<AppPage>(['requirements'])
@@ -96,13 +95,13 @@ export default function App(): JSX.Element {
     []
   )
 
-  /**
-   * 打开设置弹窗，并定位到指定分类。
-   */
-  const openSettings = useCallback((section: SettingsSection = 'ai'): void => {
-    setSettingsSection(section)
-    setSettingsOpen(true)
-  }, [])
+  const {
+    open: settingsOpen,
+    section: settingsSection,
+    openSettings,
+    closeSettings
+  } = useSettingsDialog()
+  const { openAiDialog } = useAiChatDialog()
 
   useEffect(() => {
     let mounted = true
@@ -125,11 +124,7 @@ export default function App(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    if (browserVisible) {
-      setDownloadsModalOpen(false)
-    } else {
-      setDownloadsPanelOpen(false)
-    }
+    if (!browserVisible) setDownloadsPanelOpen(false)
   }, [browserVisible])
 
   useEffect(() => {
@@ -146,7 +141,7 @@ export default function App(): JSX.Element {
     // 首次进入读取环境状态；窗口重新显示时静默刷新。
     refreshEnvironment(true)
     const unsubscribeWindow = window.electron.onWindowShown(() => {
-      void refreshEnvironment()
+      refreshEnvironment()
     })
     const unsubscribeMeegle = window.electron.onMeegleLoginEvent((event) => {
       if (event.status === 'success') {
@@ -154,7 +149,7 @@ export default function App(): JSX.Element {
           current?.provider === 'meegle' ? null : current
         )
       }
-      void refreshEnvironment()
+      refreshEnvironment()
     })
     const unsubscribeLark = window.electron.onLarkLoginEvent((event) => {
       if (event.status === 'success') {
@@ -162,10 +157,10 @@ export default function App(): JSX.Element {
           current?.provider === 'lark' ? null : current
         )
       }
-      void refreshEnvironment()
+      refreshEnvironment()
     })
     const unsubscribeAuth = window.electron.onAuthExpired((event) => {
-      void refreshEnvironment().then((status) => {
+      refreshEnvironment().then((status) => {
         if (status.stale) return
 
         const expired =
@@ -231,7 +226,7 @@ export default function App(): JSX.Element {
     }
 
     // 原生浏览视图不会随 React 组件卸载，环境不可用时必须主动关闭。
-    void window.electron.closeEmbeddedBrowser()
+    window.electron.closeEmbeddedBrowser()
     setDownloadsPanelOpen(false)
     setDownloadsModalOpen(false)
   }, [environmentLoading, environmentReady])
@@ -286,21 +281,27 @@ export default function App(): JSX.Element {
         onOpenSettings={() => openSettings()}
         downloadCount={activeCount}
         onOpenDownloads={handleOpenDownloads}
+        onOpenAi={() =>
+          openAiDialog({
+            title: 'AI 助手',
+            prompt: '',
+            autoStart: false
+          })
+        }
       />
 
       <SettingsModal
         open={settingsOpen}
         initialSection={settingsSection}
         appInfo={appInfo}
-        onLarkCliUpdated={() => void refreshEnvironment()}
+        onLarkCliUpdated={() => refreshEnvironment()}
         onClose={() => {
-          setSettingsOpen(false)
-          void refreshEnvironment()
+          closeSettings()
+          refreshEnvironment()
         }}
       />
 
       <LinkContextMenu />
-
       <Modal
         title="下载管理"
         open={downloadsModalOpen}

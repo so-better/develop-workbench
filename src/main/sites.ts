@@ -8,6 +8,7 @@ import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { backupCorruptStore } from './store-backup'
 import type { SiteInput, SiteLink, SiteState } from '../types/sites'
+import { normalizeHttpUrl, normalizeText } from '../utils'
 
 const STORE_FILE = 'sites.json'
 const MAX_NAME_LENGTH = 60
@@ -15,9 +16,6 @@ const MAX_TAGS = 10
 const MAX_TAG_LENGTH = 20
 
 const getStorePath = (): string => join(app.getPath('userData'), STORE_FILE)
-
-const normalizeText = (value: unknown, maxLength: number): string =>
-  typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 
 const normalizeTags = (value: unknown): string[] => {
   if (!Array.isArray(value)) return []
@@ -29,32 +27,6 @@ const normalizeTags = (value: unknown): string[] => {
         .filter(Boolean)
     )
   ).slice(0, MAX_TAGS)
-}
-
-const normalizeUrl = (value: unknown): string => {
-  if (typeof value !== 'string') throw new Error('站点 URL 不合法')
-
-  let normalized = value.trim()
-
-  if (!normalized) throw new Error('站点 URL 不能为空')
-
-  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(normalized)) {
-    normalized = `https://${normalized}`
-  }
-
-  let url: URL
-
-  try {
-    url = new URL(normalized)
-  } catch {
-    throw new Error('站点 URL 格式不正确')
-  }
-
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('站点只支持 http/https 地址')
-  }
-
-  return url.toString()
 }
 
 const normalizeStoredSite = (value: unknown): SiteLink | null => {
@@ -76,7 +48,7 @@ const normalizeStoredSite = (value: unknown): SiteLink | null => {
     return {
       id: site.id,
       name: site.name.trim(),
-      url: normalizeUrl(site.url),
+      url: normalizeHttpUrl(site.url, '站点 URL'),
       tags: normalizeTags(site.tags),
       clickCount: Math.max(0, Math.floor(Number(site.clickCount) || 0)),
       lastOpenedAt:
@@ -130,7 +102,7 @@ const toInput = (input: SiteInput): { name: string; url: string; tags: string[] 
 
   return {
     name,
-    url: normalizeUrl(input.url),
+    url: normalizeHttpUrl(input.url, '站点 URL'),
     tags: normalizeTags(input.tags)
   }
 }

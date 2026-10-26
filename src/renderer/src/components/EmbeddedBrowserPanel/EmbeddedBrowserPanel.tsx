@@ -8,7 +8,7 @@ import {
   GlobalOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
-import { Button, Tooltip } from 'antd'
+import { Button } from 'antd'
 import EmbeddedBrowserDownloads from '../EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
 import type {
   EmbeddedBrowserBounds,
@@ -27,24 +27,6 @@ const clampPanelWidth = (value: number): number =>
     MIN_PANEL_WIDTH,
     Math.min(value, window.innerWidth * 0.9)
   )
-
-/**
- * 原生浏览视图永远在最上层，弹窗或图片预览打开时必须临时隐藏。
- */
-const hasVisibleOverlay = (): boolean =>
-  Array.from(
-    document.querySelectorAll<HTMLElement>(
-      '.ant-modal-wrap, .ant-image-preview-root'
-    )
-  ).some((element) => {
-    const style = window.getComputedStyle(element)
-
-    return (
-      style.display !== 'none' &&
-      style.visibility !== 'hidden' &&
-      element.getAttribute('aria-hidden') !== 'true'
-    )
-  })
 
 interface EmbeddedBrowserPanelProps {
   /** 应用层维护的下载列表。 */
@@ -81,6 +63,11 @@ export default function EmbeddedBrowserPanel({
   const openingBoundsRef = useRef<EmbeddedBrowserBounds | null>(null)
   const lastBoundsRef = useRef('')
   const closingRef = useRef(false)
+
+  useEffect(() => {
+    // 兼容旧版本留下的抑制状态；新逻辑下浏览器始终显示在最上层。
+    window.electron.setEmbeddedBrowserSuppressed(false).catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -160,7 +147,7 @@ export default function EmbeddedBrowserPanel({
     closingRef.current = true
     setOpening(false)
     setClosing(true)
-    void window.electron.closeEmbeddedBrowser()
+    window.electron.closeEmbeddedBrowser()
   }
 
   // 轻舟登录完成后由主进程请求关闭浏览器面板。
@@ -178,7 +165,6 @@ export default function EmbeddedBrowserPanel({
       const target = event.target
 
       if (target instanceof Node && panelRef.current?.contains(target)) return
-      if (hasVisibleOverlay()) return
 
       requestClose()
     }
@@ -262,7 +248,7 @@ export default function EmbeddedBrowserPanel({
       if (lastBoundsRef.current === key) return
 
       lastBoundsRef.current = key
-      void window.electron.setEmbeddedBrowserBounds(next)
+      window.electron.setEmbeddedBrowserBounds(next)
     }
 
     updateBounds()
@@ -276,38 +262,6 @@ export default function EmbeddedBrowserPanel({
       window.removeEventListener('resize', updateBounds)
     }
   }, [expanded, opening, state?.visible])
-
-  useEffect(() => {
-    let frame = 0
-    let suppressed = false
-
-    const updateSuppressed = (): void => {
-      cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => {
-        const overlayVisible = hasVisibleOverlay()
-
-        if (overlayVisible === suppressed) return
-
-        suppressed = overlayVisible
-        void window.electron.setEmbeddedBrowserSuppressed(overlayVisible)
-      })
-    }
-
-    const observer = new MutationObserver(updateSuppressed)
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class', 'aria-hidden']
-    })
-    updateSuppressed()
-
-    return () => {
-      observer.disconnect()
-      cancelAnimationFrame(frame)
-      void window.electron.setEmbeddedBrowserSuppressed(false)
-    }
-  }, [])
 
   if (!state?.visible) return null
 
@@ -347,16 +301,15 @@ export default function EmbeddedBrowserPanel({
 
       <div className="embedded-browser-toolbar">
         <div className="embedded-browser-nav">
-          <Tooltip title="刷新">
-            <Button
-              type="text"
-              size="small"
-              icon={<ReloadOutlined />}
-              loading={state.loading}
-              aria-label="刷新"
-              onClick={() => void window.electron.reloadEmbeddedBrowser()}
-            />
-          </Tooltip>
+          <Button
+            type="text"
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={state.loading}
+            title="刷新"
+            aria-label="刷新"
+            onClick={() => window.electron.reloadEmbeddedBrowser()}
+          />
         </div>
 
         <div className="embedded-browser-location" title={state.url ?? undefined}>
@@ -370,24 +323,22 @@ export default function EmbeddedBrowserPanel({
         </div>
 
         <div className="embedded-browser-actions">
-          <Tooltip title={expanded ? '还原' : '最大化'}>
-            <Button
-              type="text"
-              size="small"
-              icon={expanded ? <CompressOutlined /> : <ExpandOutlined />}
-              aria-label={expanded ? '还原' : '最大化'}
-              onClick={() => setExpanded((value) => !value)}
-            />
-          </Tooltip>
-          <Tooltip title="关闭">
-            <Button
-              type="text"
-              size="small"
-              icon={<CloseOutlined />}
-              aria-label="关闭"
-              onClick={requestClose}
-            />
-          </Tooltip>
+          <Button
+            type="text"
+            size="small"
+            icon={expanded ? <CompressOutlined /> : <ExpandOutlined />}
+            title={expanded ? '还原' : '最大化'}
+            aria-label={expanded ? '还原' : '最大化'}
+            onClick={() => setExpanded((value) => !value)}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<CloseOutlined />}
+            title="关闭"
+            aria-label="关闭"
+            onClick={requestClose}
+          />
         </div>
       </div>
 
@@ -397,7 +348,7 @@ export default function EmbeddedBrowserPanel({
           <Button
             type="link"
             size="small"
-            onClick={() => void window.electron.reloadEmbeddedBrowser()}
+            onClick={() => window.electron.reloadEmbeddedBrowser()}
           >
             重试
           </Button>

@@ -199,8 +199,8 @@ export default function IdeSettings(): JSX.Element {
                 spellCheck={false}
                 disabled={!preset}
                 onChange={(event) => setCommand(event.target.value)}
-                onBlur={() => void saveConfig()}
-                onPressEnter={() => void saveConfig()}
+                onBlur={() => saveConfig()}
+                onPressEnter={() => saveConfig()}
               />
               <Button
                 variant="filled"

@@ -284,10 +284,10 @@ export default function MeegleSettings(): JSX.Element {
               setCliPathPending(true)
             }}
             onBlur={() => {
-              if (cliPathDirty) void saveCliPath()
+              if (cliPathDirty) saveCliPath()
             }}
             onPressEnter={() => {
-              if (cliPathDirty) void saveCliPath()
+              if (cliPathDirty) saveCliPath()
             }}
             placeholder="选择或输入 Meegle CLI 路径"
             spellCheck={false}

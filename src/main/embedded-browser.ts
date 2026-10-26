@@ -96,7 +96,7 @@ const schedulePersistDownloads = (): void => {
 
   persistTimer = setTimeout(() => {
     persistTimer = null
-    void persistDownloadsNow()
+    persistDownloadsNow()
   }, 400)
 }
 
@@ -153,7 +153,8 @@ const parseDownloadRecord = (value: unknown): EmbeddedBrowserDownload | null => 
     status: item.status === 'progressing' ? 'interrupted' : item.status,
     startedAt: item.startedAt,
     canResume: item.canResume,
-    paused: false
+    paused: false,
+    origin: item.origin === 'ai' ? 'ai' : 'browser'
   }
 }
 
@@ -250,7 +251,8 @@ const configureBrowserSession = (): void => {
       paused: false,
       status: 'progressing',
       startedAt: Date.now(),
-      canResume: item.canResume()
+      canResume: item.canResume(),
+      origin: 'browser'
     }
 
     item.setSaveDialogOptions({
@@ -271,7 +273,7 @@ const configureBrowserSession = (): void => {
       state.status = result
       state.savePath = item.getSavePath() || state.savePath
       broadcastDownloads()
-      void persistDownloadsNow()
+      persistDownloadsNow()
       closeRetryWindow(webContents.id)
     })
   })
@@ -327,6 +329,8 @@ const loadUrl = (entry: BrowserEntry, rawUrl: string): boolean => {
 
   entry.requestedUrl = url
   entry.error = null
+  // 浏览器始终位于弹窗之上，打开时清除可能残留的抑制状态。
+  entry.suppressed = false
 
   if (!entry.visible) {
     entry.bounds = null
@@ -336,7 +340,7 @@ const loadUrl = (entry: BrowserEntry, rawUrl: string): boolean => {
   entry.visible = true
   applyVisibility(entry)
   broadcastState(entry)
-  void entry.view.webContents.loadURL(url).catch(() => undefined)
+  entry.view.webContents.loadURL(url).catch(() => undefined)
 
   return true
 }
@@ -615,6 +619,68 @@ export const openEmbeddedBrowser = (window: BrowserWindow, rawUrl: string): bool
   return loadUrl(entry, rawUrl)
 }
 
+interface GeneratedDownloadHandle {
+  id: string
+  update: (receivedBytes: number) => void
+  complete: (savePath: string) => void
+  fail: () => void
+}
+
+/**
+ * 为 AI 产物创建一个由应用驱动的下载记录。
+ * 该记录没有 DownloadItem，但可以持续更新进度并复用统一列表。
+ */
+export const createGeneratedDownload = (input: {
+  filename: string
+  path: string
+  size: number
+  source: string
+}): GeneratedDownloadHandle => {
+  const state: EmbeddedBrowserDownload = {
+    id: randomUUID(),
+    filename: input.filename,
+    url: input.source,
+    savePath: input.path,
+    totalBytes: Math.max(0, input.size),
+    receivedBytes: 0,
+    bytesPerSecond: 0,
+    status: 'progressing',
+    startedAt: Date.now(),
+    canResume: false,
+    paused: false,
+    origin: 'ai'
+  }
+  const update = (receivedBytes: number): void => {
+    state.receivedBytes = Math.max(
+      0,
+      Math.min(Math.round(receivedBytes), state.totalBytes)
+    )
+    broadcastDownloads()
+  }
+
+  downloads.set(state.id, { item: null, state })
+  broadcastDownloads()
+
+  return {
+    id: state.id,
+    update,
+    complete: (savePath) => {
+      state.savePath = savePath
+      state.receivedBytes = state.totalBytes
+      state.status = 'completed'
+      state.bytesPerSecond = 0
+      broadcastDownloads()
+      persistDownloadsNow()
+    },
+    fail: () => {
+      state.status = 'interrupted'
+      state.bytesPerSecond = 0
+      broadcastDownloads()
+      persistDownloadsNow()
+    }
+  }
+}
+
 const retryDownload = (downloadId: string): void => {
   const entry = downloads.get(downloadId)
 
@@ -816,7 +882,7 @@ export const initializeEmbeddedBrowser = (): void => {
     }
 
     broadcastDownloads()
-    void persistDownloadsNow()
+    persistDownloadsNow()
   })
 
   ipcMain.handle('embedded-browser:pause-download', (_event, downloadId: unknown) => {
@@ -832,7 +898,7 @@ export const initializeEmbeddedBrowser = (): void => {
     syncDownloadState(entry.item, entry.state)
     entry.state.paused = true
     broadcastDownloads()
-    void persistDownloadsNow()
+    persistDownloadsNow()
   })
 
   ipcMain.handle('embedded-browser:resume-download', (_event, downloadId: unknown) => {
@@ -848,7 +914,7 @@ export const initializeEmbeddedBrowser = (): void => {
     syncDownloadState(entry.item, entry.state)
     entry.state.paused = false
     broadcastDownloads()
-    void persistDownloadsNow()
+    persistDownloadsNow()
   })
 
   ipcMain.handle('embedded-browser:retry-download', (_event, downloadId: unknown) => {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CopyOutlined, GlobalOutlined, PlusOutlined } from '@ant-design/icons'
 import { App, Popconfirm } from 'antd'
+import { getErrorMessage } from '../../../../utils'
 
 interface LinkMenuState {
   x: number
@@ -12,15 +13,6 @@ interface LinkMenuState {
 
 const MENU_WIDTH = 176
 const MENU_HEIGHT = 128
-
-const getErrorMessage = (error: unknown): string => {
-  const message = error instanceof Error ? error.message : '添加站点失败'
-
-  return message.replace(
-    /^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/,
-    ''
-  )
-}
 
 const getLinkName = (anchor: HTMLAnchorElement, href: string): string => {
   const explicit =
@@ -160,7 +152,7 @@ export default function LinkContextMenu(): JSX.Element | null {
         type="button"
         role="menuitem"
         onClick={() => {
-          void window.electron.openEmbeddedBrowser(menu.href)
+          window.electron.openEmbeddedBrowser(menu.href)
           setMenu(null)
         }}
       >
@@ -188,7 +180,7 @@ export default function LinkContextMenu(): JSX.Element | null {
             message.success('已添加到站点')
             window.dispatchEvent(new Event('sites:changed'))
           } catch (error) {
-            message.error(getErrorMessage(error))
+            message.error(getErrorMessage(error, '添加站点失败'))
           } finally {
             setMenu(null)
           }

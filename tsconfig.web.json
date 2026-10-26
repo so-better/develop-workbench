@@ -3,7 +3,8 @@
   "include": [
     "src/renderer/src/**/*",
     "src/preload/*.d.ts",
-    "src/types/**/*"
+    "src/types/**/*",
+    "src/utils/**/*"
   ],
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.web.tsbuildinfo",
