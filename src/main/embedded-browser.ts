@@ -456,6 +456,7 @@ const animateViewOut = (entry: BrowserEntry): void => {
     }
 
     const progress = Math.min(1, (Date.now() - startedAt) / duration)
+    // 与 CSS easeInCubic 近似一致，避免 React 面板和原生视图速度不同。
     const eased = Math.pow(progress, 3)
     const x = Math.round(startX + (endX - startX) * eased)
 

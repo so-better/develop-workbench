@@ -19,6 +19,8 @@ export interface AiUiMessage {
   tools?: AiToolCall[]
   sources?: AiChatSource[]
   artifacts?: AiChatArtifact[]
+  /** 用户停止或请求中断：保留已生成正文，但不尝试渲染不完整的图表。 */
+  interrupted?: boolean
   createdAt: string
 }
 
@@ -27,6 +29,8 @@ interface StreamState {
   assistantId: string
   content: string
   reasoning: string
+  /** 普通发送停止且无输出时，是否连同用户提问一起回退删除。 */
+  rollbackUserOnEmptyStop: boolean
 }
 
 export interface UseAiChatResult {
@@ -163,6 +167,34 @@ export const useAiChat = (): UseAiChatResult => {
     [updateMessages]
   )
 
+  /** 停止且无任何输出时，移除空的 AI 消息；普通发送同时移除本轮用户提问。 */
+  const removeEmptyStoppedTurn = useCallback(
+    (stream: StreamState, rollbackUser: boolean): void => {
+      const current = messagesRef.current
+      const assistantIndex = current.findIndex(
+        (message) => message.id === stream.assistantId
+      )
+
+      if (assistantIndex < 0) return
+
+      const removeIndexes = new Set<number>([assistantIndex])
+
+      if (rollbackUser) {
+        for (let index = assistantIndex - 1; index >= 0; index -= 1) {
+          if (current[index].role === 'user') {
+            removeIndexes.add(index)
+            break
+          }
+        }
+      }
+
+      updateMessages(
+        current.filter((_message, index) => !removeIndexes.has(index))
+      )
+    },
+    [updateMessages]
+  )
+
   const finishStream = useCallback(
     (errorText?: string, aborted = false): void => {
       const stream = streamRef.current
@@ -173,24 +205,35 @@ export const useAiChat = (): UseAiChatResult => {
         return
       }
 
-      const hasPartial = Boolean(
-        stream.content ||
-          stream.reasoning ||
-          pendingRef.current.content ||
-          pendingRef.current.reasoning
+      // 只有正文才算有效回复；思考过程和工具调用不能阻止停止时回退整轮。
+      const hasBodyContent = Boolean(
+        stream.content.trim() || pendingRef.current.content.trim()
       )
 
+      if (aborted && !hasBodyContent) {
+        if (rafRef.current !== null) {
+          window.cancelAnimationFrame(rafRef.current)
+          rafRef.current = null
+        }
+
+        pendingRef.current = { content: '', reasoning: '' }
+        streamRef.current = null
+        setStreamingState(false)
+        setStopping(false)
+        removeEmptyStoppedTurn(stream, stream.rollbackUserOnEmptyStop)
+        return
+      }
+
       if (errorText) {
-        pendingRef.current.content = hasPartial
+        pendingRef.current.content = hasBodyContent
           ? `${pendingRef.current.content}\n\n> 请求中断：${errorText}`
           : `请求失败：${errorText}`
-      } else if (aborted && !hasPartial) {
-        pendingRef.current.content = '已停止生成。'
       }
 
       if (errorText || aborted) {
         updateAssistant((message) => ({
           ...message,
+          interrupted: true,
           tools: message.tools?.map((tool) =>
             tool.state === 'call'
               ? { ...tool, state: 'error', output: errorText || '请求已中止' }
@@ -200,11 +243,28 @@ export const useAiChat = (): UseAiChatResult => {
       }
 
       flushStreamBuffer()
+
+      const finalMessage = messagesRef.current.find(
+        (message) => message.id === stream.assistantId
+      )
+      const hasFinalContent = Boolean(finalMessage?.content.trim())
+      const hasArtifacts = Boolean(finalMessage?.artifacts?.length)
+
+      // 正常结束但只有思考/工具、没有正文和产物时，不保留空的 AI 气泡。
+      if (!aborted && !errorText && !hasFinalContent && !hasArtifacts) {
+        removeEmptyStoppedTurn(stream, false)
+      }
+
       setStreamingState(false)
       setStopping(false)
       streamRef.current = null
     },
-    [flushStreamBuffer, setStreamingState, updateAssistant]
+    [
+      flushStreamBuffer,
+      removeEmptyStoppedTurn,
+      setStreamingState,
+      updateAssistant
+    ]
   )
 
   /** 处理已确认属于当前 stream 的事件。 */
@@ -288,7 +348,10 @@ export const useAiChat = (): UseAiChatResult => {
   }, [])
 
   const runConversation = useCallback(
-    async (conversation: AiUiMessage[]): Promise<void> => {
+    async (
+      conversation: AiUiMessage[],
+      rollbackUserOnEmptyStop = false
+    ): Promise<void> => {
       if (streamingRef.current) return
 
       const assistant = conversation[conversation.length - 1]
@@ -325,7 +388,8 @@ export const useAiChat = (): UseAiChatResult => {
           requestId: result.requestId,
           assistantId: assistant.id,
           content: '',
-          reasoning: ''
+          reasoning: '',
+          rollbackUserOnEmptyStop
         }
 
         // 回放 IPC 返回前已经到达的事件，避免首个 delta/done 丢失。
@@ -369,11 +433,14 @@ export const useAiChat = (): UseAiChatResult => {
         createdAt: nowIso()
       }
 
-      await runConversation([
-        ...messagesRef.current,
-        userMessage,
-        assistantMessage
-      ])
+      await runConversation(
+        [
+          ...messagesRef.current,
+          userMessage,
+          assistantMessage
+        ],
+        true
+      )
     },
     [runConversation]
   )

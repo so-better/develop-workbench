@@ -612,7 +612,7 @@ export default function AiChatDialog({
                     ? '正在检查模型配置'
                     : preparing
                       ? '正在准备分析'
-                      : '等待 AI 响应'}
+                      : '有什么可以帮你？'}
                 </h3>
                 <p>
                   {configStatus === null
@@ -629,6 +629,7 @@ export default function AiChatDialog({
                 message.role === 'assistant' &&
                 index === messages.length - 1
               const isGenerating = streaming && isLastAssistant
+              const renderStreaming = isGenerating || Boolean(message.interrupted)
               const isEditing = editingId === message.id
 
               return (
@@ -648,22 +649,22 @@ export default function AiChatDialog({
                             </summary>
                             <MarkdownContent
                               content={message.reasoning}
-                              streaming={isGenerating}
+                              streaming={renderStreaming}
                             />
                           </details>
-                        ) : null}
-                        {message.tools?.length ? (
-                          <ToolCards tools={message.tools} />
                         ) : null}
                         {message.content ? (
                           <MarkdownContent
                             content={message.content}
-                            streaming={isGenerating}
+                            streaming={renderStreaming}
                           />
                         ) : isGenerating ? (
                           <div className="ai-message-loading">
                             <Spin size="small" />
                           </div>
+                        ) : null}
+                        {message.tools?.length ? (
+                          <ToolCards tools={message.tools} />
                         ) : null}
                         {message.artifacts?.length ? (
                           <ArtifactsList
@@ -849,6 +850,7 @@ export default function AiChatDialog({
                 </Tooltip>
                 {streaming ? (
                   <Button
+                    type="primary"
                     danger
                     className="ai-composer-send"
                     icon={<StopOutlined />}

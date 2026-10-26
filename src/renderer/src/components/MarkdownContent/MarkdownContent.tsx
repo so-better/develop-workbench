@@ -1,4 +1,6 @@
+import { memo, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
+import type { Components } from 'react-markdown'
 import rehypeRaw from 'rehype-raw'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
 import type { Options as SanitizeSchema } from 'rehype-sanitize'
@@ -112,11 +114,59 @@ interface MarkdownContentProps {
  * 统一的 Markdown 渲染组件。
  * 关闭原始 HTML，链接统一交给应用内浏览器打开。
  */
-export default function MarkdownContent({
+const MarkdownContent = memo(function MarkdownContent({
   content,
   className,
   streaming = false
 }: MarkdownContentProps): JSX.Element {
+  // components 必须保持稳定，否则 ReactMarkdown 会把图表/代码块当成新组件并重新挂载。
+  const components = useMemo<Components>(
+    () => ({
+      pre: ({ children }) => <>{children}</>,
+      code: ({ className, children }) => {
+        const language = /^language-([\w-]+)/.exec(className ?? '')?.[1]
+        const normalizedLanguage = language?.toLowerCase()
+        const text = String(children).replace(/\n$/, '')
+
+        if (normalizedLanguage === 'mermaid' && !streaming) {
+          return <MermaidDiagram chart={text} />
+        }
+        const looksLikeECharts =
+          normalizedLanguage === 'json' && /"series"\s*:/.test(text)
+
+        if (
+          (normalizedLanguage === 'echarts' ||
+            normalizedLanguage === 'echart' ||
+            normalizedLanguage === 'chart' ||
+            looksLikeECharts) &&
+          !streaming
+        ) {
+          return <EChartBlock optionText={text} />
+        }
+        if (language || text.includes('\n')) {
+          return <CodeBlock code={text} language={language ?? 'text'} />
+        }
+
+        return <code className={className}>{children}</code>
+      },
+      a: ({ href, children }) => {
+        if (href && /^https?:\/\//i.test(href)) {
+          return <LinkPreview href={href} fallback={children} />
+        }
+
+        return (
+          <a href={href} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        )
+      },
+      img: ({ src, alt, title }) => (
+        <MarkdownImage src={src} alt={alt} title={title} />
+      )
+    }),
+    [streaming]
+  )
+
   return (
     <div className={`markdown-content${className ? ` ${className}` : ''}`}>
       <ReactMarkdown
@@ -127,52 +177,12 @@ export default function MarkdownContent({
           rehypeSafeStyles,
           rehypeKatex
         ]}
-        components={{
-          pre: ({ children }) => <>{children}</>,
-          code: ({ className, children }) => {
-            const language = /^language-([\w-]+)/.exec(className ?? '')?.[1]
-            const normalizedLanguage = language?.toLowerCase()
-            const text = String(children).replace(/\n$/, '')
-
-            if (normalizedLanguage === 'mermaid' && !streaming) {
-              return <MermaidDiagram chart={text} />
-            }
-            const looksLikeECharts =
-              normalizedLanguage === 'json' && /"series"\s*:/.test(text)
-
-            if (
-              (normalizedLanguage === 'echarts' ||
-                normalizedLanguage === 'echart' ||
-                normalizedLanguage === 'chart' ||
-                looksLikeECharts) &&
-              !streaming
-            ) {
-              return <EChartBlock optionText={text} />
-            }
-            if (language || text.includes('\n')) {
-              return <CodeBlock code={text} language={language ?? 'text'} />
-            }
-
-            return <code className={className}>{children}</code>
-          },
-          a: ({ href, children }) => {
-            if (href && /^https?:\/\//i.test(href)) {
-              return <LinkPreview href={href} fallback={children} />
-            }
-
-            return (
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                {children}
-              </a>
-            )
-          },
-          img: ({ src, alt, title }) => (
-            <MarkdownImage src={src} alt={alt} title={title} />
-          )
-        }}
+        components={components}
       >
         {normalizeMarkdownImages(content)}
       </ReactMarkdown>
     </div>
   )
-}
+})
+
+export default MarkdownContent

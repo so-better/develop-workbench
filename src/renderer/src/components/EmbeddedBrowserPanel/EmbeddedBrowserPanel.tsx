@@ -230,6 +230,9 @@ export default function EmbeddedBrowserPanel({
     if (!state?.visible || !element) return
 
     const updateBounds = (): void => {
+      // 关闭期间由主进程独立播放原生视图滑出动画，不能再回写 bounds。
+      if (closingRef.current) return
+
       const rect = element.getBoundingClientRect()
       const next = opening
         ? openingBoundsRef.current

@@ -1293,7 +1293,8 @@ body {
 }
 
 .embedded-browser-panel.is-closing {
-  animation: embedded-browser-panel-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: embedded-browser-panel-out 200ms cubic-bezier(0.32, 0, 0.67, 0)
+    forwards;
 }
 
 @keyframes embedded-browser-panel-out {
@@ -6363,6 +6364,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  margin-top: 4px;
   margin-bottom: 8px;
 }
 
