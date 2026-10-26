@@ -5027,6 +5027,13 @@ body {
   font-size: 11px;
 }
 
+.weekly-report-submit-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+}
+
 @media (max-width: 760px) {
   .weekly-report-header,
   .weekly-report-content {
@@ -5037,6 +5044,11 @@ body {
   .weekly-report-submit-bar {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .weekly-report-submit-actions {
+    justify-content: flex-end;
+    width: 100%;
   }
 }
 

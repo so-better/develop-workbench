@@ -1,5 +1,6 @@
 import type { ToolSet } from 'ai'
 import { fileTools } from './files'
+import { shellTools } from './shell'
 import { skillTools } from './skills'
 
 export { getToolArtifact } from './files'
@@ -7,6 +8,7 @@ export { getToolArtifact } from './files'
 /** 所有应用内置工具，按业务域拆分后在当前文件汇总。 */
 export const localTools: ToolSet = {
   ...skillTools,
+  ...shellTools,
   ...fileTools
 }
 

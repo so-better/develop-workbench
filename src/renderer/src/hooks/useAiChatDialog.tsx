@@ -20,7 +20,10 @@ export interface AiChatDialogRequest {
   /** 结果回写按钮文案，默认“应用到页面”。 */
   applyLabel?: string
   /** 当前业务的结果回写处理。 */
-  onApplyResult?: (content: string) => void | Promise<void>
+  onApplyResult?: (
+    content: string,
+    tools: import('../../../types/ai').AiToolCall[]
+  ) => void | Promise<void>
   /** 当前业务关闭弹窗后的回调。 */
   onClose?: () => void
 }

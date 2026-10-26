@@ -39,7 +39,10 @@ interface AiChatDialogProps {
   autoStart?: boolean
   onClose: () => void
   /** 业务页面接收 AI 结果，用于回写编辑器、表单或草稿。 */
-  onApplyResult?: (content: string) => void | Promise<void>
+  onApplyResult?: (
+    content: string,
+    tools: AiToolCall[]
+  ) => void | Promise<void>
   /** 应用按钮文案，默认“应用到页面”。 */
   applyLabel?: string
 }
@@ -488,12 +491,15 @@ export default function AiChatDialog({
       element.scrollHeight - element.scrollTop - element.clientHeight < 80
   }
 
-  const handleApply = async (content: string): Promise<void> => {
+  const handleApply = async (
+    content: string,
+    tools: AiToolCall[]
+  ): Promise<void> => {
     if (!onApplyResult) return
 
     try {
-      await onApplyResult(content)
-      antdMessage.success('已应用到页面')
+      await onApplyResult(content, tools)
+      antdMessage.success(`已${applyLabel}`)
     } catch (applyError) {
       antdMessage.error(getErrorMessage(applyError, '应用结果失败'))
     }
@@ -698,7 +704,7 @@ export default function AiChatDialog({
                               type="text"
                               size="small"
                               icon={<ImportOutlined />}
-                              onClick={() => handleApply(message.content)}
+                              onClick={() => handleApply(message.content, message.tools ?? [])}
                             >
                               {applyLabel}
                             </Button>

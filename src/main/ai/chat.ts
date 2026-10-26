@@ -13,6 +13,8 @@ import type {
 } from '../../types/ai'
 import { getErrorMessage as formatErrorMessage, isRecord } from '../../utils'
 import { trimChatMessages } from './context'
+import { getLarkCliInfo } from '../lark'
+import { getMeegleCliInfo } from '../meegle'
 import { getSystemPrompt } from './prompt'
 import { saveGeneratedArtifact } from './artifacts'
 import { resolveAiModel } from './models'
@@ -43,6 +45,17 @@ const MAX_ATTACHMENT_TEXT = 80_000
 const MAX_TOOL_OUTPUT = 20_000
 /** 单次对话最多工具步骤。 */
 const MAX_TOOL_STEPS = 20
+/** CLI 路径探测缓存时长。 */
+const CLI_PATH_CACHE_TTL_MS = 5 * 60 * 1000
+
+interface CliPathCache {
+  larkCliPath: string | null
+  meegleCliPath: string | null
+  expiresAt: number
+}
+
+let cliPathCache: CliPathCache | null = null
+let cliPathPromise: Promise<CliPathCache> | null = null
 
 /** 一个仍在生成中的聊天请求。 */
 interface ActiveChat {
@@ -249,6 +262,32 @@ const sendEvent = (
   sender.send('ai:chat:event', event)
 }
 
+/** 读取 CLI 路径，短时间内复用，避免每轮对话都执行版本探测。 */
+const getCliPaths = async (): Promise<CliPathCache> => {
+  if (cliPathCache && cliPathCache.expiresAt > Date.now()) return cliPathCache
+  if (cliPathPromise) return cliPathPromise
+
+  cliPathPromise = Promise.all([
+    getLarkCliInfo().catch(() => null),
+    getMeegleCliInfo().catch(() => null)
+  ])
+    .then(([larkCli, meegleCli]) => {
+      const next: CliPathCache = {
+        larkCliPath: larkCli?.path ?? null,
+        meegleCliPath: meegleCli?.path ?? null,
+        expiresAt: Date.now() + CLI_PATH_CACHE_TTL_MS
+      }
+
+      cliPathCache = next
+      return next
+    })
+    .finally(() => {
+      cliPathPromise = null
+    })
+
+  return cliPathPromise
+}
+
 /** 一次流式请求所需的上下文。 */
 interface RunChatInput {
   requestId: string
@@ -303,7 +342,10 @@ const runChat = async ({
 
   try {
     // MCP 工具按需发现；连接失败时仍保留本地技能和文件工具。
-    const mcpTools = await getMcpTools().catch(() => ({}))
+    const [mcpTools, cliPaths] = await Promise.all([
+      getMcpTools().catch(() => ({})),
+      getCliPaths()
+    ])
     const tools: ToolSet = { ...localTools, ...mcpTools }
     const toolLabels = buildToolLabels(tools)
 
@@ -319,7 +361,9 @@ const runChat = async ({
     const result = streamText({
       model: model.model,
       system: getSystemPrompt({
-        searchAvailable: Object.keys(mcpTools).length > 0
+        searchAvailable: Object.keys(mcpTools).length > 0,
+        larkCliPath: cliPaths.larkCliPath,
+        meegleCliPath: cliPaths.meegleCliPath
       }),
       messages: toModelMessages(trimChatMessages(messages)),
       tools,
