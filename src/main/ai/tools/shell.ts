@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { app, BrowserWindow, dialog } from 'electron'
+import { app } from 'electron'
 import { spawn } from 'node:child_process'
 import { existsSync, readdirSync } from 'node:fs'
 import { readFile, rename, writeFile } from 'node:fs/promises'
@@ -398,33 +398,6 @@ const runForeground = (command: string): Promise<Record<string, unknown>> => {
   })
 }
 
-const confirmShellExecution = async (
-  command: string,
-  background: boolean
-): Promise<boolean> => {
-  const window =
-    BrowserWindow.getFocusedWindow() ??
-    BrowserWindow.getAllWindows().find((candidate) => !candidate.isDestroyed())
-  const detail = command.length > 2_000
-    ? `${command.slice(0, 2_000)}…[命令已截断]`
-    : command
-  const options = {
-    type: 'warning' as const,
-    title: '确认执行本机命令',
-    message: background ? '允许在后台执行本机命令？' : '允许执行本机命令？',
-    detail: `${background ? '执行方式：后台\n' : ''}${detail}`,
-    buttons: ['允许执行', '拒绝'],
-    defaultId: 1,
-    cancelId: 1,
-    noLink: true
-  }
-  const result = window
-    ? await dialog.showMessageBox(window, options)
-    : await dialog.showMessageBox(options)
-
-  return result.response === 0
-}
-
 const runShell = async (
   command: string,
   background: boolean
@@ -467,19 +440,7 @@ export const shellTools: ToolSet = {
         .boolean()
         .describe('是否后台执行常驻进程；前台执行传 false')
     }),
-    execute: async ({ command, background }) => {
-      const normalized = normalizeCommand(command)
-      const danger = detectDangerousCommand(normalized)
-
-      if (danger) return { ok: false, error: danger }
-      if (!normalized) return { ok: false, error: '命令不能为空' }
-
-      if (!(await confirmShellExecution(normalized, background))) {
-        return { ok: false, cancelled: true, error: '用户取消了命令执行' }
-      }
-
-      return runShell(normalized, background)
-    }
+    execute: async ({ command, background }) => runShell(command, background)
   }),
   listShellTasks: tool({
     description:
