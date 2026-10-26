@@ -170,6 +170,15 @@ const DEFECT_WORK_ITEM_TYPE = 'issue'
 const BUG_OWNER_FIELD_KEY = 'field_b16c4b'
 const OPERATOR_ROLE_NAME = '经办人'
 const DEFAULT_OPERATOR_ROLE_KEY = 'operator'
+/** 已结束/已解决的缺陷状态，不进入待处理列表。 */
+const DEFECT_DONE_STATUSES = [
+  '已解决',
+  '测试通过',
+  '已关闭',
+  '已终止',
+  '转需求',
+  'Not a Bug'
+]
 
 let currentUserCache: { expiresAt: number; userKey: string } | null = null
 const roleNameCache = new Map<string, { expiresAt: number; names: Map<string, string> }>()
@@ -398,9 +407,13 @@ const parseDefect = (row: MqlRow): MeegleDefect | null => {
 const buildRoleCondition = (role: DefectRole | null): string => {
   if (role) return `\`__${role}\` = current_login_user()`
 
-  return DEFECT_ROLES.map(
-    (item) => `\`__${item}\` = current_login_user()`
-  ).join(' OR ')
+  return [
+    ...DEFECT_ROLES.map(
+      (item) => `\`__${item}\` = current_login_user()`
+    ),
+    '`BUG责任人` = current_login_user()',
+    '`BUG解决人` = current_login_user()'
+  ].join(' OR ')
 }
 
 /** 为缺陷相关人员补齐飞书头像。 */
@@ -460,7 +473,9 @@ export const getMyDefects = async (
     [
       `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
       `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
-      `WHERE (${buildRoleCondition(role)})`,
+      `WHERE (${buildRoleCondition(role)}) AND \`状态\` not in (${DEFECT_DONE_STATUSES.map(
+        (status) => `'${status.replace(/'/g, "''")}'`
+      ).join(', ')})`,
       'ORDER BY `更新时间` DESC'
     ].join(' ')
   )

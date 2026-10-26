@@ -684,8 +684,10 @@ export default function DefectWorkbench({
         selectedTransition.id,
         fields
       )
-      setTransitionOpen(false)
       await load()
+      setTransitionOpen(false)
+      setSelectedTransitionId(undefined)
+      setTransitionValues({})
       message.success(`缺陷已流转到「${selectedTransition.stateName}」`)
     } catch (transitionFailure) {
       setTransitionError(getErrorMessage(transitionFailure, '缺陷流转失败'))
@@ -1011,7 +1013,7 @@ export default function DefectWorkbench({
           ) : (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={data?.total === 0 ? '当前没有参与的缺陷' : '没有匹配的缺陷'}
+              description={data?.total === 0 ? '当前没有未解决缺陷' : '没有匹配的缺陷'}
             />
           )}
         </div>
