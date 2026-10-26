@@ -20,6 +20,14 @@ import type {
 } from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
 import type { RequirementBindingState } from '../types/bindings'
+import type {
+  DefectRole,
+  DefectTransitionFieldValue,
+  DefectTransitions,
+  MeegleDefectComments,
+  MeegleMyDefects,
+  UpdateDefectAssigneesInput
+} from '../types/defects'
 import type { RequirementPersonalStatusState } from '../types/requirement-status'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
 import type { LinkPreview } from '../types/link-preview'
@@ -401,6 +409,52 @@ const electronAPI = {
    */
   getMyRequirements: (): Promise<MeegleMyRequirements> =>
     ipcRenderer.invoke('requirements:get-my'),
+
+  /**
+   * 读取当前用户参与的缺陷，可按缺陷角色过滤。
+   */
+  getMyDefects: (role?: DefectRole | null): Promise<MeegleMyDefects> =>
+    ipcRenderer.invoke('defects:get-my', role ?? null),
+
+  /**
+   * 更新 BUG 处理人。
+   */
+  updateDefectAssignees: (
+    workItemId: string,
+    input: UpdateDefectAssigneesInput
+  ): Promise<void> => ipcRenderer.invoke('defects:update-assignees', workItemId, input),
+
+  /**
+   * 读取缺陷评论。
+   */
+  getDefectComments: (workItemId: string): Promise<MeegleDefectComments> =>
+    ipcRenderer.invoke('defects:get-comments', workItemId),
+
+  /**
+   * 读取缺陷可流转状态。
+   */
+  getDefectTransitions: (workItemId: string): Promise<DefectTransitions> =>
+    ipcRenderer.invoke('defects:get-transitions', workItemId),
+
+  /**
+   * 执行缺陷状态流转。
+   */
+  transitionDefect: (
+    workItemId: string,
+    transitionId: string,
+    fields?: DefectTransitionFieldValue[]
+  ): Promise<void> =>
+    ipcRenderer.invoke('defects:transition', workItemId, transitionId, fields),
+
+  /**
+   * 发表缺陷评论。
+   */
+  addDefectComment: (
+    workItemId: string,
+    content: string,
+    notifyUserKeys?: string[]
+  ): Promise<void> =>
+    ipcRenderer.invoke('defects:add-comment', workItemId, content, notifyUserKeys),
 
   /**
    * 读取用户可访问的 Meegle 空间。

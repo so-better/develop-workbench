@@ -18,6 +18,14 @@ import type {
 } from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
 import type { RequirementBindingState } from '../types/bindings'
+import type {
+  DefectRole,
+  DefectTransitionFieldValue,
+  DefectTransitions,
+  MeegleDefectComments,
+  MeegleMyDefects,
+  UpdateDefectAssigneesInput
+} from '../types/defects'
 import type { RequirementPersonalStatusState } from '../types/requirement-status'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
 import type { LinkPreview } from '../types/link-preview'
@@ -175,6 +183,29 @@ export interface ElectronAPI {
   getWeeklyReport: () => Promise<WeeklyReportState>
   /** 提交飞书个人工作周报。 */
   submitWeeklyReport: (input: SubmitWeeklyReportInput) => Promise<WeeklyReportState>
+  /** 读取当前 Meegle 用户参与的缺陷，可按缺陷角色过滤。 */
+  getMyDefects: (role?: DefectRole | null) => Promise<MeegleMyDefects>
+  /** 更新 BUG 处理人。 */
+  updateDefectAssignees: (
+    workItemId: string,
+    input: UpdateDefectAssigneesInput
+  ) => Promise<void>
+  /** 读取缺陷评论。 */
+  getDefectComments: (workItemId: string) => Promise<MeegleDefectComments>
+  /** 读取缺陷可流转状态。 */
+  getDefectTransitions: (workItemId: string) => Promise<DefectTransitions>
+  /** 执行缺陷状态流转。 */
+  transitionDefect: (
+    workItemId: string,
+    transitionId: string,
+    fields?: DefectTransitionFieldValue[]
+  ) => Promise<void>
+  /** 发表缺陷评论。 */
+  addDefectComment: (
+    workItemId: string,
+    content: string,
+    notifyUserKeys?: string[]
+  ) => Promise<void>
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: () => Promise<MeegleMyRequirements>
   /** 读取用户可访问的 Meegle 空间。 */

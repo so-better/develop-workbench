@@ -1,10 +1,12 @@
 import {
+  BugOutlined,
   FileTextOutlined,
   GlobalOutlined,
   ProjectOutlined
 } from '@ant-design/icons'
 import type { SettingsSection } from '../../types/settings'
 import RequirementWorkbench from './pages/RequirementWorkbench/RequirementWorkbench'
+import DefectWorkbench from './pages/DefectWorkbench/DefectWorkbench'
 import WeeklyReport from './pages/WeeklyReport/WeeklyReport'
 import SitesPage from './pages/SitesPage/SitesPage'
 
@@ -29,6 +31,14 @@ export const APP_PAGES = [
     icon: <ProjectOutlined />,
     render: ({ onOpenSettings }) => (
       <RequirementWorkbench onOpenSettings={onOpenSettings} />
+    )
+  },
+  {
+    key: 'defects',
+    label: '缺陷',
+    icon: <BugOutlined />,
+    render: ({ onOpenSettings }) => (
+      <DefectWorkbench onOpenSettings={onOpenSettings} />
     )
   },
   {

@@ -913,7 +913,7 @@ const toOwner = (user: UserSearchUser): MeegleRequirementOwner | null => {
 /**
  * 通过邮箱批量解析用户信息并补齐头像。
  */
-const resolveUsersByEmails = async (
+export const resolveUsersByEmails = async (
   project: MeegleProject,
   emails: string[]
 ): Promise<Map<string, MeegleRequirementOwner>> => {
@@ -1005,7 +1005,7 @@ const enrichRequirementAvatars = async (
 /**
  * 通过 user_key 批量解析用户信息。
  */
-const resolveUsers = async (
+export const resolveUsers = async (
   project: MeegleProject,
   userKeys: string[]
 ): Promise<Map<string, MeegleRequirementOwner>> => {

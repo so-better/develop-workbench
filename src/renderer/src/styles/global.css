@@ -6958,3 +6958,142 @@ body {
   height: 17px;
   font-size: 17px;
 }
+
+/* 缺陷工作台：复用需求工作台的侧栏、列表和标题结构。 */
+.requirement-header-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 23px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 21px;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 6px;
+}
+
+.defect-info-link {
+  color: #1570ef;
+  text-decoration: none;
+}
+
+.defect-info-link:hover {
+  text-decoration: underline;
+}
+
+.defect-muted {
+  margin: 0;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+
+.defect-info-group-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.defect-info-group-heading h4 {
+  margin: 0;
+}
+
+
+.defect-assignee-select {
+  width: 260px;
+  max-width: 100%;
+}
+
+.defect-description-card {
+  margin-bottom: 12px;
+}
+
+.defect-description-box {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.defect-content-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.defect-transition-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.defect-transition-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.defect-transition-form label > span {
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.defect-transition-form .ant-select {
+  width: 100%;
+}
+
+.defect-transition-current {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.defect-transition-loading {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+}
+
+.defect-transition-hint {
+  margin: 0;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.defect-transition-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+}
+
+.defect-transition-role-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.defect-transition-role-label {
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.defect-transition-role-warning {
+  margin: 0;
+  color: #d92d20;
+  font-size: 11px;
+  line-height: 1.6;
+}

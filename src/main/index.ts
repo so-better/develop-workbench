@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { initializeAiArtifacts } from './ai/artifacts'
 import { initializeAiAttachments } from './ai/attachments'
 import { initializeAiChat } from './ai/chat'
+import { initializeDefects } from './defects'
 import { initializeAiConfig } from './ai/config'
 import { initializeEmbeddedBrowser } from './embedded-browser'
 import { initializeGit } from './git'
@@ -59,6 +60,7 @@ if (!hasSingleInstanceLock) {
     initializeMeegle()
     initializeRepositories()
     initializeRequirements()
+    initializeDefects()
     initializeRequirementBindings()
     initializeRequirementStatuses()
     initializeSites()

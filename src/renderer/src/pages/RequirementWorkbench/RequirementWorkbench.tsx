@@ -906,6 +906,7 @@ export default function RequirementWorkbench({
       setBindings([])
       setData(null)
       await loadRequirements()
+      window.dispatchEvent(new CustomEvent('meegle:project-changed'))
       message.success(`已切换到 ${project.name}`)
     } catch (switchError) {
       message.error(getErrorMessage(switchError))
