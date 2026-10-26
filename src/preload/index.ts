@@ -20,6 +20,7 @@ import type {
 } from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
 import type { RequirementBindingState } from '../types/bindings'
+import type { RequirementPersonalStatusState } from '../types/requirement-status'
 import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
 import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
@@ -424,6 +425,25 @@ const electronAPI = {
    */
   updateRequirementDescription: (workItemId: string, content: string): Promise<void> =>
     ipcRenderer.invoke('requirements:update-description', workItemId, content),
+
+  /**
+   * 读取需求的本地个人状态。
+   */
+  getRequirementPersonalStatus: (
+    projectKey: string,
+    requirementId: string
+  ): Promise<RequirementPersonalStatusState> =>
+    ipcRenderer.invoke('requirement-status:get', projectKey, requirementId),
+
+  /**
+   * 保存需求的本地个人状态；传空字符串表示清除。
+   */
+  setRequirementPersonalStatus: (
+    projectKey: string,
+    requirementId: string,
+    value: string
+  ): Promise<RequirementPersonalStatusState> =>
+    ipcRenderer.invoke('requirement-status:set', projectKey, requirementId, value),
 
   /**
    * 读取需求的代码仓库绑定。

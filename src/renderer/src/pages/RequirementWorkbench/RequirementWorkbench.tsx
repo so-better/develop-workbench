@@ -47,6 +47,7 @@ import {
 import type { InputRef } from 'antd'
 import type { Dayjs } from 'dayjs'
 import type { RequirementRepoBinding } from '../../../../types/bindings'
+import type { RequirementPersonalStatus } from '../../../../types/requirement-status'
 import { getErrorMessage } from '../../../../utils'
 import type { Repository, RepositoryBindingStatus } from '../../../../types/repository'
 import type {
@@ -444,6 +445,11 @@ export default function RequirementWorkbench({
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectSwitching, setProjectSwitching] = useState(false)
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null)
+  const [personalStatus, setPersonalStatus] = useState<RequirementPersonalStatus | null>(null)
+  const [personalStatusLoading, setPersonalStatusLoading] = useState(false)
+  const [personalStatusEditing, setPersonalStatusEditing] = useState(false)
+  const [personalStatusDraft, setPersonalStatusDraft] = useState('')
+  const [personalStatusSaving, setPersonalStatusSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [requirementFilter, setRequirementFilter] = useState('')
@@ -968,6 +974,47 @@ export default function RequirementWorkbench({
       cancelled = true
     }
   }, [activityVersion, selectedRequirementId])
+
+  /**
+   * 读取当前需求的本地个人标记。
+   */
+  useEffect(() => {
+    const projectKey = data?.project.projectKey
+
+    setPersonalStatusEditing(false)
+    setPersonalStatusDraft('')
+
+    if (!selectedRequirementId || !projectKey) {
+      setPersonalStatus(null)
+      setPersonalStatusLoading(false)
+      return
+    }
+
+    let cancelled = false
+
+    setPersonalStatus(null)
+    setPersonalStatusLoading(true)
+    window.electron
+      .getRequirementPersonalStatus(projectKey, selectedRequirementId)
+      .then((state) => {
+        if (cancelled) return
+
+        setPersonalStatus(state.status)
+        setPersonalStatusDraft(state.status?.value ?? '')
+      })
+      .catch((loadError) => {
+        if (!cancelled) {
+          message.error(getErrorMessage(loadError, '读取个人标记失败'))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPersonalStatusLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [data?.project.projectKey, message, selectedRequirementId])
 
   /**
    * 读取本地仓库列表。
@@ -1835,6 +1882,52 @@ export default function RequirementWorkbench({
     }
   }
 
+  /** 开始编辑本地个人标记。 */
+  const handleStartPersonalStatusEdit = (): void => {
+    if (personalStatusLoading || personalStatusSaving) return
+
+    setPersonalStatusDraft(personalStatus?.value ?? '')
+    setPersonalStatusEditing(true)
+  }
+
+  /** 取消编辑并恢复已保存内容。 */
+  const handleCancelPersonalStatusEdit = (): void => {
+    setPersonalStatusDraft(personalStatus?.value ?? '')
+    setPersonalStatusEditing(false)
+  }
+
+  /** 保存本地个人标记；空字符串表示清除。 */
+  const handleSavePersonalStatus = async (): Promise<void> => {
+    const projectKey = data?.project.projectKey
+
+    if (!projectKey || !selectedRequirementId || personalStatusSaving) return
+
+    const value = personalStatusDraft.trim()
+
+    if (value === (personalStatus?.value ?? '')) {
+      setPersonalStatusEditing(false)
+      return
+    }
+
+    setPersonalStatusSaving(true)
+
+    try {
+      const state = await window.electron.setRequirementPersonalStatus(
+        projectKey,
+        selectedRequirementId,
+        value
+      )
+
+      setPersonalStatus(state.status)
+      setPersonalStatusDraft(state.status?.value ?? '')
+      setPersonalStatusEditing(false)
+    } catch (saveError) {
+      message.error(getErrorMessage(saveError, '保存个人标记失败'))
+    } finally {
+      setPersonalStatusSaving(false)
+    }
+  }
+
   /**
    * 开始引用回复。
    */
@@ -2430,6 +2523,65 @@ export default function RequirementWorkbench({
                   <span className="workbench-updated-at">
                     {formatUpdatedAt(selectedRequirement.updatedAt)}
                   </span>
+                  <div className="workbench-personal-status">
+                    <span className="workbench-personal-status-icon">
+                      <TagOutlined />
+                    </span>
+                    <div className="workbench-personal-status-body">
+                      {personalStatusLoading ? (
+                        <span className="workbench-personal-status-value is-placeholder">
+                          读取中...
+                        </span>
+                      ) : personalStatusEditing ? (
+                        <>
+                          <Input
+                            className="workbench-personal-status-input"
+                            variant="borderless"
+                            size="small"
+                            autoFocus
+                            maxLength={120}
+                            value={personalStatusDraft}
+                            placeholder="标记当前进展"
+                            aria-label="个人标记"
+                            onChange={(event) => setPersonalStatusDraft(event.target.value)}
+                            onBlur={() => void handleSavePersonalStatus()}
+                            onPressEnter={(event) => {
+                              event.preventDefault()
+                              event.currentTarget.blur()
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Escape') {
+                                event.preventDefault()
+                                handleCancelPersonalStatusEdit()
+                              }
+                            }}
+                          />
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`workbench-personal-status-value${
+                            personalStatus?.value ? '' : ' is-placeholder'
+                          }`}
+                          onClick={handleStartPersonalStatusEdit}
+                        >
+                          {personalStatus?.value || '添加个人标记'}
+                        </button>
+                      )}
+                    </div>
+                    {!personalStatusEditing && !personalStatusLoading ? (
+                      <Tooltip title="编辑个人标记">
+                        <Button
+                          type="text"
+                          size="small"
+                          className="workbench-personal-status-edit"
+                          icon={<EditOutlined />}
+                          aria-label="编辑个人标记"
+                          onClick={handleStartPersonalStatusEdit}
+                        />
+                      </Tooltip>
+                    ) : null}
+                  </div>
                 </div>
                 {requirementUrl ? (
                   <div className="workbench-feishu-callout">

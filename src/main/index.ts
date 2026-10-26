@@ -17,6 +17,7 @@ import { initializeMarkdownImages } from './markdown-images'
 import { initializeMeegle } from './meegle'
 import { initializeRepositories } from './repositories'
 import { initializeRequirementBindings } from './requirement-bindings'
+import { initializeRequirementStatuses } from './requirement-statuses'
 import { initializeRequirements } from './requirements'
 import { initializeSites } from './sites'
 import { initializeSystem } from './system'
@@ -59,6 +60,7 @@ if (!hasSingleInstanceLock) {
     initializeRepositories()
     initializeRequirements()
     initializeRequirementBindings()
+    initializeRequirementStatuses()
     initializeSites()
     initializeWeeklyReport()
     initializeAiConfig()

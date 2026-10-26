@@ -2510,6 +2510,117 @@ body {
   box-shadow: none;
 }
 
+.workbench-personal-status {
+  --personal-status-accent: #b7791f;
+  --personal-status-text: #7a4d0c;
+
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 5px;
+  align-items: center;
+  justify-content: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+:root[data-theme="dark"] .workbench-personal-status {
+  --personal-status-accent: #e6b45a;
+  --personal-status-text: #f1d08c;
+}
+
+.workbench-personal-status-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--personal-status-accent);
+  font-size: 12px;
+}
+
+.workbench-personal-status-body {
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+}
+
+.workbench-personal-status-value {
+  max-width: 280px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--personal-status-text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.workbench-personal-status-value:hover {
+  color: var(--personal-status-accent);
+}
+
+.workbench-personal-status-value.is-placeholder {
+  color: var(--workbench-secondary);
+  font-weight: 400;
+}
+
+.workbench-personal-status-input,
+.workbench-personal-status-input.ant-input {
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 4ch;
+  max-width: 240px;
+  field-sizing: content;
+  padding: 0;
+  color: var(--personal-status-text);
+  font-size: 11px;
+  caret-color: var(--personal-status-accent);
+  line-height: 1.4;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.workbench-personal-status-input.ant-input:focus {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.workbench-personal-status-input.ant-input::placeholder {
+  color: var(--workbench-secondary);
+}
+
+.workbench-personal-status-edit {
+  flex-shrink: 0;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0;
+  color: var(--personal-status-accent) !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.workbench-personal-status:hover .workbench-personal-status-edit,
+.workbench-personal-status:focus-within .workbench-personal-status-edit {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.workbench-personal-status-edit:hover {
+  color: var(--app-text) !important;
+  background: transparent !important;
+}
+
 .requirement-header-tag.is-active {
   color: #1570ef;
   background: rgba(22, 119, 255, 0.09);
