@@ -535,7 +535,7 @@ export default function AiChatDialog({
         </span>
       }
       open={open}
-      width={780}
+      width={900}
       centered
       footer={null}
       className="ai-chat-dialog-modal"

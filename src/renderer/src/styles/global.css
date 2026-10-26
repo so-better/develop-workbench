@@ -699,17 +699,13 @@ body {
 
 
 .storage-cleanup-card {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
+  padding: 14px;
   background: var(--workbench-soft);
   border: 1px solid var(--workbench-divider);
-  border-radius: 9px;
+  border-radius: 12px;
 }
 
-.storage-cleanup-main {
+.storage-cleanup-head {
   display: flex;
   gap: 10px;
   align-items: center;
@@ -718,18 +714,20 @@ body {
 
 .storage-cleanup-icon {
   display: grid;
-  flex: 0 0 34px;
-  width: 34px;
-  height: 34px;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
   color: #1677ff;
-  font-size: 16px;
+  font-size: 18px;
   background: rgba(22, 119, 255, 0.08);
-  border-radius: 8px;
+  border: 1px solid rgba(22, 119, 255, 0.12);
+  border-radius: 10px;
   place-items: center;
 }
 
 .storage-cleanup-copy {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 3px;
   min-width: 0;
@@ -737,13 +735,51 @@ body {
 
 .storage-cleanup-copy strong {
   color: var(--app-text);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .storage-cleanup-copy span {
   color: var(--workbench-secondary);
   font-size: 10px;
+  line-height: 1.5;
+}
+
+.storage-cleanup-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding-top: 12px;
+  margin-top: 14px;
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.storage-cleanup-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.storage-cleanup-stat span {
+  color: var(--workbench-secondary);
+  font-size: 10px;
+}
+
+.storage-cleanup-stat strong {
+  color: var(--app-text);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.storage-cleanup-note {
+  padding-top: 10px;
+  margin-top: 12px;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  line-height: 1.6;
+  border-top: 1px solid var(--workbench-divider);
 }
 
 .settings-info-list {
@@ -4272,8 +4308,14 @@ body {
   max-width: 100%;
 }
 
-.markdown-image-wrapper .ant-image {
+.markdown-image-wrapper,
+.markdown-image-wrapper .ant-image,
+.markdown-image-wrapper .ant-image-img {
   max-width: 100%;
+}
+
+.markdown-image-wrapper .ant-image-img {
+  height: auto;
 }
 
 .markdown-image-loading {
@@ -6103,12 +6145,28 @@ body {
 
 .ai-message-bubble {
   max-width: 82%;
+  min-width: 0;
   padding: 9px 13px;
   overflow-wrap: anywhere;
   font-size: 13px;
   line-height: 1.7;
   word-break: break-word;
   border-radius: 14px;
+}
+
+.ai-message-bubble img,
+.ai-message-bubble .ant-image,
+.ai-message-bubble .ant-image-img {
+  max-width: 100%;
+  height: auto;
+}
+
+.ai-message-bubble .ant-image {
+  display: block;
+}
+
+.ai-message-bubble .ai-attachment-thumbnail {
+  max-width: 100%;
 }
 
 .ai-message-bubble-assistant {
@@ -6299,8 +6357,10 @@ body {
 
 .ai-attachment-message-image .ant-image-img {
   display: block;
-  max-width: 220px;
+  width: auto;
+  max-width: min(220px, 100%);
   max-height: 220px;
+  height: auto;
   object-fit: contain;
   border-radius: 8px;
 }

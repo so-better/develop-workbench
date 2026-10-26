@@ -623,43 +623,49 @@ export default function SettingsModal({
                 <Alert type="error" showIcon message={artifactError} />
               ) : (
                 <div className="storage-cleanup-card">
-                  <div className="storage-cleanup-main">
+                  <div className="storage-cleanup-head">
                     <span className="storage-cleanup-icon">
                       <FileTextOutlined />
                     </span>
                     <div className="storage-cleanup-copy">
                       <strong>AI 产物</strong>
-                      <span>
-                        {artifactStats?.count ?? 0} 个文件
-                        {artifactStats
-                          ? ` · ${formatBytes(artifactStats.bytes)}`
-                          : ''}
-                      </span>
+                      <span>对话中生成的内部临时文件</span>
+                    </div>
+                    <Popconfirm
+                      title="清理 AI 产物？"
+                      description="将删除对话中生成的内部缓存文件，已经保存到本机的文件不受影响。"
+                      okText="清理"
+                      cancelText="取消"
+                      onConfirm={handleClearArtifacts}
+                    >
+                      <Button
+                        danger
+                        size="small"
+                        icon={<DeleteOutlined />}
+                        loading={artifactClearing}
+                        disabled={!artifactStats?.count || artifactClearing}
+                      >
+                        清理
+                      </Button>
+                    </Popconfirm>
+                  </div>
+
+                  <div className="storage-cleanup-stats">
+                    <div className="storage-cleanup-stat">
+                      <span>文件数量</span>
+                      <strong>{artifactStats?.count ?? 0}</strong>
+                    </div>
+                    <div className="storage-cleanup-stat">
+                      <span>占用空间</span>
+                      <strong>{formatBytes(artifactStats?.bytes ?? 0)}</strong>
                     </div>
                   </div>
-                  <Popconfirm
-                    title="清理 AI 产物？"
-                    description="将删除对话中生成的内部缓存文件，已经保存到本机的文件不受影响。"
-                    okText="清理"
-                    cancelText="取消"
-                    onConfirm={handleClearArtifacts}
-                  >
-                    <Button
-                      danger
-                      size="small"
-                      icon={<DeleteOutlined />}
-                      loading={artifactClearing}
-                      disabled={!artifactStats?.count || artifactClearing}
-                    >
-                      清理
-                    </Button>
-                  </Popconfirm>
+
+                  <div className="storage-cleanup-note">
+                    清理后，当前对话中尚未下载的产物将失效；已经保存到本机的文件不受影响。
+                  </div>
                 </div>
               )}
-
-              <p className="settings-help">
-                清理后，当前对话里尚未下载的产物将无法再次打开。
-              </p>
             </>
           ) : null}
 
