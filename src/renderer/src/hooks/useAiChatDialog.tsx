@@ -13,10 +13,12 @@ import AiChatDialog from '../components/AiChatDialog/AiChatDialog'
 export interface AiChatDialogRequest {
   /** 弹窗标题，例如“周报检查”。 */
   title: string
-  /** 自动发送给 AI 的用户消息。 */
+  /** 自动发送给 AI 的用户消息；发送但不显示在对话中。 */
   prompt: string
   /** 是否自动发送，默认 true。 */
   autoStart?: boolean
+  /** 只影响展示；onApplyResult 仍接收原始内容。 */
+  formatContent?: (content: string) => string
   /** 结果回写按钮文案，默认“应用到页面”。 */
   applyLabel?: string
   /** 当前业务的结果回写处理。 */
@@ -86,6 +88,7 @@ export function AiChatDialogProvider({
         title={request?.title ?? 'AI 助手'}
         initialPrompt={request?.prompt ?? ''}
         autoStart={request?.autoStart ?? true}
+        formatContent={request?.formatContent}
         applyLabel={request?.applyLabel ?? '应用到页面'}
         onClose={closeAiDialog}
         onApplyResult={request?.onApplyResult}

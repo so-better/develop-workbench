@@ -198,16 +198,51 @@ export default function WeeklyReport(): JSX.Element {
     })
   }
 
+  /** 把周报 JSON 转成聊天里的可读内容，回填仍使用原始 JSON。 */
+  const formatGeneratedReport = (content: string): string => {
+    const start = content.indexOf('{')
+    const end = content.lastIndexOf('}')
+
+    if (start < 0 || end <= start) return content
+
+    let parsed: unknown
+
+    try {
+      parsed = JSON.parse(content.slice(start, end + 1))
+    } catch {
+      return content
+    }
+
+    if (!isRecord(parsed)) return content
+
+    const source = isRecord(parsed.fields) ? parsed.fields : parsed
+    const sections = textFields.flatMap((field) => {
+      const value = source[field.id] ?? source[field.title]
+
+      if (typeof value !== 'string' || !value.trim()) return []
+
+      return [
+        `### ${field.title}`,
+        '',
+        value.replace(/\\n/g, '\n').replace(/\\t/g, '\t').trim()
+      ]
+    })
+
+    return sections.length ? sections.join('\n\n') : content
+  }
+
   const applyGeneratedReport = (
     content: string,
     tools: import('../../../../types/ai').AiToolCall[]
   ): void => {
-    const hasShellRead = tools.some(
-      (tool) => tool.name === 'executeShell' && tool.state === 'result'
+    const hasDataRead = tools.some(
+      (tool) =>
+        (tool.name === 'executeShell' || tool.name === 'getWeeklyWorkItems') &&
+        tool.state === 'result'
     )
 
-    if (!hasShellRead) {
-      throw new Error('AI 尚未通过 executeShell 读取工作数据，请先重新生成')
+    if (!hasDataRead) {
+      throw new Error('AI 尚未读取工作数据，请先重新生成')
     }
 
     const start = content.indexOf('{')
@@ -272,21 +307,31 @@ export default function WeeklyReport(): JSX.Element {
     openAiDialog({
       title: 'AI 生成周报',
       autoStart: true,
-      applyLabel: '回填周报',
+      applyLabel: '应用到周报内容',
+      formatContent: formatGeneratedReport,
       prompt: [
-        '请使用 executeShell 直接调用本机 lark-cli / meegle，自行读取我本周的工作内容和负责的需求。',
-        '需要时先用 --help / inspect 探查命令，不要假设 CLI 参数。',
-        '读取范围包括本周有更新的需求、当前进行中的工作和必要的飞书数据。',
+        '请优先调用 getWeeklyWorkItems 获取我本周更新或完成的需求。',
+        '该工具返回的数据足够时，不要再用 executeShell 逐个查询需求。',
+        '只有缺少飞书数据或工具未覆盖的信息时，才使用 executeShell 调用本机 lark-cli / meegle 补充。',
+        '需要时先用 --help / inspect 探查命令，不要假设 CLI 参数；help/版本探查最多两次。',
         '',
         '然后根据工具实际返回的数据生成本周周报。',
+        '',
+        '写作要求：',
+        '- 像正常同事写周报一样，用第一人称，简洁具体，不要使用“赋能、闭环、抓手、持续推进”等空话套话。',
+        '- 本周工作只写已经发生的事实：做了什么、做到什么程度、当前状态，以及排查或解决了什么问题；不要把计划写成已完成。',
+        '- 需求背景用一句话带过，重点写进展、结果和阻塞；没有实际进展的事项不要凑数。',
+        '- 进度用“已提测、待评审、开发中、已上线”等具体状态描述，不要写“稳步推进”。',
+        '- 下周计划只写接下来准备做的具体动作、预期产出或时间节点，不要重复本周内容。',
+        '- 需协调配合事项只写确实需要他人决策或配合的事项：找谁、需要什么、影响什么；没有就写“暂无”。',
+        '- 每条尽量写成“事项或需求 + 动作 + 结果或状态”，避免流水账和大段概括。',
+        '- 技术细节只保留影响进度或结论的部分。',
         '',
         '输出要求：',
         '- 只输出一个 JSON 对象，不要代码块、解释或额外字段。',
         '- JSON 的键必须使用下面提供的字段 id，值是纯文本。',
         '- 所有字段都要生成；没有依据时写“暂无可提供的信息”，不要编造。',
-        '- 使用第一人称，内容具体，尽量包含结果、进度、风险和协作信息。',
-        '- 本周工作按需求或项目归类，下周计划要可执行。',
-        '- 如果 CLI 读取失败或数据不足，明确说明，不要用猜测补全。',
+        '- 如果工具读取失败或数据不足，明确说明，不要用猜测补全。',
         '',
         '可回填字段：',
         fieldMeta
@@ -420,6 +465,8 @@ export default function WeeklyReport(): JSX.Element {
               <span>提交后会按飞书汇报规则通知对应汇报对象。</span>
               <div className="weekly-report-submit-actions">
                 <Button
+                  type="primary"
+                  ghost
                   icon={<RobotMark />}
                   disabled={textFields.length === 0}
                   onClick={handleGenerate}

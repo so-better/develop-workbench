@@ -21,6 +21,8 @@ export interface AiUiMessage {
   artifacts?: AiChatArtifact[]
   /** 用户停止或请求中断：保留已生成正文，但不尝试渲染不完整的图表。 */
   interrupted?: boolean
+  /** 自动发送的业务首条消息：参与上下文，但不显示在对话中。 */
+  hidden?: boolean
   createdAt: string
 }
 
@@ -38,7 +40,11 @@ export interface UseAiChatResult {
   streaming: boolean
   stopping: boolean
   error: string | null
-  send: (content: string, attachments?: AiChatAttachment[]) => Promise<void>
+  send: (
+    content: string,
+    attachments?: AiChatAttachment[],
+    options?: { hidden?: boolean }
+  ) => Promise<void>
   stop: () => Promise<void>
   reset: () => void
   regenerate: () => Promise<void>
@@ -413,7 +419,8 @@ export const useAiChat = (): UseAiChatResult => {
   const send = useCallback(
     async (
       rawContent: string,
-      attachments: AiChatAttachment[] = []
+      attachments: AiChatAttachment[] = [],
+      options?: { hidden?: boolean }
     ): Promise<void> => {
       const content = rawContent.trim()
 
@@ -424,6 +431,7 @@ export const useAiChat = (): UseAiChatResult => {
         role: 'user',
         content,
         ...(attachments.length ? { attachments } : {}),
+        ...(options?.hidden ? { hidden: true } : {}),
         createdAt: nowIso()
       }
       const assistantMessage: AiUiMessage = {

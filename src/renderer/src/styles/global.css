@@ -5034,6 +5034,11 @@ body {
   align-items: center;
 }
 
+.weekly-report-submit-actions .ant-btn .ant-btn-icon > .ai-robot-mark {
+  width: 20px;
+  height: 20px;
+}
+
 @media (max-width: 760px) {
   .weekly-report-header,
   .weekly-report-content {
@@ -6818,11 +6823,15 @@ body {
 
 /* 应用自绘 AI 机器人标识。 */
 .ai-robot-mark {
-  display: inline-block;
+  display: block;
   width: 1.08em;
   height: 1.08em;
-  vertical-align: -0.14em;
   flex: 0 0 auto;
+}
+
+.ant-btn-icon > svg.ai-robot-mark {
+  display: block;
+  vertical-align: middle;
 }
 
 .ai-chat-dialog-title .ai-robot-mark {

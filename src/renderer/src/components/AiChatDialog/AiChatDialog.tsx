@@ -33,10 +33,12 @@ import { useSettingsDialog } from '../SettingsModal/SettingsDialogProvider'
 interface AiChatDialogProps {
   open: boolean
   title: string
-  /** 打开后自动发送的首条用户消息。 */
+  /** 打开后自动发送的首条用户消息；发送但不显示在对话中。 */
   initialPrompt: string
   /** 是否自动发送 initialPrompt，默认开启。 */
   autoStart?: boolean
+  /** 只影响展示；onApplyResult 仍接收原始内容。 */
+  formatContent?: (content: string) => string
   onClose: () => void
   /** 业务页面接收 AI 结果，用于回写编辑器、表单或草稿。 */
   onApplyResult?: (
@@ -284,6 +286,7 @@ export default function AiChatDialog({
   title,
   initialPrompt,
   autoStart = true,
+  formatContent,
   onClose,
   onApplyResult,
   applyLabel = '应用到页面'
@@ -374,7 +377,7 @@ export default function AiChatDialog({
     }
 
     startedRef.current = true
-    send(initialPrompt)
+    send(initialPrompt, [], { hidden: true })
   }, [autoStart, configStatus?.configured, initialPrompt, open, reset, send])
 
   useEffect(() => {
@@ -495,7 +498,7 @@ export default function AiChatDialog({
     content: string,
     tools: AiToolCall[]
   ): Promise<void> => {
-    if (!onApplyResult) return
+    if (!onApplyResult || !content.trim()) return
 
     try {
       await onApplyResult(content, tools)
@@ -526,11 +529,12 @@ export default function AiChatDialog({
     }
   }
 
+  const visibleMessages = messages.filter((message) => !message.hidden)
   const preparing =
     open &&
     configStatus?.configured === true &&
     autoStart &&
-    messages.length === 0 &&
+    visibleMessages.length === 0 &&
     Boolean(initialPrompt.trim())
   return (
     <Modal
@@ -574,7 +578,7 @@ export default function AiChatDialog({
             />
           ) : null}
 
-          {messages.length === 0 ? (
+          {visibleMessages.length === 0 ? (
             configStatus && !configReady ? (
               <div className="ai-chat-dialog-empty ai-chat-dialog-empty--config">
                 <div className="ai-chat-dialog-empty-icon">
@@ -630,13 +634,19 @@ export default function AiChatDialog({
               </div>
             )
           ) : (
-            messages.map((message, index) => {
+            visibleMessages.map((message, index) => {
               const isLastAssistant =
                 message.role === 'assistant' &&
-                index === messages.length - 1
+                index === visibleMessages.length - 1
               const isGenerating = streaming && isLastAssistant
               const renderStreaming = isGenerating || Boolean(message.interrupted)
               const isEditing = editingId === message.id
+              const hasContent = Boolean(message.content.trim())
+              const displayContent =
+                message.role === 'assistant' && formatContent && !isGenerating
+                  ? formatContent(message.content)
+                  : message.content
+              const hasVisibleContent = Boolean(displayContent.trim())
 
               return (
                 <div
@@ -659,9 +669,9 @@ export default function AiChatDialog({
                             />
                           </details>
                         ) : null}
-                        {message.content ? (
+                        {hasVisibleContent ? (
                           <MarkdownContent
-                            content={message.content}
+                            content={displayContent}
                             streaming={renderStreaming}
                           />
                         ) : isGenerating ? (
@@ -683,23 +693,26 @@ export default function AiChatDialog({
                         ) : null}
                       </div>
                       {!isGenerating &&
-                      (message.content ||
+                      (hasContent ||
                         message.reasoning ||
                         message.tools?.length ||
                         message.sources?.length ||
                         message.artifacts?.length) ? (
                         <div className="ai-message-actions">
-                          {message.content ? (
+                          {hasContent ? (
                             <Button
                               type="text"
                               size="small"
                               icon={<CopyOutlined />}
-                              onClick={() => handleCopy(message.content)}
+                              onClick={() => handleCopy(displayContent)}
                             >
                               复制
                             </Button>
                           ) : null}
-                          {message.content && isLastAssistant && onApplyResult ? (
+                          {hasContent &&
+                          !message.interrupted &&
+                          isLastAssistant &&
+                          onApplyResult ? (
                             <Button
                               type="text"
                               size="small"

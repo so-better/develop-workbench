@@ -1728,6 +1728,144 @@ export const getMyRequirements = async (): Promise<MeegleMyRequirements> => {
   }
 }
 
+/** 周报工具返回的单条本周工作。 */
+export interface WeeklyWorkItem {
+  id: string
+  name: string
+  status: string | null
+  priority: string | null
+  iteration: string | null
+  updatedAt: string | null
+  completedAt: string | null
+  requirementType: string | null
+  tags: string[]
+  riskLabels: string[]
+  owners: string[]
+  description: string
+  technicalSolution: string
+  documentUrl: string | null
+}
+
+/** 周报工具返回的本周工作集合。 */
+export interface WeeklyWorkItemsResult {
+  project: string
+  weekStart: string
+  weekEnd: string
+  total: number
+  hasMore: boolean
+  items: WeeklyWorkItem[]
+  note: string
+}
+
+/** 周报只返回最近更新的有限条数，避免单次工具结果过大。 */
+const WEEKLY_WORK_ITEM_LIMIT = 20
+const WEEKLY_DESCRIPTION_LIMIT = 300
+const WEEKLY_SOLUTION_LIMIT = 200
+const WEEKLY_OUTPUT_BUDGET = 18_000
+
+/** 将文本压成单行并限制长度。 */
+const compactText = (value: string | null, maxLength: number): string => {
+  const text = (value ?? '').replace(/\s+/g, ' ').trim()
+
+  return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
+}
+
+/** 返回当前本地周的周一和周日，格式 YYYY-MM-DD。 */
+const getCurrentWeekRange = (): { start: string; end: string } => {
+  const start = new Date()
+  const day = start.getDay() || 7
+
+  start.setDate(start.getDate() - day + 1)
+  start.setHours(0, 0, 0, 0)
+
+  const end = new Date(start)
+  end.setDate(start.getDate() + 6)
+
+  const format = (date: Date): string => {
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const dayOfMonth = String(date.getDate()).padStart(2, '0')
+
+    return `${date.getFullYear()}-${month}-${dayOfMonth}`
+  }
+
+  return { start: format(start), end: format(end) }
+}
+
+/**
+ * 一次读取当前用户本周更新或完成的需求。
+ * 周报生成优先使用该函数，避免模型按需求逐条调用 CLI。
+ */
+export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
+  const project = await getProject()
+  const roleNames = await fetchStoryRoleNames(project)
+  const roleCondition = buildCurrentUserRoleCondition(roleNames)
+  const week = getCurrentWeekRange()
+
+  if (!roleCondition) {
+    return {
+      project: project.name,
+      weekStart: week.start,
+      weekEnd: week.end,
+      total: 0,
+      hasMore: false,
+      items: [],
+      note: '没有读取到当前用户的需求角色配置'
+    }
+  }
+
+  const rows = await fetchMqlRows(
+    project,
+    [
+      'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `完成日期`, `技术方案`, `标签`, `risk_label()`',
+      `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
+      `WHERE (${roleCondition}) AND (RELATIVE_DATETIME_EQ(\`更新时间\`, 'current_week') OR RELATIVE_DATETIME_EQ(\`完成日期\`, 'current_week'))`,
+      'ORDER BY `更新时间` DESC'
+    ].join(' ')
+  )
+  const requirements = rows
+    .map(parseRequirement)
+    .filter((requirement): requirement is MeegleRequirement => requirement !== null)
+  const items: WeeklyWorkItem[] = []
+
+  for (const requirement of requirements.slice(0, WEEKLY_WORK_ITEM_LIMIT)) {
+    const item: WeeklyWorkItem = {
+      id: requirement.id,
+      name: requirement.name,
+      status: requirement.status,
+      priority: requirement.priority,
+      iteration: requirement.iterationName,
+      updatedAt: requirement.updatedAt,
+      completedAt: requirement.completedAt,
+      requirementType: requirement.requirementType,
+      tags: requirement.tags,
+      riskLabels: requirement.riskLabels,
+      owners: requirement.owners.map((owner) => owner.name),
+      description: compactText(requirement.description, WEEKLY_DESCRIPTION_LIMIT),
+      technicalSolution: compactText(
+        requirement.technicalSolution,
+        WEEKLY_SOLUTION_LIMIT
+      ),
+      documentUrl: requirement.documentUrl
+    }
+
+    if (JSON.stringify([...items, item]).length > WEEKLY_OUTPUT_BUDGET) break
+
+    items.push(item)
+  }
+
+  return {
+    project: project.name,
+    weekStart: week.start,
+    weekEnd: week.end,
+    total: requirements.length,
+    hasMore: requirements.length > items.length,
+    items,
+    note: items.length
+      ? '仅包含本周有更新或完成的需求；需要更多详情时再按需补充'
+      : '本周没有查询到更新或完成的需求'
+  }
+}
+
 /**
  * 注册需求工作台 IPC。
  */

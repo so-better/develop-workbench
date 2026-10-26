@@ -44,7 +44,7 @@ const MAX_ATTACHMENT_TEXT = 80_000
 /** 工具结果展示上限。 */
 const MAX_TOOL_OUTPUT = 20_000
 /** 单次对话最多工具步骤。 */
-const MAX_TOOL_STEPS = 20
+const MAX_TOOL_STEPS = 50
 /** CLI 路径探测缓存时长。 */
 const CLI_PATH_CACHE_TTL_MS = 5 * 60 * 1000
 
@@ -483,6 +483,14 @@ const runChat = async ({
     }
     if (!receivedFinish) {
       throw new Error('模型响应不完整，请重试')
+    }
+    if (finishReason === 'tool-calls') {
+      throw new Error(
+        `工具调用达到上限（${MAX_TOOL_STEPS} 次），未能生成最终回答，请重试或缩小任务范围`
+      )
+    }
+    if (finishReason === 'length') {
+      throw new Error('回答达到输出长度上限，内容可能不完整，请重试')
     }
 
     sendEvent(sender, {
