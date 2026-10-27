@@ -714,13 +714,20 @@ const buildCurrentUserRoleCondition = (roleNames: string[]): string =>
 /**
  * 执行 MQL 查询并读取全部分页。
  */
-const fetchMqlRows = async (project: MeegleProject, mql: string): Promise<MoqlRow[]> => {
+const fetchMqlRows = async (
+  project: MeegleProject,
+  mql: string,
+  singlePage = false
+): Promise<MoqlRow[]> => {
   const result = await runMeegle(
     ['workitem', 'query', '--project-key', project.key, '--mql', mql, '--format', 'json'],
     MEEGLE_QUERY_TIMEOUT_MS
   )
   const response = parseCommandJson<MoqlResponse>(result, '读取需求列表')
   const rows = [...getRows(response)]
+
+  if (singlePage) return rows
+
   const total = response.list?.[0]?.count ?? rows.length
 
   if (rows.length >= total) return rows
@@ -1690,6 +1697,60 @@ export const updateRequirementNode = async (
   }
 }
 
+/** 关键词搜索使用的需求字段。 */
+const REQUIREMENT_SEARCH_FIELDS =
+  '`工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `产品线`, `需求等级`, `需求性质`, `标签`, risk_label()'
+
+/** 生成名称/ID 的 MQL 搜索条件。 */
+const buildRequirementSearchCondition = (value: unknown): string => {
+  if (typeof value !== 'string') throw new Error('搜索关键词不合法')
+
+  const keyword = value.trim().replace(/[\\%_]/g, '').slice(0, 80)
+
+  if (!keyword) return ''
+
+  const escaped = keyword.replace(/'/g, "''")
+  const idCondition = /^\d+$/.test(keyword) ? ` OR \`工作项id\` = ${keyword}` : ''
+
+  return `(\`名称\` LIKE '%${escaped}%'${idCondition})`
+}
+
+/** 在当前空间内按关键词搜索全部需求。 */
+export const searchRequirements = async (query: string): Promise<MeegleMyRequirements> => {
+  const project = await getProject()
+  const condition = buildRequirementSearchCondition(query)
+  const requirements = condition
+    ? (
+        await fetchMqlRows(
+          project,
+          [
+            `SELECT ${REQUIREMENT_SEARCH_FIELDS}`,
+            `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
+            `WHERE ${condition}`,
+            'ORDER BY `更新时间` DESC',
+            'LIMIT 20'
+          ].join(' '),
+          true
+        )
+      )
+        .map(parseRequirement)
+        .filter((requirement): requirement is MeegleRequirement => requirement !== null)
+    : []
+
+  try {
+    await enrichRequirementAvatars(project, requirements)
+  } catch {
+    // 头像不是核心数据，补齐失败时继续展示搜索结果。
+  }
+
+  return {
+    project,
+    groups: groupRequirements(requirements),
+    total: requirements.length,
+    fetchedAt: new Date().toISOString()
+  }
+}
+
 /**
  * 读取当前用户通过任意角色参与的未结束需求，并按迭代分组。
  */
@@ -1871,6 +1932,9 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
  */
 export const initializeRequirements = (): void => {
   ipcMain.handle('requirements:get-my', () => getMyRequirements())
+  ipcMain.handle('requirements:search', (_event, query: unknown) =>
+    searchRequirements(typeof query === 'string' ? query : '')
+  )
   ipcMain.handle('requirements:list-projects', () => listMeegleProjects())
   ipcMain.handle('requirements:set-project', (_event, projectKey: unknown) => {
     if (typeof projectKey !== 'string') throw new Error('空间 key 不合法')

@@ -4,7 +4,11 @@
  */
 import { ipcMain } from 'electron'
 import { runLarkCli } from './lark'
-import type { LarkDocSearchResult, LarkMessageSearchResult } from '../types/lark'
+import type {
+  LarkChatSearchResult,
+  LarkDocSearchResult,
+  LarkMessageSearchResult
+} from '../types/lark'
 
 interface LarkSearchResponse {
   ok?: boolean
@@ -37,9 +41,37 @@ const stripHighlight = (value?: string): string =>
     .replace(/&#39;/g, "'")
     .trim()
 
-/** 压缩消息正文，避免卡片和长文本占满搜索结果。 */
-const compactMessage = (value?: string): string =>
-  stripHighlight(value).replace(/\s+/g, ' ').slice(0, 180)
+/** 提取卡片标题。 */
+const extractCardTitle = (value?: string): string => {
+  const match = value?.match(/<card\s+title="([^"]+)"/i)
+
+  return stripHighlight(match?.[1])
+}
+
+/** 压缩消息正文，折叠图片和链接，避免卡片内容占满搜索结果。 */
+const compactMessage = (value?: string): string => {
+  const cleaned = (value ?? '')
+    .replace(/<card[^>]*>/gi, '')
+    .replace(/<\/card>/gi, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '[图片]')
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/gi, '$1')
+    .replace(/https?:\/\/[^\s)]+/gi, (url) => {
+      try {
+        return `[${new URL(url).hostname}]`
+      } catch {
+        return '[链接]'
+      }
+    })
+    .replace(/\[Media:[^\]]+\]/gi, '[附件]')
+    .replace(/\[图片\]/g, '图片')
+    .split(/\*\*发件人：\*\*|\[分享至会话\]/)[0]
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/(?:图片\s*){2,}/g, '图片 ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return cleaned.slice(0, 180)
+}
 
 /** 将飞书 applink 转成桌面客户端协议。 */
 const toFeishuAppUrl = (value?: string): string | null => {
@@ -184,6 +216,11 @@ export const searchLarkMessages = async (
           message.chat_name?.trim() ||
           (message.chat_type === 'p2p' ? '私聊' : '飞书消息'),
         senderName: message.sender?.name?.trim() || '未知发送人',
+        title:
+          extractCardTitle(message.content) ||
+          compactMessage(message.content) ||
+          message.chat_name?.trim() ||
+          '飞书消息',
         content: compactMessage(message.content),
         createdAt: message.create_time?.trim() || null,
         url,
@@ -193,12 +230,83 @@ export const searchLarkMessages = async (
     .filter((message): message is LarkMessageSearchResult => Boolean(message))
 }
 
-/** 注册飞书文档和消息搜索 IPC。 */
+interface LarkChatSearchResponse {
+  ok?: boolean
+  error?: {
+    message?: string
+  }
+  data?: {
+    chats?: Array<{
+      chat_id?: string
+      name?: string
+      description?: string
+      external?: boolean
+    }>
+  }
+}
+
+/** 搜索飞书群聊名称。 */
+export const searchLarkChats = async (
+  query: unknown
+): Promise<LarkChatSearchResult[]> => {
+  const keyword = normalizeQuery(query)
+
+  if (!keyword) return []
+
+  const output = await runLarkCli([
+    'im',
+    '+chat-search',
+    '--query',
+    keyword,
+    '--page-size',
+    '10',
+    '--disable-search-by-user',
+    '--format',
+    'json'
+  ])
+  let parsed: LarkChatSearchResponse
+
+  try {
+    parsed = JSON.parse(output) as LarkChatSearchResponse
+  } catch {
+    throw new Error('飞书群聊搜索返回格式不正确')
+  }
+
+  if (parsed.ok === false) {
+    throw new Error(parsed.error?.message || '飞书群聊搜索失败')
+  }
+
+  return (parsed.data?.chats ?? [])
+    .map((chat) => {
+      const chatId = chat.chat_id?.trim()
+
+      if (!chatId) return null
+
+      const url = `https://applink.feishu.cn/client/chat/open?openChatId=${encodeURIComponent(
+        chatId
+      )}`
+
+      return {
+        id: chatId,
+        name: chat.name?.trim() || '未命名群聊',
+        description: chat.description?.trim() || null,
+        external: Boolean(chat.external),
+        url,
+        appUrl: toFeishuAppUrl(url)
+      }
+    })
+    .filter((chat): chat is LarkChatSearchResult => Boolean(chat))
+}
+
+/** 注册飞书文档、消息和群聊搜索 IPC。 */
 export const initializeLarkSearch = (): void => {
   ipcMain.handle('lark:search-docs', (_event, query: unknown) =>
     searchLarkDocs(query)
   )
   ipcMain.handle('lark:search-messages', (_event, query: unknown) =>
     searchLarkMessages(query)
+  )
+  ipcMain.handle('lark:search-chats', (_event, query: unknown) =>
+    searchLarkChats(query)
   )
 }

@@ -31,6 +31,7 @@ import type {
 import type { RequirementPersonalStatusState } from '../types/requirement-status'
 import type {
   LarkCliInfo,
+  LarkChatSearchResult,
   LarkDocSearchResult,
   LarkMessageSearchResult,
   LarkLoginEvent,
@@ -276,6 +277,10 @@ const electronAPI = {
   searchLarkMessages: (query: string): Promise<LarkMessageSearchResult[]> =>
     ipcRenderer.invoke('lark:search-messages', query),
 
+  /** 搜索飞书群聊。 */
+  searchLarkChats: (query: string): Promise<LarkChatSearchResult[]> =>
+    ipcRenderer.invoke('lark:search-chats', query),
+
   /**
    * 查询 lark-cli 的路径、来源和版本。
    */
@@ -448,11 +453,19 @@ const electronAPI = {
   getMyRequirements: (): Promise<MeegleMyRequirements> =>
     ipcRenderer.invoke('requirements:get-my'),
 
+  /** 按关键词搜索当前空间内的全部需求。 */
+  searchRequirements: (keyword: string): Promise<MeegleMyRequirements> =>
+    ipcRenderer.invoke('requirements:search', keyword),
+
   /**
    * 读取当前用户参与的缺陷，可按缺陷角色过滤。
    */
   getMyDefects: (role?: DefectRole | null): Promise<MeegleMyDefects> =>
     ipcRenderer.invoke('defects:get-my', role ?? null),
+
+  /** 按关键词搜索当前空间内的全部缺陷。 */
+  searchDefects: (keyword: string): Promise<MeegleMyDefects> =>
+    ipcRenderer.invoke('defects:search', keyword),
 
   /**
    * 更新 BUG 处理人。

@@ -1,6 +1,7 @@
 import {
   CloudOutlined,
   DownloadOutlined,
+  SearchOutlined,
   SettingOutlined
 } from '@ant-design/icons'
 import { Badge, Button, Tag, Tooltip } from 'antd'
@@ -15,6 +16,7 @@ interface AppFooterProps {
   onOpenDownloads: () => void
   onOpenAi: () => void
   onOpenCloudDocs: () => void
+  onOpenQuickAccess: () => void
 }
 
 /**
@@ -27,8 +29,10 @@ export default function AppFooter({
   downloadCount,
   onOpenDownloads,
   onOpenAi,
-  onOpenCloudDocs
+  onOpenCloudDocs,
+  onOpenQuickAccess
 }: AppFooterProps): JSX.Element {
+  const quickAccessShortcut = window.electron.platform === 'darwin' ? '⌘K' : 'Ctrl K'
   return (
     <footer className="app-footer">
       <div className="footer-leading">
@@ -51,6 +55,16 @@ export default function AppFooter({
       </div>
 
       <div className="footer-actions">
+        <Button
+          type="text"
+          size="small"
+          className="footer-search-trigger"
+          icon={<SearchOutlined />}
+          onClick={onOpenQuickAccess}
+        >
+          搜索
+          <kbd>{quickAccessShortcut}</kbd>
+        </Button>
         <Tooltip title="飞书云文档">
           <Button
             type="text"

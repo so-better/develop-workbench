@@ -219,13 +219,20 @@ const getRows = (response: MqlResponse): MqlRow[] =>
   Object.values(response.data ?? {}).flatMap((rows) => rows ?? [])
 
 /** 执行 MQL 并读取全部分页。 */
-const fetchMqlRows = async (project: MeegleProject, mql: string): Promise<MqlRow[]> => {
+const fetchMqlRows = async (
+  project: MeegleProject,
+  mql: string,
+  singlePage = false
+): Promise<MqlRow[]> => {
   const result = await runMeegle(
     ['workitem', 'query', '--project-key', project.key, '--mql', mql, '--format', 'json'],
     MEEGLE_QUERY_TIMEOUT_MS
   )
   const response = parseCommandJson<MqlResponse>(result, '读取缺陷列表')
   const rows = getRows(response)
+
+  if (singlePage) return rows
+
   const total = response.list?.[0]?.count ?? rows.length
 
   if (rows.length >= total) return rows
@@ -459,6 +466,57 @@ const enrichDefectAvatars = async (
       ...collaborator,
       members: collaborator.members.map(applyAvatar)
     }))
+  }
+}
+
+/** 生成缺陷名称/ID 的 MQL 搜索条件。 */
+const buildDefectSearchCondition = (value: unknown): string => {
+  if (typeof value !== 'string') throw new Error('搜索关键词不合法')
+
+  const keyword = value.trim().replace(/[\\%_]/g, '').slice(0, 80)
+
+  if (!keyword) return ''
+
+  const escaped = keyword.replace(/'/g, "''")
+  const idCondition = /^\d+$/.test(keyword) ? ` OR \`工作项id\` = ${keyword}` : ''
+
+  return `(\`名称\` LIKE '%${escaped}%'${idCondition})`
+}
+
+/** 在当前空间内按关键词搜索全部缺陷。 */
+export const searchDefects = async (query: string): Promise<MeegleMyDefects> => {
+  const project = await getProject()
+  const condition = buildDefectSearchCondition(query)
+  const roleFields = DEFECT_ROLES.map((item) => `\`__${item}\``).join(', ')
+  const rows = condition
+    ? await fetchMqlRows(
+        project,
+        [
+          `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
+          `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
+          `WHERE ${condition}`,
+          'ORDER BY `更新时间` DESC',
+          'LIMIT 20'
+        ].join(' '),
+        true
+      )
+    : []
+  const defects = rows
+    .map(parseDefect)
+    .filter((defect): defect is MeegleDefect => defect !== null)
+
+  try {
+    await enrichDefectAvatars(project, defects)
+  } catch {
+    // 头像不是核心数据，补齐失败时继续展示搜索结果。
+  }
+
+  return {
+    project,
+    role: null,
+    defects,
+    total: defects.length,
+    fetchedAt: new Date().toISOString()
   }
 }
 
@@ -1114,6 +1172,10 @@ export const initializeDefects = (): void => {
 
       return addDefectComment(workItemId, content, keys)
     }
+  )
+
+  ipcMain.handle('defects:search', (_event, query: unknown) =>
+    searchDefects(typeof query === 'string' ? query : '')
   )
 
   ipcMain.handle('defects:get-my', (_event, role: unknown) => {

@@ -29,6 +29,7 @@ import type {
 import type { RequirementPersonalStatusState } from '../types/requirement-status'
 import type {
   LarkCliInfo,
+  LarkChatSearchResult,
   LarkDocSearchResult,
   LarkMessageSearchResult,
   LarkLoginEvent,
@@ -156,6 +157,8 @@ export interface ElectronAPI {
   searchLarkDocs: (query: string) => Promise<LarkDocSearchResult[]>
   /** 搜索飞书消息。 */
   searchLarkMessages: (query: string) => Promise<LarkMessageSearchResult[]>
+  /** 搜索飞书群聊。 */
+  searchLarkChats: (query: string) => Promise<LarkChatSearchResult[]>
   /** 查询 lark-cli 路径、来源和版本。 */
   getLarkCliInfo: () => Promise<LarkCliInfo>
   /** 只执行自动检测，不修改已保存的路径。 */
@@ -208,6 +211,8 @@ export interface ElectronAPI {
   submitWeeklyReport: (input: SubmitWeeklyReportInput) => Promise<WeeklyReportState>
   /** 读取当前 Meegle 用户参与的缺陷，可按缺陷角色过滤。 */
   getMyDefects: (role?: DefectRole | null) => Promise<MeegleMyDefects>
+  /** 按关键词搜索当前空间内的全部缺陷。 */
+  searchDefects: (keyword: string) => Promise<MeegleMyDefects>
   /** 更新 BUG 处理人。 */
   updateDefectAssignees: (
     workItemId: string,
@@ -231,6 +236,8 @@ export interface ElectronAPI {
   ) => Promise<void>
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: () => Promise<MeegleMyRequirements>
+  /** 按关键词搜索当前空间内的全部需求。 */
+  searchRequirements: (keyword: string) => Promise<MeegleMyRequirements>
   /** 读取用户可访问的 Meegle 空间。 */
   listMeegleProjects: () => Promise<MeegleProject[]>
   /** 切换当前 Meegle 空间。 */

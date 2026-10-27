@@ -55,8 +55,19 @@ export interface LarkMessageSearchResult {
   id: string
   chatName: string
   senderName: string
+  title: string
   content: string
   createdAt: string | null
+  url: string
+  appUrl: string | null
+}
+
+/** 飞书群聊搜索结果。 */
+export interface LarkChatSearchResult {
+  id: string
+  name: string
+  description: string | null
+  external: boolean
   url: string
   appUrl: string | null
 }

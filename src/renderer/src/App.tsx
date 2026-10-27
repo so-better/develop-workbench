@@ -286,6 +286,7 @@ export default function App(): JSX.Element {
         onOpenSettings={() => openSettings()}
         downloadCount={activeCount}
         onOpenDownloads={handleOpenDownloads}
+        onOpenQuickAccess={() => window.dispatchEvent(new Event('quick-access:open'))}
         onOpenAi={() =>
           openAiDialog({
             title: 'AI 助手',
