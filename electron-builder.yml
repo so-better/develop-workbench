@@ -14,18 +14,24 @@ mac:
   target:
     - dmg
     - zip
+  artifactName: ${name}-${version}-mac.${ext}
   category: public.app-category.developer-tools
   icon: build/icon.icns
 win:
   target:
-    - nsis
-    - portable
+    - target: nsis
+      arch:
+        - x64
+    - target: zip
+      arch:
+        - x64
+  artifactName: ${name}-${version}-win.${ext}
   executableName: develop-workbench
   icon: build/icon.ico
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-portable:
-  artifactName: ${name}-${version}-portable.${ext}
