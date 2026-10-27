@@ -64,6 +64,8 @@ import type {
   MeegleRequirementOwner
 } from '../../../../types/requirements'
 import type { SettingsSection } from '../../../../types/settings'
+import RobotMark from '../../components/RobotMark/RobotMark'
+import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import MarkdownContent from '../../components/MarkdownContent/MarkdownContent'
 import MarkdownEditor from '../../components/MarkdownEditor/MarkdownEditor'
 import RequirementFlowchart from '../../components/RequirementFlowchart/RequirementFlowchart'
@@ -474,6 +476,7 @@ export default function RequirementWorkbench({
   larkUser
 }: RequirementWorkbenchProps): JSX.Element {
   const { message, notification } = App.useApp()
+  const { openAiDialog } = useAiChatDialog()
   const [data, setData] = useState<MeegleMyRequirements | null>(null)
   const [projects, setProjects] = useState<MeegleProject[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
@@ -631,6 +634,25 @@ export default function RequirementWorkbench({
   const qingzhouRequirementUrl = requirementUrl
     ? `${requirementUrl}?tabKey=${qingzhouTabKey}#${qingzhouTabKey}`
     : null
+
+  /** 打开 AI 弹窗，使用需求分析技能分析当前需求。 */
+  const handleAnalyzeRequirement = (): void => {
+    if (!selectedRequirement) return
+
+    openAiDialog({
+      title: 'AI 需求分析',
+      autoStart: true,
+      prompt: [
+        '请分析下面这个飞书需求。',
+        '',
+        `Story ID：${selectedRequirement.id}`,
+        `Story 链接：${requirementUrl ?? '暂无'}`,
+        '',
+        '请优先使用 getRequirementDetail 工具通过 Story ID 读取需求详情，再读取相关需求文档和后端文档，结合当前代码输出分析报告。',
+        '本次只输出需求分析报告。'
+      ].join('\n')
+    })
+  }
 
   /** 仓库 ID 到仓库信息的映射。 */
   const repositoryMap = useMemo(
@@ -2630,19 +2652,28 @@ export default function RequirementWorkbench({
                   </div>
                 </div>
                 {requirementUrl ? (
-                  <div className="workbench-feishu-callout">
-                    <InfoCircleOutlined className="workbench-feishu-callout-icon" />
-                    <span className="workbench-feishu-callout-text">
-                      飞书详情页包含更完整的操作，需要时可在应用内打开完整页面。
-                    </span>
-                    <a
-                      className="workbench-feishu-callout-action"
-                      href={requirementUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  <div className="workbench-feishu-row">
+                    <div className="workbench-feishu-callout">
+                      <InfoCircleOutlined className="workbench-feishu-callout-icon" />
+                      <span className="workbench-feishu-callout-text">
+                        飞书详情页包含更完整的操作，需要时可在应用内打开完整页面。
+                      </span>
+                      <a
+                        className="workbench-feishu-callout-action"
+                        href={requirementUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        打开完整飞书详情页 →
+                      </a>
+                    </div>
+                    <Button
+                      type="primary"
+                      icon={<RobotMark />}
+                      onClick={handleAnalyzeRequirement}
                     >
-                      打开完整飞书详情页 →
-                    </a>
+                      AI 分析
+                    </Button>
                   </div>
                 ) : null}
               </div>

@@ -2,6 +2,7 @@ import type { ToolSet } from 'ai'
 import { fileTools } from './files'
 import { shellTools } from './shell'
 import { siteTools } from './sites'
+import { requirementTools } from './requirements'
 import { skillTools } from './skills'
 import { weeklyTools } from './weekly'
 
@@ -10,6 +11,7 @@ export { getToolArtifact } from './files'
 /** 所有应用内置工具，按业务域拆分后在当前文件汇总。 */
 export const localTools: ToolSet = {
   ...skillTools,
+  ...requirementTools,
   ...shellTools,
   ...siteTools,
   ...weeklyTools,

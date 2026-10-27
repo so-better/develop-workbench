@@ -52,7 +52,9 @@ keywords:
 - `https://project.feishu.cn/<org>/story/detail/<id>`
 - 包含 `work_item_id=<id>` 的查询参数
 
-优先使用系统提示词中提供的 meegle 绝对路径；没有路径时再用 `command -v meegle` 探测。读取 Story：
+优先调用 `getRequirementDetail` 工具，传入 Story ID 或 Story 链接。该工具会一次性返回需求标题、状态、优先级、类型、当前节点、角色、描述、需求文档和全部非空字段。
+
+只有工具不可用或返回缺少关键信息时，才使用系统提示词中提供的 meegle 绝对路径补充查询；没有路径时再用 `command -v meegle` 探测。
 
 ```bash
 meegle workitem get --work-item-id <id> --fields "_all"
