@@ -7297,3 +7297,7 @@ body {
   border: 1px solid var(--workbench-divider);
   border-radius: 4px;
 }
+
+.embedded-browser-actions {
+  gap: 8px;
+}

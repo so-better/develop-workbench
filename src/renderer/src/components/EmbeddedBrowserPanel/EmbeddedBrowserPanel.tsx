@@ -9,9 +9,10 @@ import {
   ExpandOutlined,
   ExportOutlined,
   GlobalOutlined,
+  LinkOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
-import { Button, Tooltip } from 'antd'
+import { App as AntdApp, Button, Tooltip } from 'antd'
 import EmbeddedBrowserDownloads from '../EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
 import type {
   EmbeddedBrowserBounds,
@@ -51,6 +52,7 @@ export default function EmbeddedBrowserPanel({
   downloadsOpen,
   onCloseDownloads
 }: EmbeddedBrowserPanelProps): JSX.Element | null {
+  const { message } = AntdApp.useApp()
   const [state, setState] = useState<EmbeddedBrowserState | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [opening, setOpening] = useState(false)
@@ -140,6 +142,18 @@ export default function EmbeddedBrowserPanel({
       window.clearTimeout(timer)
     }
   }, [state?.visible])
+
+  /** 复制当前页面链接。 */
+  const handleCopyUrl = async (): Promise<void> => {
+    if (!state?.url) return
+
+    try {
+      await window.electron.copyText(state.url)
+      message.success('链接已复制')
+    } catch {
+      message.error('复制链接失败')
+    }
+  }
 
   /**
    * 关闭必须由渲染层触发，才能同时播放面板滑出动画。
@@ -378,6 +392,16 @@ export default function EmbeddedBrowserPanel({
               disabled={!state.url}
               aria-label="在默认浏览器打开"
               onClick={() => window.electron.openEmbeddedBrowserExternal()}
+            />
+          </Tooltip>
+          <Tooltip title="复制链接">
+            <Button
+              type="text"
+              size="small"
+              icon={<LinkOutlined />}
+              disabled={!state.url}
+              aria-label="复制链接"
+              onClick={() => handleCopyUrl()}
             />
           </Tooltip>
           <Tooltip title={expanded ? '还原' : '最大化'}>
