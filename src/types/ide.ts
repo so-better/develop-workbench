@@ -37,10 +37,10 @@ export interface IdePreset {
  * 这里只定义展示和参数，具体命令由主进程按平台探测。
  */
 export const IDE_PRESETS: IdePreset[] = [
-  { id: 'qoder', name: 'Qoder', args: ['{path}', '--new-window'] },
-  { id: 'vscode', name: 'Visual Studio Code', args: ['{path}', '--new-window'] },
-  { id: 'cursor', name: 'Cursor', args: ['{path}', '--new-window'] },
-  { id: 'trae', name: 'Trae', args: ['{path}', '--new-window'] },
+  { id: 'qoder', name: 'Qoder', args: ['{path}'] },
+  { id: 'vscode', name: 'Visual Studio Code', args: ['{path}'] },
+  { id: 'cursor', name: 'Cursor', args: ['{path}'] },
+  { id: 'trae', name: 'Trae', args: ['{path}'] },
   { id: 'webstorm', name: 'WebStorm', args: ['{path}'] },
   { id: 'intellij', name: 'IntelliJ IDEA', args: ['{path}'] },
   { id: 'pycharm', name: 'PyCharm', args: ['{path}'] },

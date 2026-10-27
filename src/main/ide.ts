@@ -416,7 +416,7 @@ const waitForQoderWindowReady = async (
   }
 
   if (wasRunning) {
-    await new Promise((resolve) => setTimeout(resolve, 800))
+    await new Promise((resolve) => setTimeout(resolve, 100))
     return
   }
 
@@ -437,12 +437,20 @@ const waitForQoderWindowReady = async (
 const focusIdeWindow = async (config: IdeConfig): Promise<void> => {
   try {
     if (process.platform === 'darwin') {
-      const appBundle = getMacAppBundle(config.command)
+      const target = getMacAppBundle(config.command) ?? config.name
 
-      await execFileAsync('open', ['-a', appBundle ?? config.name], {
+      await execFileAsync('open', ['-a', target], {
         timeout: 5_000,
         encoding: 'utf8'
-      })
+      }).catch(() => undefined)
+
+      await new Promise((resolve) => setTimeout(resolve, 200))
+
+      await execFileAsync(
+        'osascript',
+        ['-e', `tell application "${target.replace(/"/g, '\\"')}" to activate`],
+        { timeout: 5_000, encoding: 'utf8' }
+      )
       return
     }
 
