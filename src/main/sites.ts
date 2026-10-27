@@ -7,7 +7,8 @@ import { randomUUID } from 'node:crypto'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { backupCorruptStore } from './store-backup'
-import type { SiteInput, SiteLink, SiteState } from '../types/sites'
+import { SITE_ENVS } from '../types/sites'
+import type { SiteEnv, SiteInput, SiteLink, SiteState } from '../types/sites'
 import { normalizeHttpUrl, normalizeText } from '../utils'
 
 const STORE_FILE = 'sites.json'
@@ -17,6 +18,18 @@ const MAX_TAG_LENGTH = 20
 
 const getStorePath = (): string => join(app.getPath('userData'), STORE_FILE)
 
+const normalizeSiteEnv = (value: unknown): SiteEnv | null => {
+  if (typeof value !== 'string') return null
+
+  return (SITE_ENVS as readonly string[]).includes(value)
+    ? (value as SiteEnv)
+    : null
+}
+
+const LEGACY_TAG_LABELS: Record<string, string> = {
+  自研内部系统: '技术平台'
+}
+
 const normalizeTags = (value: unknown): string[] => {
   if (!Array.isArray(value)) return []
 
@@ -24,6 +37,7 @@ const normalizeTags = (value: unknown): string[] => {
     new Set(
       value
         .map((tag) => normalizeText(tag, MAX_TAG_LENGTH))
+        .map((tag) => LEGACY_TAG_LABELS[tag] ?? tag)
         .filter(Boolean)
     )
   ).slice(0, MAX_TAGS)
@@ -50,6 +64,7 @@ const normalizeStoredSite = (value: unknown): SiteLink | null => {
       name: site.name.trim(),
       url: normalizeHttpUrl(site.url, '站点 URL'),
       tags: normalizeTags(site.tags),
+      env: normalizeSiteEnv(site.env),
       clickCount: Math.max(0, Math.floor(Number(site.clickCount) || 0)),
       lastOpenedAt:
         typeof site.lastOpenedAt === 'string' ? site.lastOpenedAt : null,
@@ -93,7 +108,9 @@ const writeSites = async (sites: SiteLink[]): Promise<void> => {
   await rename(temporaryPath, filePath)
 }
 
-const toInput = (input: SiteInput): { name: string; url: string; tags: string[] } => {
+const toInput = (
+  input: SiteInput
+): { name: string; url: string; tags: string[]; env: SiteEnv | null } => {
   if (!input || typeof input !== 'object') throw new Error('站点参数不合法')
 
   const name = normalizeText(input.name, MAX_NAME_LENGTH)
@@ -103,7 +120,8 @@ const toInput = (input: SiteInput): { name: string; url: string; tags: string[] 
   return {
     name,
     url: normalizeHttpUrl(input.url, '站点 URL'),
-    tags: normalizeTags(input.tags)
+    tags: normalizeTags(input.tags),
+    env: normalizeSiteEnv(input.env)
   }
 }
 

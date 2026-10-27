@@ -40,10 +40,11 @@ import {
   Popconfirm,
   Select,
   Spin,
+  Tag,
   Tooltip
 } from 'antd'
 import type { InputRef } from 'antd'
-import type { SiteInput, SiteLink } from '../../../../types/sites'
+import type { SiteEnv, SiteInput, SiteLink } from '../../../../types/sites'
 import RobotMark from '../../components/RobotMark/RobotMark'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import { getErrorMessage, normalizeHttpUrl } from '../../../../utils'
@@ -52,18 +53,33 @@ interface SiteFormValues {
   name: string
   url: string
   tags?: string[]
+  env?: SiteEnv | null
 }
 
-const SITE_TAG_TONES: Record<string, string> = {
-  飞书文档: 'blue',
-  飞书表格: 'teal',
-  第三方网站: 'gray',
-  公司平台: 'purple',
+const SITE_TAG_COLORS: Record<string, string> = {
+  飞书文档: 'geekblue',
+  飞书表格: 'cyan',
+  第三方网站: 'default',
+  公司平台: 'magenta',
   业务系统: 'green',
-  自研内部系统: 'orange'
+  技术平台: 'gold'
 }
 
-const getSiteTagTone = (tag: string): string => SITE_TAG_TONES[tag] ?? 'gray'
+const SITE_ENV_OPTIONS: Array<{ value: SiteEnv; label: string }> = [
+  { value: 'prod', label: '生产（prod）' },
+  { value: 'test', label: '测试（test）' },
+  { value: 'staging', label: '预发（staging）' },
+  { value: 'dev', label: '开发（dev）' },
+  { value: 'gray', label: '灰度（gray）' }
+]
+
+const SITE_ENV_TAG_COLORS: Record<SiteEnv, string> = {
+  prod: '#079455',
+  test: '#1570ef',
+  staging: '#dc6803',
+  dev: '#7c3aed',
+  gray: '#667085'
+}
 
 const DEFAULT_SITE_TAGS = [
   '飞书文档',
@@ -71,7 +87,7 @@ const DEFAULT_SITE_TAGS = [
   '第三方网站',
   '公司平台',
   '业务系统',
-  '自研内部系统'
+  '技术平台'
 ]
 
 const FREQUENT_CLICK_THRESHOLD = 2
@@ -110,6 +126,13 @@ function SiteCard({
       >
         <span className="site-card-copy">
           <span className="site-card-title">
+            {site.env ? (
+              <Tooltip title={`环境：${site.env}`}>
+                <Tag color={SITE_ENV_TAG_COLORS[site.env]}>
+                  {site.env.toUpperCase()}
+                </Tag>
+              </Tooltip>
+            ) : null}
             <Tooltip title={site.name}>
               <strong>{site.name}</strong>
             </Tooltip>
@@ -118,13 +141,9 @@ function SiteCard({
           {site.tags.length > 0 ? (
             <span className="site-card-tags">
               {site.tags.map((tag) => (
-                <span
-                  className={`site-card-tag is-${getSiteTagTone(tag)}`}
-                  title={tag}
-                  key={tag}
-                >
+                <Tag key={tag} color={SITE_TAG_COLORS[tag]}>
                   {tag}
-                </span>
+                </Tag>
               ))}
             </span>
           ) : null}
@@ -163,11 +182,11 @@ function SiteCard({
           </Popconfirm>
         </div>
       </div>
-    </article>
+    </article >
   )
 }
 
-interface SortableSiteCardProps extends Omit<SiteCardProps, 'dragHandle'> {}
+interface SortableSiteCardProps extends Omit<SiteCardProps, 'dragHandle'> { }
 
 /**
  * 可拖拽的站点卡片。
@@ -331,7 +350,7 @@ export default function SitesPage(): JSX.Element {
     if (!keyword) return sites
 
     return sites.filter((site) =>
-      [site.name, site.url, site.tags.join(' ')].some((value) =>
+      [site.name, site.url, site.tags.join(' '), site.env ?? ''].some((value) =>
         value.toLocaleLowerCase().includes(keyword)
       )
     )
@@ -400,7 +419,8 @@ export default function SitesPage(): JSX.Element {
     form.setFieldsValue({
       name: '',
       url: '',
-      tags: []
+      tags: [],
+      env: null
     })
     setModalOpen(true)
   }
@@ -410,7 +430,8 @@ export default function SitesPage(): JSX.Element {
     form.setFieldsValue({
       name: site.name,
       url: site.url,
-      tags: site.tags
+      tags: site.tags,
+      env: site.env
     })
     setModalOpen(true)
   }
@@ -433,7 +454,8 @@ export default function SitesPage(): JSX.Element {
     const input: SiteInput = {
       name: values.name.trim(),
       url: normalizeHttpUrl(values.url, '站点 URL'),
-      tags: values.tags ?? []
+      tags: values.tags ?? [],
+      env: values.env ?? null
     }
 
     setSaving(true)
@@ -481,7 +503,7 @@ export default function SitesPage(): JSX.Element {
         '请先调用 listSites 工具读取我保存的全部站点，再基于工具实际返回的数据进行分析。',
         '',
         '分析要求：',
-        '- 按用途归类，说明每类包含哪些站点',
+        '- 按用途和环境归类，说明每类包含哪些站点',
         '- 找出可能重复、命名不清晰或 URL 异常的站点',
         '- 给出标签优化建议',
         '- 可以建议补充的工具类型，但不要编造具体链接',
@@ -726,6 +748,17 @@ export default function SitesPage(): JSX.Element {
             ]}
           >
             <Input placeholder="https://example.com" spellCheck={false} />
+          </Form.Item>
+          <Form.Item
+            label="环境"
+            name="env"
+            extra="不设置表示不区分环境"
+          >
+            <Select
+              allowClear
+              placeholder="不区分环境"
+              options={SITE_ENV_OPTIONS}
+            />
           </Form.Item>
           <Form.Item label="标签" name="tags">
             <Select
