@@ -2,13 +2,13 @@
  * 外部 IDE 配置模块。
  * 当前只负责保存启动配置，不直接打开仓库。
  */
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { OpenDialogOptions } from 'electron'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { constants } from 'node:fs'
 import { access } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
+import { basename, isAbsolute, join } from 'node:path'
 import { homedir } from 'node:os'
 import { getPreferences, updatePreferences } from './preferences'
 import { getRepositoryLocalPath, prepareRepositoryForIde } from './repositories'
@@ -360,6 +360,113 @@ const spawnDetached = (
   })
 }
 
+/** macOS 命令所在的应用包路径。 */
+const getMacAppBundle = (command: string): string | null => {
+  const marker = '.app/'
+  const index = command.indexOf(marker)
+
+  if (index >= 0) return command.slice(0, index + 4)
+
+  return command.endsWith('.app') ? command : null
+}
+
+/** Windows 上不同 IDE 的进程名，优先使用常见进程名。 */
+const IDE_WINDOWS_PROCESS_NAMES: Partial<Record<IdePresetId, string[]>> = {
+  qoder: ['Qoder'],
+  vscode: ['Code'],
+  cursor: ['Cursor'],
+  trae: ['Trae'],
+  webstorm: ['webstorm64', 'webstorm'],
+  intellij: ['idea64', 'idea'],
+  pycharm: ['pycharm64', 'pycharm'],
+  goland: ['goland64', 'goland'],
+  clion: ['clion64', 'clion'],
+  'android-studio': ['studio64', 'studio'],
+  sublime: ['sublime_text'],
+  zed: ['zed'],
+  fleet: ['fleet'],
+  'visual-studio': ['devenv']
+}
+
+/** 读取 Qoder 窗口 Renderer 进程 PID。 */
+const getQoderRendererPids = async (): Promise<Set<string>> => {
+  if (process.platform !== 'darwin') return new Set()
+
+  try {
+    const { stdout } = await execFileAsync(
+      'pgrep',
+      ['-f', 'Qoder Helper \(Renderer\)'],
+      { timeout: 3_000, encoding: 'utf8' }
+    )
+
+    return new Set(stdout.trim().split(/\s+/).filter(Boolean))
+  } catch {
+    return new Set()
+  }
+}
+
+/** 等待 Qoder 新窗口出现，再留出渲染和扩展加载时间。 */
+const waitForQoderWindowReady = async (
+  previousPids: Set<string>,
+  wasRunning: boolean
+): Promise<void> => {
+  if (process.platform !== 'darwin') {
+    await new Promise((resolve) => setTimeout(resolve, 1_500))
+    return
+  }
+
+  if (wasRunning) {
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    return
+  }
+
+  const deadline = Date.now() + 6_000
+
+  while (Date.now() < deadline) {
+    const pids = await getQoderRendererPids()
+
+    if ([...pids].some((pid) => !previousPids.has(pid))) break
+
+    await new Promise((resolve) => setTimeout(resolve, 200))
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 500))
+}
+
+/** 将当前配置对应的 IDE 窗口带到最前面。 */
+const focusIdeWindow = async (config: IdeConfig): Promise<void> => {
+  try {
+    if (process.platform === 'darwin') {
+      const appBundle = getMacAppBundle(config.command)
+
+      await execFileAsync('open', ['-a', appBundle ?? config.name], {
+        timeout: 5_000,
+        encoding: 'utf8'
+      })
+      return
+    }
+
+    if (process.platform === 'win32') {
+      const commandName = basename(config.command).replace(/\.(cmd|bat|exe)$/i, '')
+      const names = [
+        ...(IDE_WINDOWS_PROCESS_NAMES[config.preset] ?? []),
+        commandName
+      ]
+        .filter(Boolean)
+        .map((name) => `'${name.replace(/'/g, "''")}'`)
+        .join(',')
+      const script = `$names=@(${names}); Add-Type -Name Win32 -Namespace Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);'; foreach($name in $names){ $p=Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; if($p){ [Native.Win32]::SetForegroundWindow($p.MainWindowHandle); break } }`
+
+      await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script], {
+        timeout: 5_000,
+        encoding: 'utf8'
+      })
+    }
+  } catch {
+    // 激活失败不影响打开仓库。
+  }
+}
+
 /**
  * 使用配置的 IDE 打开已准备好的仓库。
  * Qoder 额外通过 DeepLink 新建预填 AI 会话。
@@ -378,16 +485,21 @@ export const launchRepositoryInIde = async (
         )}&mode=agent&isNewChat=true`
       : null
 
+  const qoderRendererPids = qoderChatDeeplink
+    ? await getQoderRendererPids()
+    : new Set<string>()
+
   await spawnDetached(config.command, args)
 
   if (qoderChatDeeplink) {
-    await new Promise((resolve) => setTimeout(resolve, 3_000))
-    await spawnDetached(config.command, [
-      '--open-url',
-      '--',
-      qoderChatDeeplink
-    ])
+    await waitForQoderWindowReady(
+      qoderRendererPids,
+      qoderRendererPids.size > 0
+    )
+    await shell.openExternal(qoderChatDeeplink)
   }
+
+  await focusIdeWindow(config)
 }
 
 /**
