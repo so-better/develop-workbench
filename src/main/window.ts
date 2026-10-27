@@ -85,6 +85,11 @@ export const createMainWindow = (): void => {
   window.once('ready-to-show', () => {
     window.maximize()
     showMainWindow()
+
+    // 开发模式自动打开控制台，打包后不显示。
+    if (!app.isPackaged) {
+      window.webContents.openDevTools()
+    }
   })
 
   // 每次窗口重新显示时通知渲染进程刷新 lark 登录状态。
