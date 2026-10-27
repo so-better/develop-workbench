@@ -37,7 +37,7 @@ export interface IdePreset {
  * 这里只定义展示和参数，具体命令由主进程按平台探测。
  */
 export const IDE_PRESETS: IdePreset[] = [
-  { id: 'qoder', name: 'Qoder', args: ['{path}', '--reuse-window'] },
+  { id: 'qoder', name: 'Qoder', args: ['--add', '{path}'] },
   { id: 'vscode', name: 'Visual Studio Code', args: ['{path}', '--reuse-window'] },
   { id: 'cursor', name: 'Cursor', args: ['{path}', '--reuse-window'] },
   { id: 'trae', name: 'Trae', args: ['{path}', '--reuse-window'] },

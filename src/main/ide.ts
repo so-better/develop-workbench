@@ -288,7 +288,9 @@ const getUsableIdeConfig = async (): Promise<IdeConfig> => {
   if (!state.config) throw new Error('请先在设置中配置 IDE')
   if (!state.available) throw new Error('配置的 IDE 当前不可用')
 
-  return state.config
+  const preset = IDE_PRESETS.find((item) => item.id === state.config?.preset)
+
+  return preset ? { ...state.config, args: preset.args } : state.config
 }
 
 /**
