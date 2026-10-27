@@ -379,7 +379,7 @@ export const selectIdeCommand = async (
 ): Promise<string | null> => {
   const options: OpenDialogOptions = {
     title: '选择 IDE 应用或可执行文件',
-    properties: ['openFile'],
+    properties: ['openFile', 'showHiddenFiles'],
     defaultPath:
       process.platform === 'darwin' ? '/Applications' : currentPath || homedir()
   }

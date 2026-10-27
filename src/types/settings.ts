@@ -8,6 +8,7 @@ export type SettingsSection =
   | 'ide'
   | 'repositories'
   | 'ai'
+  | 'skills'
   | 'cleanup'
   | 'app-info'
 

@@ -5,6 +5,7 @@ import { open, rename, rm } from 'node:fs/promises'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { backupCorruptStoreSync } from './store-backup'
+import { tryNormalizeHttpUrl } from '../utils'
 import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserDownload,
@@ -283,17 +284,6 @@ const configureBrowserSession = (): void => {
   })
 }
 
-const normalizeHttpUrl = (rawUrl: string): string | null => {
-  try {
-    const url = new URL(rawUrl)
-
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
-
-    return url.toString()
-  } catch {
-    return null
-  }
-}
 
 const toState = (entry: BrowserEntry): EmbeddedBrowserState => {
   const webContents = entry.view.webContents
@@ -329,7 +319,7 @@ const loadUrl = (
   rawUrl: string,
   showNavigation = false
 ): boolean => {
-  const url = normalizeHttpUrl(rawUrl)
+  const url = tryNormalizeHttpUrl(rawUrl)
 
   if (!url) return false
 
@@ -575,11 +565,11 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
   })
 
   webContents.on('will-navigate', (event, url) => {
-    if (!normalizeHttpUrl(url)) event.preventDefault()
+    if (!tryNormalizeHttpUrl(url)) event.preventDefault()
   })
 
   webContents.on('will-redirect', (event, url) => {
-    if (!normalizeHttpUrl(url)) event.preventDefault()
+    if (!tryNormalizeHttpUrl(url)) event.preventDefault()
   })
 
   webContents.on('did-start-loading', () => {

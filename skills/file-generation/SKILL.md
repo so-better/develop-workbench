@@ -1,3 +1,16 @@
+---
+name: file-generation
+description: 本地文件生成、命名和保存规范
+keywords:
+  - file
+  - 文件
+  - 生成
+  - 导出
+  - csv
+  - markdown
+  - html
+---
+
 # 文件生成
 
 - 文本文件使用 saveLocalFile：Markdown、TXT、CSV、JSON、HTML、XML、YAML、SVG、日志，以及 Word(docx) 和 PDF。

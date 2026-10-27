@@ -1,3 +1,15 @@
+---
+name: data-viz
+description: 图表选型、ECharts 和 Mermaid 使用规范
+keywords:
+  - chart
+  - echarts
+  - mermaid
+  - 图表
+  - 可视化
+  - 流程图
+---
+
 # 数据可视化
 
 - 类别比较用条形图，时间趋势用折线图，占比用饼图但类别不超过 5 个。

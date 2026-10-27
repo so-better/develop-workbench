@@ -50,6 +50,7 @@ import type {
 } from '../types/repository'
 import type { ThemeMode, ThemeState } from '../types/theme'
 import type { SiteInput, SiteState } from '../types/sites'
+import type { SkillSettingsState } from '../types/skills'
 import type {
   SubmitWeeklyReportInput,
   WeeklyReportState
@@ -765,6 +766,24 @@ const electronAPI = {
    */
   clearAiArtifacts: (): Promise<AiArtifactStats> =>
     ipcRenderer.invoke('ai:artifacts:clear'),
+
+  /**
+   * 读取额外技能目录。
+   */
+  getSkillSettings: (): Promise<SkillSettingsState> =>
+    ipcRenderer.invoke('skills:get-settings'),
+
+  /**
+   * 保存额外技能目录。
+   */
+  setSkillDirectories: (directories: string[]): Promise<SkillSettingsState> =>
+    ipcRenderer.invoke('skills:set-directories', directories),
+
+  /**
+   * 打开系统目录选择器。
+   */
+  selectSkillDirectory: (): Promise<string | null> =>
+    ipcRenderer.invoke('skills:select-directory'),
 
   /**
    * 解析剪贴板粘贴的附件文件。

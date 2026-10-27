@@ -18,6 +18,7 @@ export interface AppPreferences {
   repositoryRoot?: string
   gitPath?: string
   ide?: IdeConfig
+  skillDirectories?: string[]
 }
 
 const DEFAULT_PREFERENCES: AppPreferences = {
@@ -111,6 +112,7 @@ const readPreferences = (): AppPreferences => {
     repositoryRoot?: unknown
     gitPath?: unknown
     ide?: unknown
+    skillDirectories?: unknown
   }
 
   cachedPreferences = {
@@ -120,7 +122,13 @@ const readPreferences = (): AppPreferences => {
     meegleProjectKey: normalizePath(value.meegleProjectKey),
     repositoryRoot: normalizePath(value.repositoryRoot),
     gitPath: normalizePath(value.gitPath),
-    ide: isIdeConfig(value.ide) ? value.ide : undefined
+    ide: isIdeConfig(value.ide) ? value.ide : undefined,
+    skillDirectories: Array.isArray(value.skillDirectories)
+      ? value.skillDirectories
+          .filter((item): item is string => typeof item === 'string')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : undefined
   }
 
   return cachedPreferences
@@ -147,6 +155,9 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
   next.repositoryRoot = normalizePath(next.repositoryRoot)
   next.gitPath = normalizePath(next.gitPath)
   next.ide = isIdeConfig(next.ide) ? next.ide : undefined
+  next.skillDirectories = next.skillDirectories
+    ?.map((item) => item.trim())
+    .filter(Boolean)
   cachedPreferences = next
 
   try {

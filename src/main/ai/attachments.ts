@@ -109,7 +109,7 @@ export const pickAiAttachments = async (
 ): Promise<AiChatAttachment[]> => {
   const options: OpenDialogOptions = {
     title: '选择 AI 附件',
-    properties: ['openFile', 'multiSelections'],
+    properties: ['openFile', 'multiSelections', 'showHiddenFiles'],
     filters: FILE_FILTERS
   }
   const result = window

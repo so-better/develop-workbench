@@ -1,3 +1,13 @@
+---
+name: translation
+description: 翻译准确性、术语一致和格式保留
+keywords:
+  - translation
+  - 翻译
+  - 本地化
+  - i18n
+---
+
 # 翻译
 
 - 先理解原文再翻译，忠实原意优先于逐字对应。

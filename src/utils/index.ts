@@ -14,9 +14,32 @@ export const isRecord = (value: unknown): value is Record<string, unknown> =>
 export const normalizeText = (value: unknown, maxLength: number): string =>
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 
+/** 提取无协议地址中的主机名，用于判断默认协议。 */
+const getHostname = (value: string): string => {
+  const host = value.split('/')[0] ?? ''
+
+  if (host.startsWith('[')) {
+    const end = host.indexOf(']')
+    return end > 0 ? host.slice(1, end) : host
+  }
+
+  return host.split(':')[0] ?? ''
+}
+
+/** IP、localhost 和 .local 主机默认使用 http，其余默认 https。 */
+const getDefaultProtocol = (value: string): 'http' | 'https' => {
+  const hostname = getHostname(value).toLowerCase()
+  const isIpv4 = /^(?:\d{1,3}\.){3}\d{1,3}$/.test(hostname)
+  const isIpv6 = hostname.includes(':') && /^[0-9a-f:]+$/i.test(hostname)
+
+  return isIpv4 || isIpv6 || hostname === 'localhost' || hostname.endsWith('.local')
+    ? 'http'
+    : 'https'
+}
+
 /**
  * 规范化 HTTP/HTTPS 地址。
- * 缺少协议时自动补 https，并校验最终协议。
+ * 缺少协议时，IP / localhost 自动补 http，其余自动补 https。
  */
 export const normalizeHttpUrl = (value: unknown, label = 'URL'): string => {
   if (typeof value !== 'string') throw new Error(`${label}不合法`)
@@ -26,7 +49,7 @@ export const normalizeHttpUrl = (value: unknown, label = 'URL'): string => {
   if (!normalized) throw new Error(`${label}不能为空`)
 
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(normalized)) {
-    normalized = `https://${normalized}`
+    normalized = `${getDefaultProtocol(normalized)}://${normalized}`
   }
 
   let url: URL
@@ -42,6 +65,15 @@ export const normalizeHttpUrl = (value: unknown, label = 'URL'): string => {
   }
 
   return url.toString()
+}
+
+/** 规范化地址，失败时返回 null，用于浏览器导航等不应抛错的场景。 */
+export const tryNormalizeHttpUrl = (value: string): string | null => {
+  try {
+    return normalizeHttpUrl(value)
+  } catch {
+    return null
+  }
 }
 
 /**

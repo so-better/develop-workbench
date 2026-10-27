@@ -6,6 +6,9 @@ directories:
 files:
   - out/**/*
   - package.json
+extraResources:
+  - from: skills
+    to: skills
 asar: true
 mac:
   target: dmg

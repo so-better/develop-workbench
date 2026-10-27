@@ -539,8 +539,8 @@ export default function RequirementWorkbench({
   /** 当前节点剩余工时 = 估分 - 实际工时。 */
   const nodeRemainingWorkTime =
     selectedNode?.points !== null &&
-    selectedNode?.points !== undefined &&
-    selectedNode.actualWorkTime !== null
+      selectedNode?.points !== undefined &&
+      selectedNode.actualWorkTime !== null
       ? Math.max(0, selectedNode.points - selectedNode.actualWorkTime)
       : null
 
@@ -622,8 +622,8 @@ export default function RequirementWorkbench({
   const requirementUrl =
     selectedRequirement && data
       ? `https://project.feishu.cn/${encodeURIComponent(
-          data.project.key
-        )}/story/detail/${encodeURIComponent(selectedRequirement.id)}`
+        data.project.key
+      )}/story/detail/${encodeURIComponent(selectedRequirement.id)}`
       : null
 
   /** 飞书需求详情中“轻舟”页签的固定视图标识。 */
@@ -659,9 +659,9 @@ export default function RequirementWorkbench({
   /** 新增绑定时的分支选项。 */
   const newRepositoryBranchOptions = newRepositoryId
     ? (repoBranches[newRepositoryId] ?? []).map((branch) => ({
-        value: branch,
-        label: branch
-      }))
+      value: branch,
+      label: branch
+    }))
     : []
   const newRepository = newRepositoryId
     ? repositoryMap.get(newRepositoryId) ?? null
@@ -674,197 +674,197 @@ export default function RequirementWorkbench({
   /** 基本信息 Tab 的分组字段。 */
   const basicInfoGroups: BasicInfoGroup[] = selectedRequirement
     ? [
-        {
-          title: '基础信息',
-          fields: [
-            {
-              label: '当前状态',
-              value: selectedRequirement.status ? (
-                <Tag
-                  bordered={false}
-                  className={`requirement-header-tag is-${getStatusTone(
-                    selectedRequirement.status
-                  )}`}
-                >
-                  {selectedRequirement.status}
-                </Tag>
-              ) : (
-                '未填写'
+      {
+        title: '基础信息',
+        fields: [
+          {
+            label: '当前状态',
+            value: selectedRequirement.status ? (
+              <Tag
+                bordered={false}
+                className={`requirement-header-tag is-${getStatusTone(
+                  selectedRequirement.status
+                )}`}
+              >
+                {selectedRequirement.status}
+              </Tag>
+            ) : (
+              '未填写'
+            )
+          },
+          {
+            label: '优先级',
+            value: selectedRequirement.priority ? (
+              <Tag
+                bordered={false}
+                className={`requirement-header-tag is-${getPriorityTone(
+                  selectedRequirement.priority
+                )}`}
+              >
+                {selectedRequirement.priority}
+              </Tag>
+            ) : (
+              '未填写'
+            )
+          },
+          {
+            label: '需求类型',
+            value: renderInfoTags(
+              [formatRequirementType(selectedRequirement.requirementType) ?? ''].filter(Boolean),
+              'blue'
+            )
+          },
+          {
+            label: '产品线',
+            value: renderInfoTags(
+              selectedRequirement.productLines.length > 0
+                ? [selectedRequirement.productLines.join(' / ')]
+                : [],
+              'teal'
+            )
+          },
+          {
+            label: '所属迭代',
+            value: renderInfoTags([selectedGroup?.iterationName ?? '未规划迭代'], 'blue')
+          },
+          {
+            label: '需求文档',
+            value: selectedRequirement.documentUrl ? (
+              <Typography.Link
+                className="requirement-info-doc-link"
+                href={selectedRequirement.documentUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <LinkOutlined />
+                查看文档
+              </Typography.Link>
+            ) : (
+              '未填写'
+            )
+          },
+          {
+            label: '创建人',
+            value: renderPeople(
+              selectedRequirement.createdBy ? [selectedRequirement.createdBy] : []
+            )
+          }
+        ]
+      },
+      {
+        title: '参与人员',
+        fields: [
+          {
+            label: '参与人员',
+            wide: true,
+            hideLabel: true,
+            value: renderCollaborators(selectedRequirement.collaborators)
+          }
+        ]
+      },
+      {
+        title: '时间与版本',
+        fields: [
+          { label: '提出时间', value: selectedRequirement.proposedAt ?? '未填写' },
+          {
+            label: '预计上线时间',
+            value: selectedRequirement.expectedReleaseAt ?? '未填写'
+          },
+          { label: '完成日期', value: selectedRequirement.completedAt ?? '未填写' },
+          {
+            label: '规划版本',
+            value: renderInfoTags(selectedRequirement.planningVersions, 'purple')
+          },
+          {
+            label: '实际上车版本',
+            value: renderInfoTags(selectedRequirement.actualReleaseVersions, 'cyan')
+          }
+        ]
+      },
+      {
+        title: '研发属性',
+        fields: [
+          {
+            label: '需求等级',
+            value: renderInfoTags(
+              selectedRequirement.requirementLevel ? [selectedRequirement.requirementLevel] : [],
+              'orange'
+            )
+          },
+          {
+            label: '需求性质',
+            value: renderInfoTags(
+              selectedRequirement.requirementNature ? [selectedRequirement.requirementNature] : [],
+              'pink'
+            )
+          },
+          {
+            label: '需求复杂度',
+            value: renderInfoTags(
+              selectedRequirement.complexity !== null
+                ? [String(selectedRequirement.complexity)]
+                : [],
+              'gray'
+            )
+          },
+          {
+            label: '研发难度估分',
+            value: renderInfoTags(
+              selectedRequirement.developmentDifficulty !== null
+                ? [String(selectedRequirement.developmentDifficulty)]
+                : [],
+              'gray'
+            )
+          },
+          {
+            label: '预估开发量',
+            value: renderInfoTags(
+              selectedRequirement.estimatedWorkload ? [selectedRequirement.estimatedWorkload] : [],
+              'gray'
+            )
+          },
+          {
+            label: '技术方案',
+            value: selectedRequirement.technicalSolution ?? '未填写'
+          },
+          {
+            label: '应用',
+            value: renderInfoTags(
+              selectedRequirement.application ? [selectedRequirement.application] : [],
+              'teal'
+            )
+          },
+          { label: '标签', value: renderInfoTags(selectedRequirement.tags, 'green') },
+          {
+            label: '是否涉及权限',
+            value: selectedRequirement.permissionsInvolved
+              ? renderInfoTags(
+                [selectedRequirement.permissionsInvolved],
+                getBooleanTagTone(selectedRequirement.permissionsInvolved)
               )
-            },
-            {
-              label: '优先级',
-              value: selectedRequirement.priority ? (
-                <Tag
-                  bordered={false}
-                  className={`requirement-header-tag is-${getPriorityTone(
-                    selectedRequirement.priority
-                  )}`}
-                >
-                  {selectedRequirement.priority}
-                </Tag>
-              ) : (
-                '未填写'
+              : '未填写'
+          },
+          {
+            label: '是否涉及历史数据',
+            value: selectedRequirement.historicalDataInvolved
+              ? renderInfoTags(
+                [selectedRequirement.historicalDataInvolved],
+                getBooleanTagTone(selectedRequirement.historicalDataInvolved)
               )
-            },
-            {
-              label: '需求类型',
-              value: renderInfoTags(
-                [formatRequirementType(selectedRequirement.requirementType) ?? ''].filter(Boolean),
-                'blue'
+              : '未填写'
+          },
+          {
+            label: '是否涉及性能测试',
+            value: selectedRequirement.performanceTestInvolved
+              ? renderInfoTags(
+                [selectedRequirement.performanceTestInvolved],
+                getBooleanTagTone(selectedRequirement.performanceTestInvolved)
               )
-            },
-            {
-              label: '产品线',
-              value: renderInfoTags(
-                selectedRequirement.productLines.length > 0
-                  ? [selectedRequirement.productLines.join(' / ')]
-                  : [],
-                'teal'
-              )
-            },
-            {
-              label: '所属迭代',
-              value: renderInfoTags([selectedGroup?.iterationName ?? '未规划迭代'], 'blue')
-            },
-            {
-              label: '需求文档',
-              value: selectedRequirement.documentUrl ? (
-                <Typography.Link
-                  className="requirement-info-doc-link"
-                  href={selectedRequirement.documentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <LinkOutlined />
-                  查看文档
-                </Typography.Link>
-              ) : (
-                '未填写'
-              )
-            },
-            {
-              label: '创建人',
-              value: renderPeople(
-                selectedRequirement.createdBy ? [selectedRequirement.createdBy] : []
-              )
-            }
-          ]
-        },
-        {
-          title: '参与人员',
-          fields: [
-            {
-              label: '参与人员',
-              wide: true,
-              hideLabel: true,
-              value: renderCollaborators(selectedRequirement.collaborators)
-            }
-          ]
-        },
-        {
-          title: '时间与版本',
-          fields: [
-            { label: '提出时间', value: selectedRequirement.proposedAt ?? '未填写' },
-            {
-              label: '预计上线时间',
-              value: selectedRequirement.expectedReleaseAt ?? '未填写'
-            },
-            { label: '完成日期', value: selectedRequirement.completedAt ?? '未填写' },
-            {
-              label: '规划版本',
-              value: renderInfoTags(selectedRequirement.planningVersions, 'purple')
-            },
-            {
-              label: '实际上车版本',
-              value: renderInfoTags(selectedRequirement.actualReleaseVersions, 'cyan')
-            }
-          ]
-        },
-        {
-          title: '研发属性',
-          fields: [
-            {
-              label: '需求等级',
-              value: renderInfoTags(
-                selectedRequirement.requirementLevel ? [selectedRequirement.requirementLevel] : [],
-                'orange'
-              )
-            },
-            {
-              label: '需求性质',
-              value: renderInfoTags(
-                selectedRequirement.requirementNature ? [selectedRequirement.requirementNature] : [],
-                'pink'
-              )
-            },
-            {
-              label: '需求复杂度',
-              value: renderInfoTags(
-                selectedRequirement.complexity !== null
-                  ? [String(selectedRequirement.complexity)]
-                  : [],
-                'gray'
-              )
-            },
-            {
-              label: '研发难度估分',
-              value: renderInfoTags(
-                selectedRequirement.developmentDifficulty !== null
-                  ? [String(selectedRequirement.developmentDifficulty)]
-                  : [],
-                'gray'
-              )
-            },
-            {
-              label: '预估开发量',
-              value: renderInfoTags(
-                selectedRequirement.estimatedWorkload ? [selectedRequirement.estimatedWorkload] : [],
-                'gray'
-              )
-            },
-            {
-              label: '技术方案',
-              value: selectedRequirement.technicalSolution ?? '未填写'
-            },
-            {
-              label: '应用',
-              value: renderInfoTags(
-                selectedRequirement.application ? [selectedRequirement.application] : [],
-                'teal'
-              )
-            },
-            { label: '标签', value: renderInfoTags(selectedRequirement.tags, 'green') },
-            {
-              label: '是否涉及权限',
-              value: selectedRequirement.permissionsInvolved
-                ? renderInfoTags(
-                    [selectedRequirement.permissionsInvolved],
-                    getBooleanTagTone(selectedRequirement.permissionsInvolved)
-                  )
-                : '未填写'
-            },
-            {
-              label: '是否涉及历史数据',
-              value: selectedRequirement.historicalDataInvolved
-                ? renderInfoTags(
-                    [selectedRequirement.historicalDataInvolved],
-                    getBooleanTagTone(selectedRequirement.historicalDataInvolved)
-                  )
-                : '未填写'
-            },
-            {
-              label: '是否涉及性能测试',
-              value: selectedRequirement.performanceTestInvolved
-                ? renderInfoTags(
-                    [selectedRequirement.performanceTestInvolved],
-                    getBooleanTagTone(selectedRequirement.performanceTestInvolved)
-                  )
-                : '未填写'
-            }
-          ]
-        }
-      ]
+              : '未填写'
+          }
+        ]
+      }
+    ]
     : []
 
   /**
@@ -1246,14 +1246,14 @@ export default function RequirementWorkbench({
     try {
       const state = newRepositoryIsQingzhou
         ? await window.electron.addQingzhouRequirementBinding(
-            selectedRequirementId,
-            newRepositoryId
-          )
+          selectedRequirementId,
+          newRepositoryId
+        )
         : await window.electron.addRequirementBinding(
-            selectedRequirementId,
-            newRepositoryId,
-            newBranchName as string
-          )
+          selectedRequirementId,
+          newRepositoryId,
+          newBranchName as string
+        )
 
       if (newRepositoryIsQingzhou) {
         await loadBranches(newRepositoryId, true, true)
@@ -1559,10 +1559,10 @@ export default function RequirementWorkbench({
   const mergeRequestUrl =
     mergeRequestSource && mergeRequestTarget
       ? getMergeRequestUrl(
-          mergeRequestRepository?.remoteUrl,
-          mergeRequestSource,
-          mergeRequestTarget
-        )
+        mergeRequestRepository?.remoteUrl,
+        mergeRequestSource,
+        mergeRequestTarget
+      )
       : null
   const mergeRequestBranchOptions = Array.from(
     new Set([
@@ -2094,8 +2094,8 @@ export default function RequirementWorkbench({
       const statusFiltered =
         selectedStatuses.size > 0
           ? group.requirements.filter((requirement) =>
-              selectedStatuses.has(requirement.status ?? '状态未知')
-            )
+            selectedStatuses.has(requirement.status ?? '状态未知')
+          )
           : group.requirements
 
       if (statusFiltered.length === 0) return []
@@ -2236,16 +2236,15 @@ export default function RequirementWorkbench({
       key={requirement.id}
       id={`workbench-requirement-${requirement.id}`}
       type="button"
-      className={`workbench-requirement-item${
-        requirement.id === selectedRequirementId ? ' is-active' : ''
-      }`}
+      className={`workbench-requirement-item${requirement.id === selectedRequirementId ? ' is-active' : ''
+        }`}
       aria-current={requirement.id === selectedRequirementId ? 'true' : undefined}
       onClick={() => setSelectedRequirementId(requirement.id)}
     >
       <span className="workbench-requirement-item-title-row">
         {requirement.priority === 'P0' ||
-        requirement.priority === 'P1' ||
-        requirement.priority === 'P2' ? (
+          requirement.priority === 'P1' ||
+          requirement.priority === 'P2' ? (
           <span className={`requirement-priority is-${getPriorityTone(requirement.priority)}`}>
             {requirement.priority}
           </span>
@@ -2608,9 +2607,8 @@ export default function RequirementWorkbench({
                       ) : (
                         <button
                           type="button"
-                          className={`workbench-personal-status-value${
-                            personalStatus?.value ? '' : ' is-placeholder'
-                          }`}
+                          className={`workbench-personal-status-value${personalStatus?.value ? '' : ' is-placeholder'
+                            }`}
                           onClick={handleStartPersonalStatusEdit}
                         >
                           {personalStatus?.value || '添加个人标记'}
@@ -2733,22 +2731,21 @@ export default function RequirementWorkbench({
                           const bindingStatus = bindingStatuses[binding.id]
                           const qingzhouTasksUrl = binding.qingzhouWorkItemId
                             ? `https://z.xlbsoft.com/workList/tasks?workItemId=${encodeURIComponent(
-                                binding.qingzhouWorkItemId
-                              )}&archiveStatus=all${
+                              binding.qingzhouWorkItemId
+                            )}&archiveStatus=all${binding.qingzhouCodeRepositoryId
+                              ? `&codeRepositoryId=${encodeURIComponent(
                                 binding.qingzhouCodeRepositoryId
-                                  ? `&codeRepositoryId=${encodeURIComponent(
-                                      binding.qingzhouCodeRepositoryId
-                                    )}`
-                                  : ''
-                              }`
+                              )}`
+                              : ''
+                            }`
                             : null
                           const qingzhouIterationBuildUrl =
                             isQingzhou &&
-                            binding.iterationBranch &&
-                            binding.qingzhouIterationBranchId
+                              binding.iterationBranch &&
+                              binding.qingzhouIterationBranchId
                               ? `https://z.xlbsoft.com/workList/branch/${encodeURIComponent(
-                                  binding.qingzhouIterationBranchId
-                                )}`
+                                binding.qingzhouIterationBranchId
+                              )}`
                               : null
                           const remoteBranchesUrl = isQingzhou
                             ? null
@@ -2758,20 +2755,20 @@ export default function RequirementWorkbench({
                             : binding.branchName
                           const targetBranchMissing = Boolean(
                             targetBranch &&
-                              bindingStatus &&
-                              !bindingStatus.branchExists
+                            bindingStatus &&
+                            !bindingStatus.branchExists
                           )
                           const iterationBranchMissing = Boolean(
                             isQingzhou &&
-                              binding.iterationBranch &&
-                              bindingStatus &&
-                              !bindingStatus.iterationBranchExists
+                            binding.iterationBranch &&
+                            bindingStatus &&
+                            !bindingStatus.iterationBranchExists
                           )
                           const qingzhouBranchesMissing = Boolean(
                             isQingzhou &&
-                              bindingStatus &&
-                              !bindingStatus.branchExists &&
-                              !bindingStatus.iterationBranchExists
+                            bindingStatus &&
+                            !bindingStatus.branchExists &&
+                            !bindingStatus.iterationBranchExists
                           )
 
                           return (
@@ -2824,8 +2821,7 @@ export default function RequirementWorkbench({
                                       </Tooltip>
                                       {repository?.remoteUrl ? (
                                         <Tooltip title="选择来源和目标分支">
-                                          <button
-                                            type="button"
+                                          <Typography.Link
                                             className="requirement-repo-qingzhou-link requirement-repo-mr-link"
                                             onClick={() =>
                                               handleOpenCreateMergeRequest(binding)
@@ -2833,7 +2829,7 @@ export default function RequirementWorkbench({
                                           >
                                             <PullRequestOutlined />
                                             创建 MR
-                                          </button>
+                                          </Typography.Link>
                                         </Tooltip>
                                       ) : null}
                                     </span>
@@ -2978,7 +2974,7 @@ export default function RequirementWorkbench({
                                     !repository?.available ||
                                     (isQingzhou
                                       ? !binding.requirementBranch &&
-                                        !binding.iterationBranch
+                                      !binding.iterationBranch
                                       : bindingStatus?.branchExists === false) ||
                                     qingzhouBranchesMissing ||
                                     (openingIdeBindingId !== null && !openingThisBinding)
@@ -3372,7 +3368,7 @@ export default function RequirementWorkbench({
                               )}`}
                             >
                               {selectedNode.status === 'finished' ||
-                              selectedNode.status === 'done' ? (
+                                selectedNode.status === 'done' ? (
                                 <CheckCircleFilled />
                               ) : selectedNode.status === 'doing' ? (
                                 <ClockCircleFilled />
@@ -3501,9 +3497,8 @@ export default function RequirementWorkbench({
                               return (
                                 <>
                                   <div
-                                    className={`requirement-description-box${
-                                      collapsed ? ' is-collapsed' : ''
-                                    }`}
+                                    className={`requirement-description-box${collapsed ? ' is-collapsed' : ''
+                                      }`}
                                   >
                                     <MarkdownContent
                                       content={description}
@@ -3511,7 +3506,7 @@ export default function RequirementWorkbench({
                                     />
                                   </div>
                                   {description.length > 420 ||
-                                  description.split('\n').length > 12 ? (
+                                    description.split('\n').length > 12 ? (
                                     <Button
                                       type="link"
                                       size="small"

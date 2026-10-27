@@ -14,6 +14,7 @@ import LarkAuth from '../LarkAuth/LarkAuth'
 import IdeSettings from '../IdeSettings/IdeSettings'
 import MeegleSettings from '../MeegleSettings/MeegleSettings'
 import RepositorySettings from '../RepositorySettings/RepositorySettings'
+import SkillSettings from '../SkillSettings/SkillSettings'
 
 const CodeEditor = lazy(() => import('../CodeEditor/CodeEditor'))
 
@@ -405,6 +406,14 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
+            className={`settings-nav-item${activeSection === 'skills' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'skills' ? 'page' : undefined}
+            onClick={() => setActiveSection('skills')}
+          >
+            技能
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item${activeSection === 'cleanup' ? ' is-active' : ''}`}
             aria-current={activeSection === 'cleanup' ? 'page' : undefined}
             onClick={() => setActiveSection('cleanup')}
@@ -593,6 +602,8 @@ export default function SettingsModal({
               )}
             </>
           ) : null}
+
+          {activeSection === 'skills' ? <SkillSettings /> : null}
 
           {activeSection === 'git' ? (
             <GitSettings />

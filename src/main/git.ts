@@ -253,7 +253,7 @@ export const setGitPath = async (gitPath: string | null): Promise<GitInfo> => {
 export const selectGitPath = async (currentPath?: string | null): Promise<string | null> => {
   const options: OpenDialogOptions = {
     title: '选择 Git 可执行文件',
-    properties: ['openFile']
+    properties: ['openFile', 'showHiddenFiles']
   }
   const normalizedPath = typeof currentPath === 'string' ? currentPath.trim() : ''
 

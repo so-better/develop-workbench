@@ -1,3 +1,15 @@
+---
+name: sql
+description: SQL 查询、数据库设计和性能优化
+keywords:
+  - sql
+  - database
+  - 数据库
+  - 查询
+  - 索引
+  - 优化
+---
+
 # SQL 与数据库
 
 - 只查询需要的列，过滤条件尽量下推到 WHERE。

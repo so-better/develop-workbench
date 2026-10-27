@@ -48,6 +48,7 @@ import type {
 } from '../types/repository'
 import type { ThemeMode, ThemeState } from '../types/theme'
 import type { SiteInput, SiteState } from '../types/sites'
+import type { SkillSettingsState } from '../types/skills'
 import type {
   SubmitWeeklyReportInput,
   WeeklyReportState
@@ -335,6 +336,12 @@ export interface ElectronAPI {
   getAiArtifactStats: () => Promise<AiArtifactStats>
   /** 清空应用内 AI 产物。 */
   clearAiArtifacts: () => Promise<AiArtifactStats>
+  /** 读取额外技能目录。 */
+  getSkillSettings: () => Promise<SkillSettingsState>
+  /** 保存额外技能目录。 */
+  setSkillDirectories: (directories: string[]) => Promise<SkillSettingsState>
+  /** 打开系统目录选择器。 */
+  selectSkillDirectory: () => Promise<string | null>
   /** 解析剪贴板粘贴的附件文件。 */
   parseAiAttachmentFiles: (
     files: AiAttachmentFilePayload[]

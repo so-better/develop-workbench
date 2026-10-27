@@ -1211,7 +1211,7 @@ export const selectDirectory = async (
 ): Promise<string | null> => {
   const options: OpenDialogOptions = {
     title,
-    properties: ['openDirectory', 'createDirectory'],
+    properties: ['openDirectory', 'createDirectory', 'showHiddenFiles'],
     defaultPath
   }
   const focusedWindow = BrowserWindow.getFocusedWindow()

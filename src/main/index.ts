@@ -21,6 +21,7 @@ import { initializeRequirementBindings } from './requirement-bindings'
 import { initializeRequirementStatuses } from './requirement-statuses'
 import { initializeRequirements } from './requirements'
 import { initializeSites } from './sites'
+import { initializeSkillSettings } from './skill-settings'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
 import { initializeWeeklyReport } from './weekly-report'
@@ -72,6 +73,7 @@ if (!hasSingleInstanceLock) {
     initializeRequirementBindings()
     initializeRequirementStatuses()
     initializeSites()
+    initializeSkillSettings()
     initializeWeeklyReport()
     initializeAiConfig()
     initializeAiAttachments()
