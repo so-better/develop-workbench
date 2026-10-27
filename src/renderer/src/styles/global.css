@@ -7312,7 +7312,13 @@ body {
   z-index: 10002 !important;
 }
 
-.requirement-ide-session-checkbox {
+.requirement-ide-session-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.requirement-ide-open-confirm .requirement-ide-session-option {
   margin-top: 16px;
 }
 
@@ -7332,4 +7338,21 @@ body {
   margin-top: 4px !important;
   color: var(--workbench-secondary) !important;
   font-size: 12px !important;
+}
+
+.requirement-branch-choice .settings-help {
+  text-align: left;
+}
+
+.requirement-branch-choice .settings-help,
+.requirement-ide-open-confirm .settings-help {
+  margin: 8px 0 0;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.requirement-ide-session-option .settings-help {
+  margin: 0;
 }

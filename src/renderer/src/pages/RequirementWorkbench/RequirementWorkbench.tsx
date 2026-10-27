@@ -3937,13 +3937,18 @@ export default function RequirementWorkbench({
             </Radio>
           </Radio.Group>
           {canPrefillSession ? (
-            <Checkbox
-              className="requirement-ide-session-checkbox"
-              checked={ideSessionPrompt}
-              onChange={(event) => updateIdeSessionPrompt(event.target.checked)}
-            >
-              预置需求分析会话
-            </Checkbox>
+            <div className="requirement-ide-session-option">
+              <Checkbox
+                className="requirement-ide-session-checkbox"
+                checked={ideSessionPrompt}
+                onChange={(event) => updateIdeSessionPrompt(event.target.checked)}
+              >
+                预置需求分析会话
+              </Checkbox>
+              <p className="settings-help">
+                勾选后会创建 AI 会话并预填当前需求的飞书链接；取消勾选则只打开 IDE。
+              </p>
+            </div>
           ) : null}
         </div>
       </Modal>
@@ -3990,7 +3995,7 @@ export default function RequirementWorkbench({
             </p>
           ) : null}
           {canPrefillSession ? (
-            <>
+            <div className="requirement-ide-session-option">
               <Checkbox
                 className="requirement-ide-session-checkbox"
                 checked={ideSessionPrompt}
@@ -4001,7 +4006,7 @@ export default function RequirementWorkbench({
               <p className="settings-help">
                 勾选后会创建 AI 会话并预填当前需求的飞书链接；取消勾选则只打开 IDE。
               </p>
-            </>
+            </div>
           ) : null}
         </div>
       </Modal>
