@@ -2709,13 +2709,11 @@ body {
   gap: 4px;
   align-items: center;
   width: fit-content;
-  color: #1677ff;
   font-size: 11px;
   text-decoration: none;
 }
 
 .requirement-repo-qingzhou-link:hover {
-  color: #4096ff;
   text-decoration: underline;
 }
 
@@ -2730,10 +2728,6 @@ body {
 .requirement-repo-mr-link .anticon {
   color: inherit;
   font-size: inherit;
-}
-
-:root[data-theme="dark"] .requirement-repo-qingzhou-link {
-  color: #84b9ff;
 }
 
 .requirement-repo-info .ant-tag {
@@ -2982,22 +2976,11 @@ body {
   font-size: 11px;
 }
 
-.requirement-repo-qingzhou-state a {
-  color: #7c3aed;
-  font-size: 11px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.requirement-repo-qingzhou-state a:hover {
-  text-decoration: underline;
-}
-
-.requirement-repo-qingzhou-state.is-empty {
+.requirement-repo-qingzhou-state.is-pending {
   color: #b54708;
 }
 
-:root[data-theme="dark"] .requirement-repo-qingzhou-state.is-empty {
+:root[data-theme="dark"] .requirement-repo-qingzhou-state.is-pending {
   color: #fdb022;
 }
 
@@ -4023,12 +4006,7 @@ body {
   display: inline-flex;
   gap: 5px;
   align-items: center;
-  color: #1677ff;
   font-size: 12px;
-}
-
-.requirement-info-doc-link:hover {
-  color: #4096ff;
 }
 
 .requirement-remark-block {
@@ -6750,12 +6728,7 @@ body {
 }
 
 .defect-info-link {
-  color: #1570ef;
   text-decoration: none;
-}
-
-.defect-info-link:hover {
-  text-decoration: underline;
 }
 
 .defect-muted {

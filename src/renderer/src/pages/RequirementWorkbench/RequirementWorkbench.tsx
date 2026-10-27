@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import dayjs from 'dayjs'
+import { pinyin } from 'pinyin-pro'
 import {
   CheckCircleFilled,
   ClockCircleFilled,
@@ -42,12 +43,14 @@ import {
   Spin,
   Tabs,
   Tag,
-  Tooltip
+  Tooltip,
+  Typography
 } from 'antd'
 import type { InputRef } from 'antd'
 import type { Dayjs } from 'dayjs'
 import type { RequirementRepoBinding } from '../../../../types/bindings'
 import type { RequirementPersonalStatus } from '../../../../types/requirement-status'
+import type { LarkUser } from '../../../../types/lark'
 import { getErrorMessage } from '../../../../utils'
 import type { Repository, RepositoryBindingStatus } from '../../../../types/repository'
 import type {
@@ -68,6 +71,36 @@ import RequirementFlowchart from '../../components/RequirementFlowchart/Requirem
 interface RequirementWorkbenchProps {
   /** 打开设置弹窗，并定位到指定分类。 */
   onOpenSettings: (section: SettingsSection) => void
+  /** 当前飞书用户，用于生成分支名首字母。 */
+  larkUser: LarkUser | null
+}
+
+/**
+ * 提取用户姓名首字母，中文按拼音首字母转换。
+ * 例如“凌凯”转换为 lk。
+ */
+const getUserNameInitials = (name: string | null | undefined): string => {
+  const normalized = name?.trim()
+
+  if (!normalized) return 'dev'
+
+  if (!/[\u3400-\u9fff]/.test(normalized)) {
+    const words = normalized.match(/[a-z]+/gi) ?? []
+    const initials = words.map((word) => word[0]).join('').toLowerCase()
+
+    return initials.slice(0, 4) || 'dev'
+  }
+
+  const initials = pinyin(normalized, {
+    pattern: 'first',
+    toneType: 'none',
+    type: 'array'
+  })
+    .join('')
+    .replace(/[^a-z]/gi, '')
+    .toLowerCase()
+
+  return initials.slice(0, 4) || 'dev'
 }
 
 interface BasicInfoField {
@@ -437,7 +470,8 @@ const formatNodeActualTime = (
  * 左侧展示当前用户的需求，右侧暂时只保留需求头部信息。
  */
 export default function RequirementWorkbench({
-  onOpenSettings
+  onOpenSettings,
+  larkUser
 }: RequirementWorkbenchProps): JSX.Element {
   const { message, notification } = App.useApp()
   const [data, setData] = useState<MeegleMyRequirements | null>(null)
@@ -592,6 +626,12 @@ export default function RequirementWorkbench({
         )}/story/detail/${encodeURIComponent(selectedRequirement.id)}`
       : null
 
+  /** 飞书需求详情中“轻舟”页签的固定视图标识。 */
+  const qingzhouTabKey = 'MII_69A014D411820BBC_dashboard_01py9t'
+  const qingzhouRequirementUrl = requirementUrl
+    ? `${requirementUrl}?tabKey=${qingzhouTabKey}#${qingzhouTabKey}`
+    : null
+
   /** 仓库 ID 到仓库信息的映射。 */
   const repositoryMap = useMemo(
     () => new Map(repositories.map((repository) => [repository.id, repository])),
@@ -690,7 +730,7 @@ export default function RequirementWorkbench({
             {
               label: '需求文档',
               value: selectedRequirement.documentUrl ? (
-                <a
+                <Typography.Link
                   className="requirement-info-doc-link"
                   href={selectedRequirement.documentUrl}
                   target="_blank"
@@ -698,7 +738,7 @@ export default function RequirementWorkbench({
                 >
                   <LinkOutlined />
                   查看文档
-                </a>
+                </Typography.Link>
               ) : (
                 '未填写'
               )
@@ -1230,7 +1270,7 @@ export default function RequirementWorkbench({
       message.success(
         newRepositoryIsQingzhou
           ? !addedBinding?.qingzhouTaskId
-            ? '轻舟工作项已绑定，尚未创建代码任务'
+            ? '轻舟工作项已绑定，尚未创建代码任务（请在飞书需求详情的轻舟页签中创建）'
             : !addedBinding.requirementBranch
               ? '轻舟工作项已绑定，待创建需求分支'
               : '轻舟工作项已绑定'
@@ -1293,7 +1333,7 @@ export default function RequirementWorkbench({
       setBindingStatusVersion((value) => value + 1)
       message.success(
         !syncedBinding?.qingzhouTaskId
-          ? '同步完成，尚未创建代码任务'
+          ? '同步完成，尚未创建代码任务（请在飞书需求详情的轻舟页签中创建）'
           : !syncedBinding.requirementBranch
             ? '同步完成，待创建需求分支'
             : '轻舟分支已同步'
@@ -1331,7 +1371,11 @@ export default function RequirementWorkbench({
         : branches[0] ?? null
 
     setCreateBranchBase(preferredBase)
-    setCreateBranchName(selectedRequirementId ? `feature/${selectedRequirementId}` : '')
+    setCreateBranchName(
+      selectedRequirementId
+        ? `feat/${getUserNameInitials(larkUser?.name)}/${selectedRequirementId}`
+        : ''
+    )
     setCreateBranchOpen(true)
   }
 
@@ -1461,7 +1505,10 @@ export default function RequirementWorkbench({
 
       // 留出时间让用户看到分支检查和拉取结果。
       await new Promise((resolve) => setTimeout(resolve, 1000))
-      await window.electron.launchRepositoryInIde(binding.repositoryId)
+      const chatPrompt = requirementUrl
+        ? `${requirementUrl}\n帮我分析一下这个需求`
+        : undefined
+      await window.electron.launchRepositoryInIde(binding.repositoryId, chatPrompt)
     } catch (openError) {
       message.error(getErrorMessage(openError))
     } finally {
@@ -2684,11 +2731,6 @@ export default function RequirementWorkbench({
                           const isQingzhou = binding.mode === 'qingzhou'
                           const openingThisBinding = openingIdeBindingId === binding.id
                           const bindingStatus = bindingStatuses[binding.id]
-                          const qingzhouTaskUrl = binding.qingzhouTaskId
-                            ? `https://z.xlbsoft.com/workList/task/${encodeURIComponent(
-                                binding.qingzhouTaskId
-                              )}`
-                            : null
                           const qingzhouTasksUrl = binding.qingzhouWorkItemId
                             ? `https://z.xlbsoft.com/workList/tasks?workItemId=${encodeURIComponent(
                                 binding.qingzhouWorkItemId
@@ -2743,7 +2785,7 @@ export default function RequirementWorkbench({
                                   {isQingzhou && qingzhouTasksUrl ? (
                                     <span className="requirement-repo-qingzhou-links">
                                       <Tooltip title="去创建合并">
-                                        <a
+                                        <Typography.Link
                                           className="requirement-repo-qingzhou-link"
                                           href={qingzhouTasksUrl}
                                           target="_blank"
@@ -2751,11 +2793,11 @@ export default function RequirementWorkbench({
                                         >
                                           <LinkOutlined />
                                           轻舟工作任务
-                                        </a>
+                                        </Typography.Link>
                                       </Tooltip>
                                       {qingzhouIterationBuildUrl ? (
                                         <Tooltip title="去构建流水线">
-                                          <a
+                                          <Typography.Link
                                             className="requirement-repo-qingzhou-link"
                                             href={qingzhouIterationBuildUrl}
                                             target="_blank"
@@ -2763,14 +2805,14 @@ export default function RequirementWorkbench({
                                           >
                                             <DeploymentUnitOutlined />
                                             轻舟迭代分支构建
-                                          </a>
+                                          </Typography.Link>
                                         </Tooltip>
                                       ) : null}
                                     </span>
                                   ) : remoteBranchesUrl ? (
                                     <span className="requirement-repo-qingzhou-links">
                                       <Tooltip title="打开远程仓库分支">
-                                        <a
+                                        <Typography.Link
                                           className="requirement-repo-qingzhou-link"
                                           href={remoteBranchesUrl}
                                           target="_blank"
@@ -2778,7 +2820,7 @@ export default function RequirementWorkbench({
                                         >
                                           <BranchesOutlined />
                                           远程仓库
-                                        </a>
+                                        </Typography.Link>
                                       </Tooltip>
                                       {repository?.remoteUrl ? (
                                         <Tooltip title="选择来源和目标分支">
@@ -2838,20 +2880,31 @@ export default function RequirementWorkbench({
                                       onCopy={handleCopyBranchName}
                                     />
                                     {!binding.qingzhouTaskId ? (
-                                      <div className="requirement-repo-qingzhou-state is-empty">
-                                        <span>尚未创建代码任务，请先在轻舟创建工作项</span>
+                                      <div className="requirement-repo-qingzhou-state is-pending">
+                                        <span>
+                                          尚未创建代码任务，请在飞书需求详情的轻舟页签中创建工作项
+                                        </span>
+                                        {qingzhouRequirementUrl ? (
+                                          <Typography.Link
+                                            href={qingzhouRequirementUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                          >
+                                            去飞书需求
+                                          </Typography.Link>
+                                        ) : null}
                                       </div>
                                     ) : !binding.requirementBranch ? (
-                                      <div className="requirement-repo-qingzhou-state">
+                                      <div className="requirement-repo-qingzhou-state is-pending">
                                         <span>待创建需求分支</span>
-                                        {qingzhouTaskUrl ? (
-                                          <a
-                                            href={qingzhouTaskUrl}
+                                        {qingzhouTasksUrl ? (
+                                          <Typography.Link
+                                            href={qingzhouTasksUrl}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                           >
                                             去轻舟创建
-                                          </a>
+                                          </Typography.Link>
                                         ) : null}
                                       </div>
                                     ) : null}
@@ -3790,7 +3843,7 @@ export default function RequirementWorkbench({
           <label>新分支名</label>
           <Input
             value={createBranchName}
-            placeholder="feature/需求ID"
+            placeholder="feat/首字母/需求ID"
             spellCheck={false}
             onChange={(event) => setCreateBranchName(event.target.value)}
           />

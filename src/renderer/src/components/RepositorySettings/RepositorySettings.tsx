@@ -280,15 +280,16 @@ export default function RepositorySettings(): JSX.Element {
         <Tooltip title={branch}>
           <span className="repository-branch-text">{branch}</span>
         </Tooltip>
-        <Button
-          type="text"
-          size="small"
-          className="repository-copy-button"
-          icon={<CopyOutlined />}
-          aria-label={`复制分支 ${branch}`}
-          title="复制分支名"
-          onClick={() => handleCopyBranch(branch)}
-        />
+        <Tooltip title="复制分支名">
+          <Button
+            type="text"
+            size="small"
+            className="repository-copy-button"
+            icon={<CopyOutlined />}
+            aria-label={`复制分支 ${branch}`}
+            onClick={() => handleCopyBranch(branch)}
+          />
+        </Tooltip>
       </div>
     )
   }

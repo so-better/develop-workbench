@@ -85,6 +85,10 @@ const electronAPI = {
   getEmbeddedBrowserState: (): Promise<EmbeddedBrowserState> =>
     ipcRenderer.invoke('embedded-browser:get-state'),
 
+  /** 在系统默认浏览器中打开当前页面。 */
+  openEmbeddedBrowserExternal: (): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:open-external'),
+
   closeEmbeddedBrowser: (): Promise<void> =>
     ipcRenderer.invoke('embedded-browser:close'),
 
@@ -202,8 +206,11 @@ const electronAPI = {
   /**
    * 启动 IDE 打开仓库。
    */
-  launchRepositoryInIde: (repositoryId: string): Promise<void> =>
-    ipcRenderer.invoke('ide:launch-repository', repositoryId),
+  launchRepositoryInIde: (
+    repositoryId: string,
+    chatPrompt?: string
+  ): Promise<void> =>
+    ipcRenderer.invoke('ide:launch-repository', repositoryId, chatPrompt),
 
   /**
    * 选择 IDE 可执行文件。

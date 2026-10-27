@@ -255,7 +255,7 @@ export default function App(): JSX.Element {
                 hidden={workspace !== page.key}
                 aria-hidden={workspace !== page.key}
               >
-                {page.render({ onOpenSettings: openSettings })}
+                {page.render({ onOpenSettings: openSettings, larkUser })}
               </div>
             ))
           ) : (

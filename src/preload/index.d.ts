@@ -68,6 +68,8 @@ export interface ElectronAPI {
   ) => Promise<boolean>
   /** 读取内嵌浏览器状态。 */
   getEmbeddedBrowserState: () => Promise<EmbeddedBrowserState>
+  /** 在系统默认浏览器中打开当前页面。 */
+  openEmbeddedBrowserExternal: () => Promise<void>
   /** 关闭内嵌浏览器面板。 */
   closeEmbeddedBrowser: () => Promise<void>
   /** 内嵌浏览器刷新。 */
@@ -122,7 +124,7 @@ export interface ElectronAPI {
     hasUpstream: boolean
   }>
   /** 启动 IDE 打开仓库。 */
-  launchRepositoryInIde: (repositoryId: string) => Promise<void>
+  launchRepositoryInIde: (repositoryId: string, chatPrompt?: string) => Promise<void>
   /** 选择 IDE 可执行文件。 */
   selectIdeCommand: (
     currentPath?: string | null,

@@ -755,6 +755,19 @@ export const initializeEmbeddedBrowser = (): void => {
     }
   )
 
+  ipcMain.handle('embedded-browser:open-external', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+
+    if (!window) return
+
+    const entry = entries.get(window.id)
+    const url = entry?.view.webContents.getURL()
+
+    if (!url || !/^https?:\/\//i.test(url)) return
+
+    await shell.openExternal(url)
+  })
+
   ipcMain.handle('embedded-browser:get-state', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
 

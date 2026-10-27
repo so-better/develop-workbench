@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { CopyOutlined, DeleteOutlined, FileTextOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Input, Modal, Popconfirm, Spin } from 'antd'
+import { Alert, App, Button, Input, Modal, Popconfirm, Spin, Tooltip } from 'antd'
 import type { AiArtifactStats } from '../../../../types/ai'
 import type { AppInfo } from '../../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../../types/lark'
@@ -682,16 +682,17 @@ export default function SettingsModal({
                     <span>{item.label}</span>
                     <div className="settings-info-value">
                       <strong>{item.value}</strong>
-                      <button
-                        type="button"
-                        className="settings-copy-button"
-                        aria-label={`复制${item.label}`}
-                        title="复制"
-                        disabled={!appInfo}
-                        onClick={() => copyValue(item.value)}
-                      >
-                        <CopyOutlined />
-                      </button>
+                      <Tooltip title="复制">
+                        <button
+                          type="button"
+                          className="settings-copy-button"
+                          aria-label={`复制${item.label}`}
+                          disabled={!appInfo}
+                          onClick={() => copyValue(item.value)}
+                        >
+                          <CopyOutlined />
+                        </button>
+                      </Tooltip>
                     </div>
                   </div>
                 ))}

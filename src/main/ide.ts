@@ -2,7 +2,7 @@
  * 外部 IDE 配置模块。
  * 当前只负责保存启动配置，不直接打开仓库。
  */
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { OpenDialogOptions } from 'electron'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -318,8 +318,12 @@ const quoteWindowsArgument = (value: string): string =>
 
 /**
  * 使用配置的 IDE 打开已准备好的仓库。
+ * Qoder 额外通过 DeepLink 新建预填 AI 会话。
  */
-export const launchRepositoryInIde = async (repositoryId: string): Promise<void> => {
+export const launchRepositoryInIde = async (
+  repositoryId: string,
+  chatPrompt?: string
+): Promise<void> => {
   const config = await getUsableIdeConfig()
   const repositoryPath = await getRepositoryLocalPath(repositoryId)
   const args = config.args.map((arg) => arg.replace(/\{path\}/g, repositoryPath))
@@ -355,6 +359,15 @@ export const launchRepositoryInIde = async (repositoryId: string): Promise<void>
       resolve()
     })
   })
+
+  if (config.preset === 'qoder' && chatPrompt?.trim()) {
+    // 等待 IDE 接管工作区后，再让 Qoder 处理新建会话的 DeepLink。
+    await new Promise((resolve) => setTimeout(resolve, 1_200))
+    const deeplink = `qoder://aicoding.aicoding-deeplink/chat?text=${encodeURIComponent(
+      chatPrompt.trim()
+    )}&mode=agent&isNewChat=true`
+    await shell.openExternal(deeplink)
+  }
 }
 
 /**
@@ -416,10 +429,17 @@ export const initializeIde = (): void => {
     }
   )
 
-  ipcMain.handle('ide:launch-repository', (_event, repositoryId: unknown) => {
-    if (typeof repositoryId !== 'string') throw new Error('仓库 ID 不合法')
-    return launchRepositoryInIde(repositoryId)
-  })
+  ipcMain.handle(
+    'ide:launch-repository',
+    (_event, repositoryId: unknown, chatPrompt: unknown) => {
+      if (typeof repositoryId !== 'string') throw new Error('仓库 ID 不合法')
+      if (chatPrompt !== undefined && typeof chatPrompt !== 'string') {
+        throw new Error('会话内容不合法')
+      }
+
+      return launchRepositoryInIde(repositoryId, chatPrompt)
+    }
+  )
   ipcMain.handle(
     'ide:select-command',
     (_event, currentPath: unknown, presetId: unknown) =>

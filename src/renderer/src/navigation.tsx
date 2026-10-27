@@ -4,6 +4,7 @@ import {
   GlobalOutlined,
   ProjectOutlined
 } from '@ant-design/icons'
+import type { LarkUser } from '../../types/lark'
 import type { SettingsSection } from '../../types/settings'
 import RequirementWorkbench from './pages/RequirementWorkbench/RequirementWorkbench'
 import DefectWorkbench from './pages/DefectWorkbench/DefectWorkbench'
@@ -12,6 +13,7 @@ import SitesPage from './pages/SitesPage/SitesPage'
 
 interface PageRenderContext {
   onOpenSettings: (section: SettingsSection) => void
+  larkUser: LarkUser | null
 }
 
 interface AppPageDefinition {
@@ -29,8 +31,8 @@ export const APP_PAGES = [
     key: 'requirements',
     label: '需求',
     icon: <ProjectOutlined />,
-    render: ({ onOpenSettings }) => (
-      <RequirementWorkbench onOpenSettings={onOpenSettings} />
+    render: ({ onOpenSettings, larkUser }) => (
+      <RequirementWorkbench onOpenSettings={onOpenSettings} larkUser={larkUser} />
     )
   },
   {

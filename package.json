@@ -39,6 +39,7 @@
     "mermaid": "^12.2.0",
     "monaco-editor": "^0.57.0",
     "officeparser": "^8.2.0",
+    "pinyin-pro": "^3.29.5",
     "pptxgenjs": "^4.0.1",
     "qrcode": "^1.5.4",
     "quill": "^2.0.3",

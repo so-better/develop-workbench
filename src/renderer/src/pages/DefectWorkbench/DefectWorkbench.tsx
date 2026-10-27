@@ -20,7 +20,8 @@ import {
   Skeleton,
   Spin,
   Tabs,
-  Tooltip
+  Tooltip,
+  Typography
 } from 'antd'
 import { DEFECT_ROLES } from '../../../../types/defects'
 import type {
@@ -453,14 +454,14 @@ export default function DefectWorkbench({
               label: '关联需求',
               value:
                 selectedDefect.linkedRequirement && linkedRequirementUrl ? (
-                  <a
+                  <Typography.Link
                     className="defect-info-link"
                     href={linkedRequirementUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
                     {selectedDefect.linkedRequirement.name}
-                  </a>
+                  </Typography.Link>
                 ) : (
                   '未关联'
                 )
