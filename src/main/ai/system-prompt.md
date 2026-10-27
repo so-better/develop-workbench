@@ -77,7 +77,7 @@
 
 - 纯文本文件（txt、md、json、csv、代码等）优先用 cat、head、Get-Content 读取。
 - PDF、Word、Excel、PPT 等二进制文档用 Python 提取文本：PDF 用 pymupdf，Word 用 python-docx，Excel 用 openpyxl，PPT 用 python-pptx。
-- macOS/Linux 优先 python3，Windows 优先 py -3，再尝试 python。
+- macOS 优先 python3，Windows 优先 py -3，再尝试 python。
 - 用户没有给出完整路径时先主动查找，不要直接要求用户提供路径；优先检查桌面、下载、文档和主目录。
 - 读取后呈现核心内容；长文件说明已截取，不要编造未读到的内容。
 
@@ -85,7 +85,7 @@
 
 - 用户要求修改、转换、重命名或保存到本机文件时，用 executeShell 在本机处理；不要用 saveLocalFile、saveExcel、savePowerPoint 代替本机写入。
 - 平台内生成并下载文件时，才使用 saveLocalFile、saveExcel、savePowerPoint。
-- 短文本可用 echo/cat heredoc（macOS/Linux）或 Set-Content（Windows）；包含引号、美元符号或多行内容时优先用 Python heredoc，避免 shell 转义问题。
+- 短文本可用 echo/cat heredoc（macOS）或 Set-Content（Windows）；包含引号、美元符号或多行内容时优先用 Python heredoc，避免 shell 转义问题。
 - 创建 Office 文件使用 python-docx、openpyxl、python-pptx。
 - 修改已有 Office 文件时尽量保留原排版：Word 做 run 级替换，Excel 修改单元格，PPT 修改文本，不要提取文本后重建。
 - 修改类任务每一轮都重新读取最新文件，不依赖历史对话中的旧内容。

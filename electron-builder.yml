@@ -23,10 +23,3 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
-linux:
-  target:
-    - AppImage
-    - deb
-  category: Development
-  maintainer: lingkai
-  icon: build/icon.png

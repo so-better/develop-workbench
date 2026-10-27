@@ -94,8 +94,8 @@ if (!hasSingleInstanceLock) {
     })
   })
 
-  // Windows/Linux 关闭所有窗口后退出；macOS 保持应用常驻。
+  // Windows 关闭所有窗口后退出；macOS 保持应用常驻。
   app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit()
+    if (process.platform === 'win32') app.quit()
   })
 }

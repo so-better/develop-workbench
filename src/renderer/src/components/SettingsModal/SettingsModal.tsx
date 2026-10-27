@@ -36,8 +36,7 @@ const formatBytes = (bytes: number): string => {
 
 const platformNames: Record<string, string> = {
   darwin: 'macOS',
-  win32: 'Windows',
-  linux: 'Linux'
+  win32: 'Windows'
 }
 
 const larkCliSourceNames: Record<LarkCliPathSource, string> = {

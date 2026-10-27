@@ -26,13 +26,7 @@ export const getSystemPrompt = ({
   const time = current.format('YYYY-MM-DD HH:mm:ss dddd')
 
   const platformName =
-    platform === 'darwin'
-      ? 'macOS'
-      : platform === 'win32'
-        ? 'Windows'
-        : platform === 'linux'
-          ? 'Linux'
-          : platform
+    platform === 'darwin' ? 'macOS' : platform === 'win32' ? 'Windows' : platform
   const cliStatus = [
     `- 操作系统：${platformName}`,
     `- lark-cli：${larkCliPath ? `\`${larkCliPath}\`` : '未检测到'}`,
