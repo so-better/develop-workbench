@@ -2633,10 +2633,10 @@ body {
 }
 
 .requirement-repo-row {
-  display: grid;
-  grid-template-columns: minmax(180px, 0.9fr) minmax(0, 1.6fr) auto;
-  gap: 14px;
+  display: flex;
+  justify-content: flex-start;
   align-items: center;
+  gap: 14px;
   padding: 12px;
   background: var(--workbench-soft);
   border: 1px solid var(--workbench-divider);
@@ -2653,6 +2653,7 @@ body {
   gap: 10px;
   align-items: center;
   min-width: 0;
+  width: 240px;
 }
 
 .requirement-repo-icon {
@@ -2741,6 +2742,7 @@ body {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  flex: 1;
 }
 
 .requirement-repo-branch {
