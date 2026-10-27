@@ -59,9 +59,9 @@ export const createMainWindow = (): void => {
     title: 'AI 研发工作台',
     ...(process.platform === 'win32'
       ? {
-        titleBarStyle: 'hidden' as const,
-        titleBarOverlay: getTitleBarOverlayOptions()
-      }
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: getTitleBarOverlayOptions()
+        }
       : {}),
     icon: app.isPackaged ? undefined : join(__dirname, '../../build/icon.png'),
     backgroundColor: getThemeBackgroundColor(),

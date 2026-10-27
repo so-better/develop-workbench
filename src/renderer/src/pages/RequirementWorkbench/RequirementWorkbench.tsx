@@ -1420,6 +1420,30 @@ export default function RequirementWorkbench({
     }
   }
 
+  /** 复制当前需求名称。 */
+  const handleCopyRequirementName = async (): Promise<void> => {
+    if (!selectedRequirement) return
+
+    try {
+      await window.electron.copyText(selectedRequirement.name)
+      message.success('需求名称已复制')
+    } catch {
+      message.error('复制需求名称失败')
+    }
+  }
+
+  /** 复制当前需求的飞书详情链接。 */
+  const handleCopyRequirementUrl = async (): Promise<void> => {
+    if (!requirementUrl) return
+
+    try {
+      await window.electron.copyText(requirementUrl)
+      message.success('需求链接已复制')
+    } catch {
+      message.error('复制需求链接失败')
+    }
+  }
+
   /**
    * 打开新建分支弹窗，默认使用仓库主分支作为基线。
    */
@@ -2583,7 +2607,31 @@ export default function RequirementWorkbench({
                       onClick={() => refreshWorkbench()}
                     />
                   </Tooltip>
-                  <h1>{selectedRequirement.name}</h1>
+                  <div className="workbench-title-content">
+                    <h1>{selectedRequirement.name}</h1>
+                    <span className="workbench-title-copy-actions">
+                      <Tooltip title="复制标题">
+                        <Button
+                          type="text"
+                          size="small"
+                          icon={<CopyOutlined />}
+                          aria-label="复制需求名称"
+                          onClick={() => handleCopyRequirementName()}
+                        />
+                      </Tooltip>
+                      {requirementUrl ? (
+                        <Tooltip title="复制链接">
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={<LinkOutlined />}
+                            aria-label="复制需求链接"
+                            onClick={() => handleCopyRequirementUrl()}
+                          />
+                        </Tooltip>
+                      ) : null}
+                    </span>
+                  </div>
                 </div>
                 <div className="workbench-heading-meta">
                   <Tag
