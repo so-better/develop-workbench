@@ -2,7 +2,7 @@
  * 外部 IDE 配置模块。
  * 当前只负责保存启动配置，不直接打开仓库。
  */
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { OpenDialogOptions } from 'electron'
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
@@ -316,21 +316,16 @@ export const prepareRepositoryInIde = async (
 const quoteWindowsArgument = (value: string): string =>
   /[\s"&|<>^()]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
 
-/**
- * 使用配置的 IDE 打开已准备好的仓库。
- * Qoder 额外通过 DeepLink 新建预填 AI 会话。
- */
-export const launchRepositoryInIde = async (
-  repositoryId: string,
-  chatPrompt?: string
+/** 启动一个脱离当前进程的 IDE/CLI 子进程。 */
+const spawnDetached = (
+  command: string,
+  args: string[],
+  cwd?: string
 ): Promise<void> => {
-  const config = await getUsableIdeConfig()
-  const repositoryPath = await getRepositoryLocalPath(repositoryId)
-  const args = config.args.map((arg) => arg.replace(/\{path\}/g, repositoryPath))
   const useCommandShell =
-    process.platform === 'win32' && /\.(cmd|bat)$/i.test(config.command)
+    process.platform === 'win32' && /\.(cmd|bat)$/i.test(command)
 
-  await new Promise<void>((resolve, reject) => {
+  return new Promise<void>((resolve, reject) => {
     const child = useCommandShell
       ? spawn(
           process.env.ComSpec || 'cmd.exe',
@@ -338,16 +333,18 @@ export const launchRepositoryInIde = async (
             '/d',
             '/s',
             '/c',
-            `"${[config.command, ...args].map(quoteWindowsArgument).join(' ')}"`
+            `"${[command, ...args].map(quoteWindowsArgument).join(' ')}"`
           ],
           {
+            cwd,
             detached: true,
             stdio: 'ignore',
             windowsHide: true,
             windowsVerbatimArguments: true
           }
         )
-      : spawn(config.command, args, {
+      : spawn(command, args, {
+          cwd,
           detached: true,
           stdio: 'ignore',
           windowsHide: true
@@ -359,14 +356,35 @@ export const launchRepositoryInIde = async (
       resolve()
     })
   })
+}
 
-  if (config.preset === 'qoder' && chatPrompt?.trim()) {
-    // 给 Qoder 留出接管启动参数的时间，但不轮询进程，避免等待过久。
-    await new Promise((resolve) => setTimeout(resolve, 1_200))
-    const deeplink = `qoder-ide://aicoding.aicoding-deeplink/chat?text=${encodeURIComponent(
-      chatPrompt.trim()
-    )}&mode=agent&isNewChat=true`
-    await shell.openExternal(deeplink)
+/**
+ * 使用配置的 IDE 打开已准备好的仓库。
+ * Qoder 额外通过 DeepLink 新建预填 AI 会话。
+ */
+export const launchRepositoryInIde = async (
+  repositoryId: string,
+  chatPrompt?: string
+): Promise<void> => {
+  const config = await getUsableIdeConfig()
+  const repositoryPath = await getRepositoryLocalPath(repositoryId)
+  const args = config.args.map((arg) => arg.replace(/\{path\}/g, repositoryPath))
+  const qoderChatDeeplink =
+    config.preset === 'qoder' && chatPrompt?.trim()
+      ? `qoder-ide://aicoding.aicoding-deeplink/chat?text=${encodeURIComponent(
+          chatPrompt.trim()
+        )}&mode=agent&isNewChat=true`
+      : null
+
+  await spawnDetached(config.command, args)
+
+  if (qoderChatDeeplink) {
+    await new Promise((resolve) => setTimeout(resolve, 3_000))
+    await spawnDetached(config.command, [
+      '--open-url',
+      '--',
+      qoderChatDeeplink
+    ])
   }
 }
 
