@@ -11,11 +11,15 @@ extraResources:
     to: skills
 asar: true
 mac:
-  target: dmg
+  target:
+    - dmg
+    - zip
   category: public.app-category.developer-tools
   icon: build/icon.icns
 win:
-  target: nsis
+  target:
+    - nsis
+    - portable
   executableName: develop-workbench
   icon: build/icon.ico
 nsis:
@@ -23,3 +27,5 @@ nsis:
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
+portable:
+  artifactName: ${name}-${version}-portable.${ext}
