@@ -12,7 +12,7 @@ import {
   LinkOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
-import { App as AntdApp, Button, Tooltip } from 'antd'
+import { App as AntdApp, Button } from 'antd'
 import EmbeddedBrowserDownloads from '../EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
 import type {
   EmbeddedBrowserBounds,
@@ -339,38 +339,32 @@ export default function EmbeddedBrowserPanel({
         <div className="embedded-browser-nav">
           {state.showNavigation ? (
             <>
-              <Tooltip title="后退">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ArrowLeftOutlined />}
-                  disabled={!state.canGoBack}
-                  aria-label="后退"
-                  onClick={() => window.electron.goBackEmbeddedBrowser()}
-                />
-              </Tooltip>
-              <Tooltip title="前进">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<ArrowRightOutlined />}
-                  disabled={!state.canGoForward}
-                  aria-label="前进"
-                  onClick={() => window.electron.goForwardEmbeddedBrowser()}
-                />
-              </Tooltip>
+              <Button
+                type="text"
+                size="small"
+                icon={<ArrowLeftOutlined />}
+                disabled={!state.canGoBack}
+                aria-label="后退"
+                onClick={() => window.electron.goBackEmbeddedBrowser()}
+              />
+              <Button
+                type="text"
+                size="small"
+                icon={<ArrowRightOutlined />}
+                disabled={!state.canGoForward}
+                aria-label="前进"
+                onClick={() => window.electron.goForwardEmbeddedBrowser()}
+              />
             </>
           ) : null}
-          <Tooltip title="刷新">
-            <Button
-              type="text"
-              size="small"
-              icon={<ReloadOutlined />}
-              loading={state.loading}
-              aria-label="刷新"
-              onClick={() => window.electron.reloadEmbeddedBrowser()}
-            />
-          </Tooltip>
+          <Button
+            type="text"
+            size="small"
+            icon={<ReloadOutlined />}
+            loading={state.loading}
+            aria-label="刷新"
+            onClick={() => window.electron.reloadEmbeddedBrowser()}
+          />
         </div>
 
         <div className="embedded-browser-location" title={state.url ?? undefined}>
@@ -384,44 +378,36 @@ export default function EmbeddedBrowserPanel({
         </div>
 
         <div className="embedded-browser-actions">
-          <Tooltip title="在默认浏览器打开">
-            <Button
-              type="text"
-              size="small"
-              icon={<ExportOutlined />}
-              disabled={!state.url}
-              aria-label="在默认浏览器打开"
-              onClick={() => window.electron.openEmbeddedBrowserExternal()}
-            />
-          </Tooltip>
-          <Tooltip title="复制链接">
-            <Button
-              type="text"
-              size="small"
-              icon={<LinkOutlined />}
-              disabled={!state.url}
-              aria-label="复制链接"
-              onClick={() => handleCopyUrl()}
-            />
-          </Tooltip>
-          <Tooltip title={expanded ? '还原' : '最大化'}>
-            <Button
-              type="text"
-              size="small"
-              icon={expanded ? <CompressOutlined /> : <ExpandOutlined />}
-              aria-label={expanded ? '还原' : '最大化'}
-              onClick={() => setExpanded((value) => !value)}
-            />
-          </Tooltip>
-          <Tooltip title="关闭">
-            <Button
-              type="text"
-              size="small"
-              icon={<CloseOutlined />}
-              aria-label="关闭"
-              onClick={requestClose}
-            />
-          </Tooltip>
+          <Button
+            type="text"
+            size="small"
+            icon={<ExportOutlined />}
+            disabled={!state.url}
+            aria-label="在默认浏览器打开"
+            onClick={() => window.electron.openEmbeddedBrowserExternal()}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<LinkOutlined />}
+            disabled={!state.url}
+            aria-label="复制链接"
+            onClick={() => handleCopyUrl()}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={expanded ? <CompressOutlined /> : <ExpandOutlined />}
+            aria-label={expanded ? '还原' : '最大化'}
+            onClick={() => setExpanded((value) => !value)}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<CloseOutlined />}
+            aria-label="关闭"
+            onClick={requestClose}
+          />
         </div>
       </div>
 

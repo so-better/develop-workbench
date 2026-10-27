@@ -7301,3 +7301,13 @@ body {
 .embedded-browser-actions {
   gap: 8px;
 }
+
+/* 内置浏览器面板层级较高，避免 message 和 tooltip 被遮挡。 */
+.ant-message,
+.ant-notification {
+  z-index: 10001 !important;
+}
+
+.ant-tooltip {
+  z-index: 10002 !important;
+}
