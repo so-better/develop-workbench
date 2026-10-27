@@ -7311,3 +7311,25 @@ body {
 .ant-tooltip {
   z-index: 10002 !important;
 }
+
+.requirement-ide-session-checkbox {
+  margin-top: 16px;
+}
+
+.requirement-ide-open-confirm p {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.requirement-ide-open-confirm .settings-help {
+  margin-top: 8px;
+  text-align: left;
+}
+
+.requirement-ide-open-branch {
+  margin-top: 4px !important;
+  color: var(--workbench-secondary) !important;
+  font-size: 12px !important;
+}

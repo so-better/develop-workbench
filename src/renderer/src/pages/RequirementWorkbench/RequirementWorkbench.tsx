@@ -31,6 +31,7 @@ import {
   App,
   Avatar,
   Button,
+  Checkbox,
   DatePicker,
   Empty,
   Input,
@@ -171,6 +172,8 @@ const BranchRow = ({
 
 /** 记住上次选择需求的 localStorage key。 */
 const SELECTED_REQUIREMENT_KEY = 'develop-workbench:selected-requirement'
+/** 记住是否预置 IDE 会话的 localStorage key。 */
+const IDE_SESSION_PROMPT_KEY = 'develop-workbench:ide-session-prompt'
 
 /**
  * 将 Git 远程地址转换为不包含 .git 的仓库根地址。
@@ -616,6 +619,13 @@ export default function RequirementWorkbench({
   const [branchChoiceType, setBranchChoiceType] = useState<
     'requirement' | 'iteration'
   >('requirement')
+  const [ideSessionPrompt, setIdeSessionPrompt] = useState(
+    () => localStorage.getItem(IDE_SESSION_PROMPT_KEY) !== 'false'
+  )
+  const [canPrefillSession, setCanPrefillSession] = useState(false)
+  const [openIdeConfirmBinding, setOpenIdeConfirmBinding] =
+    useState<RequirementRepoBinding | null>(null)
+  const [openIdeConfirmBranch, setOpenIdeConfirmBranch] = useState<string | null>(null)
 
   // 创建合并请求弹窗。
   const [mergeRequestBinding, setMergeRequestBinding] =
@@ -1533,7 +1543,8 @@ export default function RequirementWorkbench({
    */
   const handleOpenInIde = async (
     binding: RequirementRepoBinding,
-    branchOverride?: string
+    branchOverride?: string,
+    prefillSession = true
   ): Promise<void> => {
     if (openingIdeRef.current !== null) return
 
@@ -1595,9 +1606,10 @@ export default function RequirementWorkbench({
 
       // 留出时间让用户看到分支检查和拉取结果。
       await new Promise((resolve) => setTimeout(resolve, 1000))
-      const chatPrompt = requirementUrl
-        ? `${requirementUrl}\n帮我分析一下这个需求`
-        : undefined
+      const chatPrompt =
+        prefillSession && requirementUrl
+          ? `${requirementUrl}\n帮我分析一下这个需求`
+          : undefined
       await window.electron.launchRepositoryInIde(binding.repositoryId, chatPrompt)
     } catch (openError) {
       message.error(getErrorMessage(openError))
@@ -1668,7 +1680,9 @@ export default function RequirementWorkbench({
   /**
    * 轻舟仓库有两个分支时先让用户选择，普通仓库直接打开。
    */
-  const handleRequestOpenInIde = (binding: RequirementRepoBinding): void => {
+  const handleRequestOpenInIde = async (
+    binding: RequirementRepoBinding
+  ): Promise<void> => {
     const requirementBranch =
       binding.mode === 'qingzhou' ? binding.requirementBranch : binding.branchName
     const iterationBranch =
@@ -1680,6 +1694,10 @@ export default function RequirementWorkbench({
     const canUseIteration = Boolean(
       iterationBranch && (!status || status.iterationBranchExists)
     )
+    const ideState = await window.electron.getIdeConfig().catch(() => null)
+    const canPrefill = ideState?.config?.preset === 'qoder'
+
+    setCanPrefillSession(canPrefill)
 
     if (binding.mode === 'qingzhou' && canUseRequirement && canUseIteration) {
       const stored = localStorage.getItem(getBranchChoiceKey(binding.repositoryId))
@@ -1691,16 +1709,27 @@ export default function RequirementWorkbench({
     }
 
     if (canUseRequirement) {
-      handleOpenInIde(binding, requirementBranch as string)
+      if (binding.mode === 'qingzhou') {
+        handleOpenInIde(binding, requirementBranch as string, canPrefill)
+      } else {
+        setOpenIdeConfirmBinding(binding)
+        setOpenIdeConfirmBranch(requirementBranch as string)
+      }
       return
     }
 
     if (canUseIteration) {
-      handleOpenInIde(binding, iterationBranch as string)
+      handleOpenInIde(binding, iterationBranch as string, canPrefill)
       return
     }
 
     message.error('绑定的分支在本地不存在，请先点击同步或刷新')
+  }
+
+  /** 保存预置会话勾选状态。 */
+  const updateIdeSessionPrompt = (checked: boolean): void => {
+    setIdeSessionPrompt(checked)
+    localStorage.setItem(IDE_SESSION_PROMPT_KEY, String(checked))
   }
 
   const handleConfirmBranchChoice = (): void => {
@@ -1720,7 +1749,13 @@ export default function RequirementWorkbench({
     setBranchChoiceOpen(false)
     setBranchChoiceBinding(null)
 
-    if (branchName) handleOpenInIde(binding, branchName)
+    if (branchName) {
+      handleOpenInIde(
+        binding,
+        branchName,
+        canPrefillSession && ideSessionPrompt
+      )
+    }
   }
 
   /**
@@ -3901,6 +3936,73 @@ export default function RequirementWorkbench({
               </span>
             </Radio>
           </Radio.Group>
+          {canPrefillSession ? (
+            <Checkbox
+              className="requirement-ide-session-checkbox"
+              checked={ideSessionPrompt}
+              onChange={(event) => updateIdeSessionPrompt(event.target.checked)}
+            >
+              预置需求分析会话
+            </Checkbox>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        title="打开 IDE"
+        open={Boolean(openIdeConfirmBinding)}
+        okText="打开 IDE"
+        cancelText="取消"
+        destroyOnHidden
+        onOk={() => {
+          const binding = openIdeConfirmBinding
+          const branchName = openIdeConfirmBranch
+
+          setOpenIdeConfirmBinding(null)
+          setOpenIdeConfirmBranch(null)
+
+          if (binding && branchName) {
+            handleOpenInIde(
+              binding,
+              branchName,
+              canPrefillSession && ideSessionPrompt
+            )
+          }
+        }}
+        onCancel={() => {
+          setOpenIdeConfirmBinding(null)
+          setOpenIdeConfirmBranch(null)
+        }}
+      >
+        <div className="requirement-ide-open-confirm">
+          <p>
+            即将在 IDE 中打开仓库
+            {openIdeConfirmBinding
+              ? `「${repositoryMap.get(openIdeConfirmBinding.repositoryId)?.name ??
+              openIdeConfirmBinding.repositoryId
+              }」`
+              : ''}
+            。
+          </p>
+          {openIdeConfirmBranch ? (
+            <p className="requirement-ide-open-branch">
+              分支：{openIdeConfirmBranch}
+            </p>
+          ) : null}
+          {canPrefillSession ? (
+            <>
+              <Checkbox
+                className="requirement-ide-session-checkbox"
+                checked={ideSessionPrompt}
+                onChange={(event) => updateIdeSessionPrompt(event.target.checked)}
+              >
+                预置需求分析会话
+              </Checkbox>
+              <p className="settings-help">
+                勾选后会创建 AI 会话并预填当前需求的飞书链接；取消勾选则只打开 IDE。
+              </p>
+            </>
+          ) : null}
         </div>
       </Modal>
 
