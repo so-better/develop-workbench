@@ -1562,7 +1562,7 @@ export const transitionRequirementNode = async (
 }
 
 /**
- * 更新节点排期、估分、负责人和实际工时。
+ * 更新节点排期、估分和负责人。
  * update-node 不支持一次修改多个类别，因此拆成多次调用。
  */
 export const updateRequirementNode = async (
@@ -1604,15 +1604,7 @@ export const updateRequirementNode = async (
     throw new Error('填写估分前请先设置总排期')
   }
 
-  if (
-    input.actualWorkTime !== undefined &&
-    input.actualWorkTime !== null &&
-    (!Number.isFinite(input.actualWorkTime) || input.actualWorkTime < 0)
-  ) {
-    throw new Error('实际工时不能小于 0')
-  }
-
-  if (!hasSchedule && input.actualWorkTime === undefined && !hasOwners) {
+  if (!hasSchedule && !hasOwners) {
     throw new Error('没有需要更新的节点信息')
   }
 
@@ -1620,8 +1612,8 @@ export const updateRequirementNode = async (
 
   if (hasSchedule) {
     const nodeSchedule: Record<string, number> = {
-      estimate_start_time: input.startAt as number,
-      estimate_finish_time: input.endAt as number
+      estimate_start_date: input.startAt as number,
+      estimate_end_date: input.endAt as number
     }
 
     if (typeof input.points === 'number' && Number.isFinite(input.points)) {
@@ -1669,32 +1661,6 @@ export const updateRequirementNode = async (
     ensureWriteSuccess(ownerResult, '更新节点负责人')
   }
 
-  if (input.actualWorkTime !== undefined) {
-    const fieldsResult = await runMeegle(
-      [
-        'workflow',
-        'update-node',
-        '--project-key',
-        project.key,
-        '--work-item-id',
-        workItemId,
-        '--node-id',
-        nodeId,
-        '--fields',
-        JSON.stringify([
-          {
-            field_key: 'actual_work_time',
-            field_value: input.actualWorkTime === null ? '' : String(input.actualWorkTime)
-          }
-        ]),
-        '--format',
-        'json'
-      ],
-      MEEGLE_QUERY_TIMEOUT_MS
-    )
-
-    ensureWriteSuccess(fieldsResult, '更新实际工时')
-  }
 }
 
 /** 关键词搜索使用的需求字段。 */

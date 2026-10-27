@@ -538,6 +538,7 @@ export default function RequirementWorkbench({
   const [activityError, setActivityError] = useState<string | null>(null)
   const [activityVersion, setActivityVersion] = useState(0)
   const [selectedNodeKey, setSelectedNodeKey] = useState<string | null>(null)
+  const activityRequirementIdRef = useRef<string | null>(null)
 
   /** 当前选中的流程节点。 */
   const selectedNode = activity?.nodes.find((node) => node.key === selectedNodeKey) ?? null
@@ -562,11 +563,10 @@ export default function RequirementWorkbench({
       ? Math.max(0, selectedNode.points - selectedNode.actualWorkTime)
       : null
 
-  // 节点估分、排期和实际工时编辑弹窗。
+  // 节点估分和排期编辑弹窗。
   const [nodeEditing, setNodeEditing] = useState(false)
   const [nodeEditRange, setNodeEditRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [nodeEditPoints, setNodeEditPoints] = useState<number | null>(null)
-  const [nodeEditActualWorkTime, setNodeEditActualWorkTime] = useState<number | null>(null)
   const [nodeEditOwnerKeys, setNodeEditOwnerKeys] = useState<string[]>([])
   const [nodeOwnerOptions, setNodeOwnerOptions] = useState<MeegleRequirementOwner[]>([])
   const [nodeOwnerSearching, setNodeOwnerSearching] = useState(false)
@@ -1051,6 +1051,7 @@ export default function RequirementWorkbench({
    */
   useEffect(() => {
     if (!selectedRequirementId) {
+      activityRequirementIdRef.current = null
       setActivity(null)
       setSelectedNodeKey(null)
       setActivityError(null)
@@ -1058,7 +1059,11 @@ export default function RequirementWorkbench({
     }
 
     let cancelled = false
-    setActivity(null)
+
+    if (activityRequirementIdRef.current !== selectedRequirementId) {
+      setActivity(null)
+    }
+
     setActivityLoading(true)
     setActivityError(null)
 
@@ -1067,6 +1072,7 @@ export default function RequirementWorkbench({
       .then((result) => {
         if (cancelled) return
 
+        activityRequirementIdRef.current = selectedRequirementId
         setActivity(result)
         setSelectedNodeKey((currentKey) => {
           if (currentKey && result.nodes.some((node) => node.key === currentKey)) {
@@ -1824,7 +1830,7 @@ export default function RequirementWorkbench({
   }, [selectedRequirementId])
 
   /**
-   * 打开节点内联编辑，并带入现有排期、估分和实际工时。
+   * 打开节点内联编辑，并带入现有排期和估分。
    */
   const openNodeEditor = (): void => {
     if (!selectedNode) return
@@ -1834,7 +1840,6 @@ export default function RequirementWorkbench({
 
     setNodeEditRange(start?.isValid() && end?.isValid() ? [start, end] : null)
     setNodeEditPoints(selectedNode.points)
-    setNodeEditActualWorkTime(selectedNode.actualWorkTime)
     setNodeEditOwnerKeys(
       selectedNode.owners.flatMap((owner) => (owner.userKey ? [owner.userKey] : []))
     )
@@ -1932,7 +1937,7 @@ export default function RequirementWorkbench({
   }
 
   /**
-   * 保存节点排期、估分、负责人和实际工时。
+   * 保存节点排期、估分和负责人。
    */
   const handleSaveNodeInfo = async (): Promise<void> => {
     if (!selectedRequirementId || !selectedNode) return
@@ -1969,14 +1974,49 @@ export default function RequirementWorkbench({
           ? originalEnd.valueOf()
           : nodeEditRange[1].endOf('day').valueOf()
         : undefined
+      const scheduleChanged =
+        nodeEditRange !== null &&
+        (startAt !== undefined &&
+          (!selectedNode.scheduleStart ||
+            startAt !== dayjs(selectedNode.scheduleStart).valueOf()) ||
+          (endAt !== undefined &&
+            (!selectedNode.scheduleEnd ||
+              endAt !== dayjs(selectedNode.scheduleEnd).valueOf())) ||
+          (nodeEditPoints ?? null) !== selectedNode.points)
+
+      if (!scheduleChanged && !ownersChanged) {
+        setNodeEditing(false)
+        return
+      }
 
       await window.electron.updateRequirementNode(selectedRequirementId, selectedNode.key, {
-        startAt,
-        endAt,
-        points: nodeEditRange ? (nodeEditPoints ?? undefined) : undefined,
-        actualWorkTime: nodeEditActualWorkTime,
+        ...(scheduleChanged ? { startAt, endAt, points: nodeEditPoints ?? undefined } : {}),
         ...(ownersChanged ? { ownerUserKeys: nextOwnerKeys } : {})
       })
+
+      setActivity((current) =>
+        current
+          ? {
+              ...current,
+              nodes: current.nodes.map((node) =>
+                node.key === selectedNode.key
+                  ? {
+                      ...node,
+                      scheduleStart:
+                        startAt === undefined
+                          ? node.scheduleStart
+                          : new Date(startAt).toISOString(),
+                      scheduleEnd:
+                        endAt === undefined
+                          ? node.scheduleEnd
+                          : new Date(endAt).toISOString(),
+                      points: nodeEditRange ? nodeEditPoints : node.points
+                    }
+                  : node
+              )
+            }
+          : current
+      )
       message.success('节点信息已更新')
       setNodeEditing(false)
       setActivityVersion((value) => value + 1)
@@ -3454,7 +3494,6 @@ export default function RequirementWorkbench({
                             </span>
                             {nodeEditing ? (
                               <InputNumber
-                                size="small"
                                 min={0}
                                 step={0.1}
                                 className="requirement-node-inline-input"
@@ -3475,7 +3514,6 @@ export default function RequirementWorkbench({
                             </span>
                             {nodeEditing ? (
                               <DatePicker.RangePicker
-                                size="small"
                                 format="MM-DD"
                                 className="requirement-node-inline-range"
                                 value={nodeEditRange}
@@ -3519,29 +3557,16 @@ export default function RequirementWorkbench({
                               <span>
                                 总实际工时 <em>*</em>
                               </span>
-                              {nodeEditing ? (
-                                <InputNumber
-                                  size="small"
-                                  min={0}
-                                  step={0.1}
-                                  className="requirement-node-inline-input"
-                                  value={nodeEditActualWorkTime}
-                                  placeholder="未记录"
-                                  onChange={(value) =>
-                                    setNodeEditActualWorkTime(
-                                      typeof value === 'number' ? value : null
-                                    )
-                                  }
-                                />
-                              ) : (
-                                <strong>
-                                  {formatWorkTime(selectedNode.actualWorkTime)}
-                                </strong>
-                              )}
+                              <strong>
+                                {formatWorkTime(selectedNode.actualWorkTime)}
+                              </strong>
                             </div>
                             <div className="requirement-node-workhour-summary">
                               <span>总估分：{formatWorkTime(selectedNode.points)}</span>
                               <span>总剩余工时：{formatWorkTime(nodeRemainingWorkTime)}</span>
+                            </div>
+                            <div className="requirement-node-workhour-actual">
+                              实际工时需在飞书项目页面登记。
                             </div>
                             <div className="requirement-node-workhour-actual">
                               实际时间：
