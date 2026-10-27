@@ -2257,32 +2257,6 @@ export default function RequirementWorkbench({
   }
 
   /**
-   * 搜索快捷键：Cmd/Ctrl+K 聚焦，Esc 清空并退出搜索。
-   */
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      const isFocusShortcut =
-        (event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 'k'
-
-      if (isFocusShortcut) {
-        event.preventDefault()
-        searchInputRef.current?.focus()
-        return
-      }
-
-      if (event.key === 'Escape' && searchInputRef.current?.input === document.activeElement) {
-        event.preventDefault()
-        setRequirementFilter('')
-        searchInputRef.current?.blur()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
-
-  /**
    * 选中需求后将其滚动到左侧列表可见区域。
    * 刷新或恢复上次选择时尤其有用。
    */

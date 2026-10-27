@@ -727,7 +727,7 @@ export const getRepositoryBindingStatus = async (
 }
 
 /**
- * 从基线分支创建本地开发分支。
+ * 从基线分支创建开发分支，并在存在 origin 时推送到远程。
  * 只创建分支，不切换当前工作区。
  */
 export const createRepositoryBranch = async (
@@ -770,21 +770,41 @@ export const createRepositoryBranch = async (
     await runGit(['branch', normalizedBranch, normalizedBase], {
       cwd: repository.localPath
     })
-    return
+  } else {
+    const hasRemoteBase = await runGit(
+      ['rev-parse', '--verify', `refs/remotes/origin/${normalizedBase}`],
+      { cwd: repository.localPath }
+    )
+      .then(() => true)
+      .catch(() => false)
+
+    if (!hasRemoteBase) throw new Error('基线分支没有可用的本地或远程引用')
+
+    await runGit(
+      ['branch', '--track', normalizedBranch, `origin/${normalizedBase}`],
+      { cwd: repository.localPath }
+    )
   }
 
-  const hasRemoteBase = await runGit(
-    ['rev-parse', '--verify', `refs/remotes/origin/${normalizedBase}`],
-    { cwd: repository.localPath }
-  )
-    .then(() => true)
-    .catch(() => false)
+  if (!repository.remoteUrl) return
 
-  if (!hasRemoteBase) throw new Error('基线分支没有可用的本地或远程引用')
+  try {
+    await runGit(
+      ['push', '--set-upstream', 'origin', normalizedBranch],
+      { cwd: repository.localPath }
+    )
+  } catch (error) {
+    // 推送失败时回滚本地分支，避免用户重试时被“分支已存在”阻塞。
+    await runGit(['branch', '-D', normalizedBranch], {
+      cwd: repository.localPath
+    }).catch(() => undefined)
 
-  await runGit(['branch', '--track', normalizedBranch, `origin/${normalizedBase}`], {
-    cwd: repository.localPath
-  })
+    const detail =
+      (error as { stderr?: string }).stderr?.trim() ||
+      (error instanceof Error ? error.message : '未知错误')
+
+    throw new Error(`分支推送远程失败：${detail}`)
+  }
 }
 
 /**

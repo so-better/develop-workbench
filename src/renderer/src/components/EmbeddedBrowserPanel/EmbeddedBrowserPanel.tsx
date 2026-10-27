@@ -160,6 +160,22 @@ export default function EmbeddedBrowserPanel({
     })
   }, [])
 
+  // Esc 关闭面板。
+  useEffect(() => {
+    if (!state?.visible) return
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+
+      event.preventDefault()
+      requestClose()
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [state?.visible])
+
   // 点击面板外关闭；弹窗打开时不处理，避免登录或确认流程被中断。
   useEffect(() => {
     if (!state?.visible) return

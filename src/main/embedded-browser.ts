@@ -564,6 +564,13 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
     return { action: 'deny' }
   })
 
+  webContents.on('before-input-event', (event, input) => {
+    if (input.key === 'Escape' && !input.isAutoRepeat) {
+      event.preventDefault()
+      entry.window.webContents.send('embedded-browser:request-close')
+    }
+  })
+
   webContents.on('will-navigate', (event, url) => {
     if (!tryNormalizeHttpUrl(url)) event.preventDefault()
   })

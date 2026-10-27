@@ -29,7 +29,14 @@ import type {
   UpdateDefectAssigneesInput
 } from '../types/defects'
 import type { RequirementPersonalStatusState } from '../types/requirement-status'
-import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
+import type {
+  LarkCliInfo,
+  LarkDocSearchResult,
+  LarkMessageSearchResult,
+  LarkLoginEvent,
+  LarkLoginSession,
+  LarkUser
+} from '../types/lark'
 import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
@@ -59,6 +66,12 @@ import type {
 const electronAPI = {
   // 当前运行平台，渲染进程可在首次渲染时同步读取。
   platform: process.platform,
+
+  /**
+   * 打开系统协议链接，用于飞书消息等外部客户端跳转。
+   */
+  openExternalUrl: (url: string): Promise<void> =>
+    ipcRenderer.invoke('system:open-external-url', url),
 
   /**
    * 获取应用版本及 Electron、Chromium、Node.js 运行时信息。
@@ -254,6 +267,14 @@ const electronAPI = {
    * 未登录或 lark-cli 不可用时返回 null。
    */
   getLarkUser: (): Promise<LarkUser | null> => ipcRenderer.invoke('lark:get-user'),
+
+  /** 搜索飞书云文档。 */
+  searchLarkDocs: (query: string): Promise<LarkDocSearchResult[]> =>
+    ipcRenderer.invoke('lark:search-docs', query),
+
+  /** 搜索飞书消息。 */
+  searchLarkMessages: (query: string): Promise<LarkMessageSearchResult[]> =>
+    ipcRenderer.invoke('lark:search-messages', query),
 
   /**
    * 查询 lark-cli 的路径、来源和版本。

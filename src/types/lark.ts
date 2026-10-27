@@ -38,3 +38,25 @@ export interface LarkLoginSession {
 export type LarkLoginEvent =
   | { status: 'success' }
   | { status: 'error'; message: string }
+
+/** 飞书云文档搜索结果。 */
+export interface LarkDocSearchResult {
+  id: string
+  title: string
+  url: string
+  type: string
+  owner: string | null
+  updatedAt: string | null
+  summary: string | null
+}
+
+/** 飞书消息搜索结果。 */
+export interface LarkMessageSearchResult {
+  id: string
+  chatName: string
+  senderName: string
+  content: string
+  createdAt: string | null
+  url: string
+  appUrl: string | null
+}

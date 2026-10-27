@@ -13,6 +13,7 @@ import { initializeEmbeddedBrowser } from './embedded-browser'
 import { initializeGit } from './git'
 import { initializeIde } from './ide'
 import { initializeLark } from './lark'
+import { initializeLarkSearch } from './lark-search'
 import { initializeLinkPreview } from './link-preview'
 import { initializeMarkdownImages } from './markdown-images'
 import { initializeMeegle } from './meegle'
@@ -64,6 +65,7 @@ if (!hasSingleInstanceLock) {
     initializeGit()
     initializeIde()
     initializeLark()
+    initializeLarkSearch()
     initializeLinkPreview()
     initializeMarkdownImages()
     initializeMeegle()

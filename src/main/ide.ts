@@ -361,9 +361,9 @@ export const launchRepositoryInIde = async (
   })
 
   if (config.preset === 'qoder' && chatPrompt?.trim()) {
-    // 等待 IDE 接管工作区后，再让 Qoder 处理新建会话的 DeepLink。
+    // 给 Qoder 留出接管启动参数的时间，但不轮询进程，避免等待过久。
     await new Promise((resolve) => setTimeout(resolve, 1_200))
-    const deeplink = `qoder://aicoding.aicoding-deeplink/chat?text=${encodeURIComponent(
+    const deeplink = `qoder-ide://aicoding.aicoding-deeplink/chat?text=${encodeURIComponent(
       chatPrompt.trim()
     )}&mode=agent&isNewChat=true`
     await shell.openExternal(deeplink)

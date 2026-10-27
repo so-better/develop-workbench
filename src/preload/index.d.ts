@@ -27,7 +27,14 @@ import type {
   UpdateDefectAssigneesInput
 } from '../types/defects'
 import type { RequirementPersonalStatusState } from '../types/requirement-status'
-import type { LarkCliInfo, LarkLoginEvent, LarkLoginSession, LarkUser } from '../types/lark'
+import type {
+  LarkCliInfo,
+  LarkDocSearchResult,
+  LarkMessageSearchResult,
+  LarkLoginEvent,
+  LarkLoginSession,
+  LarkUser
+} from '../types/lark'
 import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
@@ -58,6 +65,8 @@ export interface ElectronAPI {
   platform: string
   /** 获取应用与运行时版本信息。 */
   getAppInfo: () => Promise<AppInfo>
+  /** 打开系统协议链接。 */
+  openExternalUrl: (url: string) => Promise<void>
   /** 获取链接预览信息。 */
   getLinkPreview: (url: string) => Promise<LinkPreview>
   /** 通过应用内浏览器登录态获取飞书 Markdown 图片。 */
@@ -143,6 +152,10 @@ export interface ElectronAPI {
   selectGitPath: (currentPath?: string | null) => Promise<string | null>
   /** 读取 lark-cli 当前登录用户，未登录时返回 null。 */
   getLarkUser: () => Promise<LarkUser | null>
+  /** 搜索飞书云文档。 */
+  searchLarkDocs: (query: string) => Promise<LarkDocSearchResult[]>
+  /** 搜索飞书消息。 */
+  searchLarkMessages: (query: string) => Promise<LarkMessageSearchResult[]>
   /** 查询 lark-cli 路径、来源和版本。 */
   getLarkCliInfo: () => Promise<LarkCliInfo>
   /** 只执行自动检测，不修改已保存的路径。 */

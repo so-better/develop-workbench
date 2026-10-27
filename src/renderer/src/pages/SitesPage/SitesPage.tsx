@@ -298,36 +298,6 @@ export default function SitesPage(): JSX.Element {
     return () => window.removeEventListener('sites:changed', handleSitesChanged)
   }, [loadSites])
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      const page = document.querySelector<HTMLElement>('.sites-page')
-
-      if (!page || page.offsetParent === null) return
-
-      if (
-        (event.metaKey || event.ctrlKey) &&
-        event.key.toLocaleLowerCase() === 'k'
-      ) {
-        event.preventDefault()
-        searchInputRef.current?.focus()
-        return
-      }
-
-      if (
-        event.key === 'Escape' &&
-        searchInputRef.current?.input === document.activeElement
-      ) {
-        event.preventDefault()
-        setSearch('')
-        searchInputRef.current?.blur()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
-
   /**
    * 打开站点，并记录一次打开频率。
    */
@@ -570,7 +540,6 @@ export default function SitesPage(): JSX.Element {
                 prefix={<SearchOutlined />}
                 placeholder="搜索站点、URL 或标签"
                 aria-label="搜索站点"
-                aria-keyshortcuts="Meta+K Control+K"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />

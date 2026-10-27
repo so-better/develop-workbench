@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { App as AntdApp, Modal, Spin } from 'antd'
 import AppFooter from './components/AppFooter/AppFooter'
 import AppTitleBar from './components/AppTitleBar/AppTitleBar'
+import QuickAccess from './components/QuickAccess/QuickAccess'
 import AppNavigation from './components/AppNavigation/AppNavigation'
 import LinkContextMenu from './components/LinkContextMenu/LinkContextMenu'
 import { APP_PAGES } from './navigation'
@@ -277,6 +278,8 @@ export default function App(): JSX.Element {
           />
         ) : null}
       </div>
+
+      <QuickAccess />
 
       <AppFooter
         appInfo={appInfo}
