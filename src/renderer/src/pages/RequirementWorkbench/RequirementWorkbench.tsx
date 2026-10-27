@@ -635,9 +635,35 @@ export default function RequirementWorkbench({
     ? `${requirementUrl}?tabKey=${qingzhouTabKey}#${qingzhouTabKey}`
     : null
 
+  /** 仓库 ID 到仓库信息的映射。 */
+  const repositoryMap = useMemo(
+    () => new Map(repositories.map((repository) => [repository.id, repository])),
+    [repositories]
+  )
+
   /** 打开 AI 弹窗，使用需求分析技能分析当前需求。 */
   const handleAnalyzeRequirement = (): void => {
     if (!selectedRequirement) return
+
+    const repositoryLines = bindings.map((binding) => {
+      const repository = repositoryMap.get(binding.repositoryId)
+
+      if (!repository) return `- ${binding.repositoryId}（仓库信息不可用）`
+
+      const requirementBranch =
+        binding.mode === 'qingzhou' ? binding.requirementBranch : binding.branchName
+      const details = [
+        `路径：${repository.localPath}`,
+        `当前分支：${repository.currentBranch ?? '未知'}`
+      ]
+
+      if (requirementBranch && requirementBranch !== repository.currentBranch) {
+        details.push(`需求分支：${requirementBranch}`)
+      }
+      if (!repository.available) details.push('本地仓库不可用')
+
+      return `- ${repository.name}：${details.join('；')}`
+    })
 
     openAiDialog({
       title: 'AI 需求分析',
@@ -648,17 +674,22 @@ export default function RequirementWorkbench({
         `Story ID：${selectedRequirement.id}`,
         `Story 链接：${requirementUrl ?? '暂无'}`,
         '',
-        '请优先使用 getRequirementDetail 工具通过 Story ID 读取需求详情，再读取相关需求文档和后端文档，结合当前代码输出分析报告。',
+        '请优先使用 getRequirementDetail 工具通过 Story ID 读取需求详情，再读取相关需求文档和后端文档，结合绑定的本地仓库代码输出分析报告。',
+        '',
+        '已绑定的代码仓库：',
+        ...(repositoryLines.length > 0 ? repositoryLines : ['- 暂无可用仓库']),
+        '',
+        '代码分析要求：',
+        '- 使用 executeShell 在仓库绝对路径下执行 rg、find、cat、git show 等只读命令。',
+        '- 需要读取非当前分支时使用 `git show <branch>:<path>`，不要切换分支。',
+        '- 只读取和分析代码，不修改代码、不提交。',
+        '- 当前分支与需求分支不一致时，在报告中说明可能影响。',
+        '- 没有可用仓库或无法读取代码时，明确说明缺少代码上下文，不要猜测实现。',
+        '',
         '本次只输出需求分析报告。'
       ].join('\n')
     })
   }
-
-  /** 仓库 ID 到仓库信息的映射。 */
-  const repositoryMap = useMemo(
-    () => new Map(repositories.map((repository) => [repository.id, repository])),
-    [repositories]
-  )
 
   /** 已绑定的仓库 ID，用于过滤新增下拉框。 */
   const boundRepositoryIds = useMemo(

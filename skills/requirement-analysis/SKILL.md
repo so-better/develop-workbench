@@ -7,6 +7,9 @@ keywords:
   - story
   - 飞书
   - prd
+  - 飞书文档
+  - lark-cli
+  - meegle
   - 改动点
   - 接口
   - 影响范围
@@ -37,9 +40,9 @@ keywords:
 从用户消息中提取以下信息：
 
 - 飞书 Story URL 或 work-item-id
-- 产品需求文档链接（可以多个）
-- 后端开发文档链接（可以没有）
-- 目标项目根目录（用于代码探索）
+- Story 字段中的需求文档、PRD、后端开发文档和设计文档链接
+- 用户额外提供的文档链接
+- 目标项目根目录和绑定仓库路径（用于代码探索）
 - 开发平台：RN（React Native）或 PC Web
 
 缺少 Story 信息时先向用户索要。平台不明确且需求同时涉及 RN 和 PC 时，先在对话中询问；不要使用不存在的提问工具。
@@ -64,15 +67,44 @@ meegle workitem get --work-item-id <id> --fields "_all"
 
 ## 第三步：读取需求文档
 
-1. 优先读取用户明确提供的 PRD 和后端文档。
-2. Story 中带有文档链接但用户未明确提供时，先列出链接并询问是否读取；用户确认后再读。
-3. 飞书文档使用 lark-cli：
+### 1. 收集文档链接
+
+从以下来源提取文档链接，不要只依赖用户手动提供：
+
+- `getRequirementDetail` 返回的 `documentUrl`
+- Story 字段中的“需求文档”“PRD”“后端开发文档”“技术方案”“设计文档”
+- Story 描述、备注、评论中出现的飞书文档链接
+- 用户明确提供的文档链接
+
+识别飞书文档域名，包括 `feishu.cn`、`larksuite.com`、`larkoffice.com`，以及其中的 `/docx/`、`/wiki/`、`/docs/`、`/sheets/`、`/base/` 路径。
+
+Story 详情链接仍然通过 `getRequirementDetail` 读取，不要把 Story 链接当作普通文档请求。
+
+### 2. 飞书文档优先使用 lark-cli
+
+飞书文档正文优先使用 lark-cli，不要用 WebFetch 或浏览器反复请求飞书页面：
 
 ```bash
 lark-cli docs +fetch --doc "<文档URL>" --doc-format markdown --detail simple
 ```
 
-文档很长时先读大纲，再按章节读取；不要把全文一次性塞入上下文。优先关注：
+文档很长时先读取大纲，再按章节读取：
+
+```bash
+lark-cli docs +fetch --doc "<文档URL>" --doc-format markdown --max-depth 2
+```
+
+按文档类型使用对应的 lark-cli 子命令。`docs +fetch` 不支持某个链接类型时，先用 `--help` 或对应 domain 的 `--help` 确认参数，不要猜测。
+
+### 3. 读取顺序和失败处理
+
+1. 先读取主需求 PRD，再读取子需求文档。
+2. 再读取后端开发文档、接口文档和技术方案。
+3. 最后读取设计稿、验收标准和补充说明。
+4. lark-cli 返回权限或登录错误时，先检查 `lark-cli auth status`，并向用户说明阻塞；不要让用户重复粘贴同一链接，也不要改用 WebFetch 绕过权限。
+5. 文档内容已由 `getRequirementDetail` 或 meegle 字段返回时，直接使用该内容，不重复请求。
+
+需求文档和后端文档冲突时，以需求文档为准，并在报告中标明冲突位置。优先关注：
 
 - 背景、目标、范围
 - 页面和交互
@@ -88,6 +120,8 @@ lark-cli docs +fetch --doc "<文档URL>" --doc-format markdown --detail simple
 - 已有接口封装和类型定义
 - 同类页面或相似交互
 - 状态管理、权限和埋点实现
+
+如果用户或当前上下文提供了绑定仓库路径，优先在这些仓库内执行只读检索；需要查看非当前分支时使用 `git show <branch>:<path>`，不要切换分支。
 
 代码探索只用于判断实现方式和影响范围，不能反过来扩展需求范围。不要把“同类页面有”当成“本次需求必须做”。
 
@@ -182,6 +216,7 @@ lark-cli docs +fetch --doc "<文档URL>" --doc-format markdown --detail simple
 ## 完成条件
 
 - Story 已读取，或已明确说明无法读取的原因。
+- Story 中的飞书文档链接已收集，并说明哪些成功读取、哪些因权限或格式无法读取。
 - 需求文档和后端文档的读取范围已说明。
 - 每个改动点都有依据，或明确标记为待确认。
 - 已输出待确认事项。
