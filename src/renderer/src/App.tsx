@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { App as AntdApp, Modal, Spin } from 'antd'
 import AppFooter from './components/AppFooter/AppFooter'
+import AppTitleBar from './components/AppTitleBar/AppTitleBar'
 import AppNavigation from './components/AppNavigation/AppNavigation'
 import LinkContextMenu from './components/LinkContextMenu/LinkContextMenu'
 import { APP_PAGES } from './navigation'
@@ -233,6 +234,7 @@ export default function App(): JSX.Element {
 
   return (
     <div className="app-shell">
+      <AppTitleBar />
       <div className="app-body">
         {environmentReady && !environmentLoading ? (
           <AppNavigation activePage={workspace} onChange={handlePageChange} />

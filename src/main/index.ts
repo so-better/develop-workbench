@@ -26,6 +26,14 @@ import { initializeTheme } from './theme'
 import { initializeWeeklyReport } from './weekly-report'
 import { createMainWindow, focusMainWindow, getMainWindow } from './window'
 
+// 保留原有数据路径，避免修改应用名后丢失偏好、站点、登录态和浏览器会话。
+const originalUserDataPath = app.getPath('userData')
+const originalSessionDataPath = app.getPath('sessionData')
+
+app.setName('AI 研发工作台')
+app.setPath('userData', originalUserDataPath)
+app.setPath('sessionData', originalSessionDataPath)
+
 // 单实例锁：确保同一时间只运行一个工作台实例。
 const hasSingleInstanceLock = app.requestSingleInstanceLock()
 

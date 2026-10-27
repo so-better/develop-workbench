@@ -29,6 +29,25 @@ const getThemeState = (): ThemeState => ({
 export const getThemeBackgroundColor = (): string =>
   nativeTheme.shouldUseDarkColors ? DARK_BACKGROUND : LIGHT_BACKGROUND
 
+/** Windows 原生标题栏覆盖层颜色。 */
+export const getTitleBarOverlayOptions = (): {
+  color: string
+  symbolColor: string
+  height: number
+} => ({
+  color: nativeTheme.shouldUseDarkColors ? '#18191c' : '#ffffff',
+  symbolColor: nativeTheme.shouldUseDarkColors ? '#e6e7e9' : '#172033',
+  height: 32
+})
+
+let titleBarOverlayWindow: BrowserWindow | null = null
+
+/** 记录启用了标题栏覆盖层的主窗口，主题切换时只更新该窗口。 */
+export const registerTitleBarOverlayWindow = (window: BrowserWindow): void => {
+  titleBarOverlayWindow = window
+  window.setTitleBarOverlay(getTitleBarOverlayOptions())
+}
+
 /**
  * 将主题变化广播给所有窗口。
  * 同时更新原生窗口底色，保证窗口框架和页面内容一致。
@@ -39,6 +58,15 @@ const broadcastThemeState = (): void => {
   // 所有窗口共用同一份主题状态，避免多窗口之间显示不一致。
   for (const window of BrowserWindow.getAllWindows()) {
     window.setBackgroundColor(state.isDark ? DARK_BACKGROUND : LIGHT_BACKGROUND)
+
+    if (
+      process.platform === 'win32' &&
+      titleBarOverlayWindow &&
+      !titleBarOverlayWindow.isDestroyed()
+    ) {
+      titleBarOverlayWindow.setTitleBarOverlay(getTitleBarOverlayOptions())
+    }
+
     window.webContents.send('theme:changed', state)
   }
 }

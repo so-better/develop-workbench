@@ -1,7 +1,11 @@
 import { app, BrowserWindow, screen } from 'electron'
 import { join } from 'node:path'
 import { openEmbeddedBrowser } from './embedded-browser'
-import { getThemeBackgroundColor } from './theme'
+import {
+  getThemeBackgroundColor,
+  getTitleBarOverlayOptions,
+  registerTitleBarOverlayWindow
+} from './theme'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -51,7 +55,14 @@ export const createMainWindow = (): void => {
     center: true,
     // 等页面渲染完成后再显示，避免启动时出现白屏。
     show: false,
+    autoHideMenuBar: true,
     title: 'AI 研发工作台',
+    ...(process.platform === 'win32'
+      ? {
+          titleBarStyle: 'hidden' as const,
+          titleBarOverlay: getTitleBarOverlayOptions()
+        }
+      : {}),
     icon: app.isPackaged ? undefined : join(__dirname, '../../build/icon.png'),
     backgroundColor: getThemeBackgroundColor(),
     webPreferences: {
@@ -65,6 +76,10 @@ export const createMainWindow = (): void => {
   })
 
   mainWindow = window
+
+  if (process.platform === 'win32') {
+    registerTitleBarOverlayWindow(window)
+  }
 
   // 首次打开时最大化到屏幕工作区，随后再显示窗口。
   window.once('ready-to-show', () => {
@@ -88,6 +103,15 @@ export const createMainWindow = (): void => {
   window.webContents.setWindowOpenHandler(({ url }) => {
     openEmbeddedBrowser(window, url)
     return { action: 'deny' }
+  })
+
+  // 屏蔽主页面刷新快捷键；内嵌浏览器保留自己的刷新按钮。
+  window.webContents.on('before-input-event', (event, input) => {
+    const key = input.key.toLowerCase()
+
+    if (((input.control || input.meta) && key === 'r') || key === 'f5') {
+      event.preventDefault()
+    }
   })
 
   // 阻止应用页面直接跳走，改为在应用内浏览器打开。
