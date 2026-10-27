@@ -539,6 +539,18 @@ export default function RequirementWorkbench({
   /** 当前选中的流程节点。 */
   const selectedNode = activity?.nodes.find((node) => node.key === selectedNodeKey) ?? null
 
+  /** 选中流程图节点后，将节点详情滚动到可视区域。 */
+  const handleSelectNode = (nodeKey: string): void => {
+    setSelectedNodeKey(nodeKey)
+
+    window.requestAnimationFrame(() => {
+      nodeDetailRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      })
+    })
+  }
+
   /** 当前节点剩余工时 = 估分 - 实际工时。 */
   const nodeRemainingWorkTime =
     selectedNode?.points !== null &&
@@ -620,6 +632,7 @@ export default function RequirementWorkbench({
   const [bindingStatusVersion, setBindingStatusVersion] = useState(0)
   const branchCacheRef = useRef(new Map<string, string[]>())
   const workbenchContentRef = useRef<HTMLDivElement>(null)
+  const nodeDetailRef = useRef<HTMLDivElement>(null)
 
   /** 飞书需求详情页地址。 */
   const requirementUrl =
@@ -3214,11 +3227,11 @@ export default function RequirementWorkbench({
                     <RequirementFlowchart
                       nodes={activity.nodes}
                       selectedNodeKey={selectedNodeKey}
-                      onSelectNode={setSelectedNodeKey}
+                      onSelectNode={handleSelectNode}
                     />
 
                     {selectedNode ? (
-                      <div className="requirement-node-detail">
+                      <div className="requirement-node-detail" ref={nodeDetailRef}>
                         <div className="requirement-node-detail-head">
                           <span className="requirement-node-detail-title">
                             <span
