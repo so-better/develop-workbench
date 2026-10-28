@@ -1372,6 +1372,12 @@ const fetchWorkflowNodes = async (
   const nodes = rawNodes.map((node): MeegleWorkflowNode => {
     const basic = node.basic ?? {}
     const schedule = node.schedule ?? {}
+    const nodeFieldKeys = new Set(
+      (node.form_items ?? [])
+        .filter((item) => item.form_item_type === 'node_field')
+        .map((item) => item.field_key?.trim() || '')
+        .filter(Boolean)
+    )
 
     return {
       key: basic.node_key ?? '',
@@ -1388,6 +1394,15 @@ const fetchWorkflowNodes = async (
         typeof schedule.actual_work_time === 'number' ? schedule.actual_work_time : null,
       points: typeof schedule.points === 'number' ? schedule.points : null,
       formItems: readNodeFormItems(node),
+      supportsSchedule:
+        nodeFieldKeys.has('schedule') ||
+        schedule.estimate_start_time != null ||
+        schedule.estimate_finish_time != null,
+      supportsPoints:
+        nodeFieldKeys.has('point') || typeof schedule.points === 'number',
+      supportsActualWorkTime:
+        nodeFieldKeys.has('actual_work_time') ||
+        typeof schedule.actual_work_time === 'number',
       nextNodeKeys: basic.next_node_keys ?? []
     }
   })

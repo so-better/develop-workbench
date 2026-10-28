@@ -227,6 +227,15 @@ export interface MeegleWorkflowNode {
   /** 节点表单字段。 */
   formItems: MeegleNodeFormItem[]
 
+  /** 节点是否配置总排期字段。 */
+  supportsSchedule: boolean
+
+  /** 节点是否配置估分字段。 */
+  supportsPoints: boolean
+
+  /** 节点是否配置实际工时字段。 */
+  supportsActualWorkTime: boolean
+
   /** 后续节点 key。 */
   nextNodeKeys: string[]
 }

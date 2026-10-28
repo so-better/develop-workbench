@@ -1835,11 +1835,17 @@ export default function RequirementWorkbench({
   const openNodeEditor = (): void => {
     if (!selectedNode) return
 
-    const start = selectedNode.scheduleStart ? dayjs(selectedNode.scheduleStart) : null
-    const end = selectedNode.scheduleEnd ? dayjs(selectedNode.scheduleEnd) : null
+    const start =
+      selectedNode.supportsSchedule && selectedNode.scheduleStart
+        ? dayjs(selectedNode.scheduleStart)
+        : null
+    const end =
+      selectedNode.supportsSchedule && selectedNode.scheduleEnd
+        ? dayjs(selectedNode.scheduleEnd)
+        : null
 
     setNodeEditRange(start?.isValid() && end?.isValid() ? [start, end] : null)
-    setNodeEditPoints(selectedNode.points)
+    setNodeEditPoints(selectedNode.supportsPoints ? selectedNode.points : null)
     setNodeEditOwnerKeys(
       selectedNode.owners.flatMap((owner) => (owner.userKey ? [owner.userKey] : []))
     )
@@ -1942,7 +1948,8 @@ export default function RequirementWorkbench({
   const handleSaveNodeInfo = async (): Promise<void> => {
     if (!selectedRequirementId || !selectedNode) return
 
-    const pointsChanged = nodeEditPoints !== selectedNode.points
+    const pointsChanged =
+      selectedNode.supportsPoints && nodeEditPoints !== selectedNode.points
 
     if (!nodeEditRange && pointsChanged) {
       message.warning('修改估分前请先设置总排期')
@@ -1964,17 +1971,20 @@ export default function RequirementWorkbench({
         ? dayjs(selectedNode.scheduleStart)
         : null
       const originalEnd = selectedNode.scheduleEnd ? dayjs(selectedNode.scheduleEnd) : null
-      const startAt = nodeEditRange
-        ? originalStart?.isSame(nodeEditRange[0], 'day')
-          ? originalStart.valueOf()
-          : nodeEditRange[0].startOf('day').valueOf()
-        : undefined
-      const endAt = nodeEditRange
-        ? originalEnd?.isSame(nodeEditRange[1], 'day')
-          ? originalEnd.valueOf()
-          : nodeEditRange[1].endOf('day').valueOf()
-        : undefined
+      const startAt =
+        selectedNode.supportsSchedule && nodeEditRange
+          ? originalStart?.isSame(nodeEditRange[0], 'day')
+            ? originalStart.valueOf()
+            : nodeEditRange[0].startOf('day').valueOf()
+          : undefined
+      const endAt =
+        selectedNode.supportsSchedule && nodeEditRange
+          ? originalEnd?.isSame(nodeEditRange[1], 'day')
+            ? originalEnd.valueOf()
+            : nodeEditRange[1].endOf('day').valueOf()
+          : undefined
       const scheduleChanged =
+        selectedNode.supportsSchedule &&
         nodeEditRange !== null &&
         (startAt !== undefined &&
           (!selectedNode.scheduleStart ||
@@ -1982,7 +1992,8 @@ export default function RequirementWorkbench({
           (endAt !== undefined &&
             (!selectedNode.scheduleEnd ||
               endAt !== dayjs(selectedNode.scheduleEnd).valueOf())) ||
-          (nodeEditPoints ?? null) !== selectedNode.points)
+          (selectedNode.supportsPoints &&
+            (nodeEditPoints ?? null) !== selectedNode.points))
 
       if (!scheduleChanged && !ownersChanged) {
         setNodeEditing(false)
@@ -3490,43 +3501,57 @@ export default function RequirementWorkbench({
 
                           <div className="requirement-node-summary-block">
                             <span className="requirement-node-summary-label">
-                              总估分 <em>*</em>
+                              总估分 {selectedNode.supportsPoints ? <em>*</em> : null}
                             </span>
-                            {nodeEditing ? (
-                              <InputNumber
-                                min={0}
-                                step={0.1}
-                                className="requirement-node-inline-input"
-                                value={nodeEditPoints}
-                                placeholder="未设置"
-                                onChange={(value) =>
-                                  setNodeEditPoints(typeof value === 'number' ? value : null)
-                                }
-                              />
+                            {selectedNode.supportsPoints ? (
+                              nodeEditing ? (
+                                <InputNumber
+                                  min={0}
+                                  step={0.1}
+                                  className="requirement-node-inline-input"
+                                  value={nodeEditPoints}
+                                  placeholder="未设置"
+                                  onChange={(value) =>
+                                    setNodeEditPoints(
+                                      typeof value === 'number' ? value : null
+                                    )
+                                  }
+                                />
+                              ) : (
+                                <strong>{formatWorkTime(selectedNode.points)}</strong>
+                              )
                             ) : (
-                              <strong>{formatWorkTime(selectedNode.points)}</strong>
+                              <strong className="requirement-node-summary-na">
+                                不适用
+                              </strong>
                             )}
                           </div>
 
                           <div className="requirement-node-summary-block">
                             <span className="requirement-node-summary-label">
-                              总排期 <em>*</em>
+                              总排期 {selectedNode.supportsSchedule ? <em>*</em> : null}
                             </span>
-                            {nodeEditing ? (
-                              <DatePicker.RangePicker
-                                format="MM-DD"
-                                className="requirement-node-inline-range"
-                                value={nodeEditRange}
-                                onChange={(value) =>
-                                  setNodeEditRange(value as [Dayjs, Dayjs] | null)
-                                }
-                              />
+                            {selectedNode.supportsSchedule ? (
+                              nodeEditing ? (
+                                <DatePicker.RangePicker
+                                  format="MM-DD"
+                                  className="requirement-node-inline-range"
+                                  value={nodeEditRange}
+                                  onChange={(value) =>
+                                    setNodeEditRange(value as [Dayjs, Dayjs] | null)
+                                  }
+                                />
+                              ) : (
+                                <strong>
+                                  {formatNodeRange(
+                                    selectedNode.scheduleStart,
+                                    selectedNode.scheduleEnd
+                                  )}
+                                </strong>
+                              )
                             ) : (
-                              <strong>
-                                {formatNodeRange(
-                                  selectedNode.scheduleStart,
-                                  selectedNode.scheduleEnd
-                                )}
+                              <strong className="requirement-node-summary-na">
+                                不适用
                               </strong>
                             )}
                           </div>
@@ -3550,34 +3575,49 @@ export default function RequirementWorkbench({
                           )}
                         </div>
 
-                        <details className="requirement-node-section" open>
-                          <summary>工时</summary>
-                          <div className="requirement-node-workhour">
-                            <div className="requirement-node-workhour-row">
-                              <span>
-                                总实际工时 <em>*</em>
-                              </span>
-                              <strong>
-                                {formatWorkTime(selectedNode.actualWorkTime)}
-                              </strong>
+                        {selectedNode.supportsPoints ||
+                        selectedNode.supportsActualWorkTime ? (
+                          <details className="requirement-node-section" open>
+                            <summary>工时</summary>
+                            <div className="requirement-node-workhour">
+                              {selectedNode.supportsActualWorkTime ? (
+                                <div className="requirement-node-workhour-row">
+                                  <span>
+                                    总实际工时 <em>*</em>
+                                  </span>
+                                  <strong>
+                                    {formatWorkTime(selectedNode.actualWorkTime)}
+                                  </strong>
+                                </div>
+                              ) : null}
+                              {selectedNode.supportsPoints ? (
+                                <div className="requirement-node-workhour-summary">
+                                  <span>
+                                    总估分：{formatWorkTime(selectedNode.points)}
+                                  </span>
+                                  <span>
+                                    总剩余工时：{formatWorkTime(nodeRemainingWorkTime)}
+                                  </span>
+                                </div>
+                              ) : null}
+                              {selectedNode.supportsActualWorkTime ? (
+                                <>
+                                  <div className="requirement-node-workhour-actual">
+                                    实际工时需在飞书项目页面登记。
+                                  </div>
+                                  <div className="requirement-node-workhour-actual">
+                                    实际时间：
+                                    {formatNodeActualTime(
+                                      selectedNode.actualStart,
+                                      selectedNode.actualEnd,
+                                      selectedNode.status
+                                    )}
+                                  </div>
+                                </>
+                              ) : null}
                             </div>
-                            <div className="requirement-node-workhour-summary">
-                              <span>总估分：{formatWorkTime(selectedNode.points)}</span>
-                              <span>总剩余工时：{formatWorkTime(nodeRemainingWorkTime)}</span>
-                            </div>
-                            <div className="requirement-node-workhour-actual">
-                              实际工时需在飞书项目页面登记。
-                            </div>
-                            <div className="requirement-node-workhour-actual">
-                              实际时间：
-                              {formatNodeActualTime(
-                                selectedNode.actualStart,
-                                selectedNode.actualEnd,
-                                selectedNode.status
-                              )}
-                            </div>
-                          </div>
-                        </details>
+                          </details>
+                        ) : null}
                       </div>
                     ) : null}
                   </>

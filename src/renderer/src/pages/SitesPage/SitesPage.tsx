@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   AppstoreOutlined,
   DeleteOutlined,
@@ -74,8 +74,8 @@ const SITE_ENV_OPTIONS: Array<{ value: SiteEnv; label: string }> = [
 ]
 
 const SITE_ENV_TAG_COLORS: Record<SiteEnv, string> = {
-  prod: '#079455',
-  test: '#1570ef',
+  prod: '#1677ff',
+  test: '#079455',
   staging: '#dc6803',
   dev: '#7c3aed',
   gray: '#667085'
@@ -116,8 +116,14 @@ function SiteCard({
   onRemove,
   dragHandle
 }: SiteCardProps): JSX.Element {
+  const accent = site.env ? SITE_ENV_TAG_COLORS[site.env] : '#1677ff'
+
   return (
-    <article className="site-card">
+    <article
+      className="site-card"
+      style={{ '--site-accent': accent } as CSSProperties}
+    >
+      <span className="site-card-accent" aria-hidden="true" />
       <button
         type="button"
         className="site-card-main"

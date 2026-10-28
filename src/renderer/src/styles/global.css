@@ -32,6 +32,12 @@
   --elevated-panel: #ffffff;
   /* 需求工作台专用颜色，避免复用仓库设置页的浅色变量。 */
   --workbench-shadow: 0 18px 50px -38px rgba(15, 23, 42, 0.35);
+  /* 站点卡片需要更明确的边界，避免和页面背景融在一起。 */
+  --site-card-border: #dfe6f0;
+  --site-card-footer-border: rgba(15, 23, 42, 0.08);
+  --site-card-shadow:
+    0 1px 2px rgba(15, 23, 42, 0.05),
+    0 12px 32px -26px rgba(15, 23, 42, 0.42);
 }
 
 :root[data-theme="dark"] {
@@ -62,6 +68,11 @@
   --elevated-panel: #26272c;
   /* 深色模式下工作台需要比全局背景略亮的表面色。 */
   --workbench-shadow: 0 18px 50px -38px rgba(0, 0, 0, 0.7);
+  --site-card-border: #343742;
+  --site-card-footer-border: rgba(255, 255, 255, 0.08);
+  --site-card-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.38),
+    0 14px 34px -26px rgba(0, 0, 0, 0.9);
 }
 
 * {
@@ -5396,7 +5407,7 @@ body {
 .sites-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
+  gap: 16px;
 }
 
 .site-card {
@@ -5405,23 +5416,31 @@ body {
   flex-direction: column;
   min-width: 0;
   height: 100%;
-  background: linear-gradient(
-    160deg,
-    var(--workbench-panel) 0%,
-    var(--workbench-soft) 100%
-  );
-  border: 1px solid var(--workbench-divider);
+  overflow: hidden;
+  background: var(--workbench-panel);
+  border: 1px solid var(--site-card-border);
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.025);
+  box-shadow: var(--site-card-shadow);
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.18s ease;
 }
 
+.site-card-accent {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 3px;
+  background: var(--site-accent);
+  opacity: 0.9;
+}
+
 .site-card:hover {
-  border-color: rgba(22, 119, 255, 0.26);
-  box-shadow: 0 14px 30px -25px rgba(15, 23, 42, 0.62);
+  border-color: var(--site-accent);
+  box-shadow:
+    0 2px 5px -2px rgba(15, 23, 42, 0.12),
+    0 18px 40px -28px rgba(15, 23, 42, 0.58);
   transform: translateY(-2px);
 }
 
@@ -5455,7 +5474,7 @@ body {
   flex: 1;
   align-items: center;
   width: 100%;
-  padding: 12px 12px 9px;
+  padding: 14px 14px 10px;
   color: var(--app-text);
   font-family: inherit;
   text-align: left;
@@ -5498,9 +5517,9 @@ body {
 .site-card-tags {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
+  justify-content: flex-start;
   gap: 4px;
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
 .site-card-tags .ant-tag {
@@ -5516,9 +5535,9 @@ body {
   min-width: 0;
   overflow: hidden;
   color: var(--app-text);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 1.45;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -5548,8 +5567,9 @@ body {
   gap: 8px;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 12px 12px;
-  border-top: 1px solid var(--workbench-divider);
+  padding: 10px 14px 12px;
+  background: var(--workbench-soft);
+  border-top: 1px solid var(--site-card-footer-border);
 }
 
 .site-card-url-button {
@@ -5559,7 +5579,7 @@ body {
   overflow: hidden;
   color: var(--workbench-secondary);
   font-family: inherit;
-  font-size: 10px;
+  font-size: 11px;
   text-align: left;
   background: transparent;
   border: 0;
@@ -5590,7 +5610,7 @@ body {
   display: flex;
   flex-shrink: 0;
   gap: 0;
-  opacity: 0.55;
+  opacity: 0.68;
   transition: opacity 0.15s ease;
 }
 
@@ -5665,11 +5685,6 @@ body {
 
 :root[data-theme="dark"] .site-card {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
-}
-
-:root[data-theme="dark"] .site-card:hover {
-  border-color: rgba(96, 165, 250, 0.3);
-  box-shadow: 0 14px 30px -25px rgba(0, 0, 0, 0.8);
 }
 
 @media (max-width: 760px) {
@@ -8287,4 +8302,15 @@ body {
   .quick-note-row {
     animation: none;
   }
+}
+
+.requirement-node-summary-block strong.requirement-node-summary-na {
+  color: var(--app-muted);
+  font-weight: 400;
+}
+
+:root[data-theme="dark"] .site-card:hover {
+  box-shadow:
+    0 2px 6px -2px rgba(0, 0, 0, 0.42),
+    0 18px 40px -28px rgba(0, 0, 0, 0.95);
 }
