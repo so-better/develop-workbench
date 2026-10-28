@@ -1,6 +1,7 @@
 import {
   CloudOutlined,
   DownloadOutlined,
+  ReadOutlined,
   SearchOutlined,
   SettingOutlined
 } from '@ant-design/icons'
@@ -14,6 +15,7 @@ interface AppFooterProps {
   onOpenSettings: () => void
   downloadCount: number
   onOpenDownloads: () => void
+  onOpenGuide: () => void
   onOpenAi: () => void
   onOpenCloudDocs: () => void
   onOpenQuickAccess: () => void
@@ -28,6 +30,7 @@ export default function AppFooter({
   onOpenSettings,
   downloadCount,
   onOpenDownloads,
+  onOpenGuide,
   onOpenAi,
   onOpenCloudDocs,
   onOpenQuickAccess
@@ -65,6 +68,15 @@ export default function AppFooter({
           搜索
           <kbd>{quickAccessShortcut}</kbd>
         </Button>
+        <Tooltip title="使用手册">
+          <Button
+            type="text"
+            size="middle"
+            icon={<ReadOutlined />}
+            aria-label="打开使用手册"
+            onClick={onOpenGuide}
+          />
+        </Tooltip>
         <Tooltip title="飞书云文档">
           <Button
             type="text"

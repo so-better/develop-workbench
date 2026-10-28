@@ -19,6 +19,7 @@ export interface AppPreferences {
   gitPath?: string
   ide?: IdeConfig
   skillDirectories?: string[]
+  productGuideSeenVersion?: number
 }
 
 const DEFAULT_PREFERENCES: AppPreferences = {
@@ -113,6 +114,7 @@ const readPreferences = (): AppPreferences => {
     gitPath?: unknown
     ide?: unknown
     skillDirectories?: unknown
+    productGuideSeenVersion?: unknown
   }
 
   cachedPreferences = {
@@ -128,7 +130,13 @@ const readPreferences = (): AppPreferences => {
           .filter((item): item is string => typeof item === 'string')
           .map((item) => item.trim())
           .filter(Boolean)
-      : undefined
+      : undefined,
+    productGuideSeenVersion:
+      typeof value.productGuideSeenVersion === 'number' &&
+      Number.isInteger(value.productGuideSeenVersion) &&
+      value.productGuideSeenVersion >= 0
+        ? value.productGuideSeenVersion
+        : undefined
   }
 
   return cachedPreferences
@@ -158,6 +166,12 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
   next.skillDirectories = next.skillDirectories
     ?.map((item) => item.trim())
     .filter(Boolean)
+  next.productGuideSeenVersion =
+    typeof next.productGuideSeenVersion === 'number' &&
+    Number.isInteger(next.productGuideSeenVersion) &&
+    next.productGuideSeenVersion >= 0
+      ? next.productGuideSeenVersion
+      : undefined
   cachedPreferences = next
 
   try {

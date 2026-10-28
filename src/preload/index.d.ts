@@ -9,6 +9,7 @@ import type {
   AiArtifactStats
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
+import type { ProductGuideState } from '../types/product-guide'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
@@ -66,6 +67,10 @@ export interface ElectronAPI {
   platform: string
   /** 获取应用与运行时版本信息。 */
   getAppInfo: () => Promise<AppInfo>
+  /** 读取产品使用手册的当前版本和已读版本。 */
+  getProductGuideState: () => Promise<ProductGuideState>
+  /** 将当前产品手册版本标记为已读。 */
+  markProductGuideSeen: () => Promise<void>
   /** 打开系统协议链接。 */
   openExternalUrl: (url: string) => Promise<void>
   /** 获取链接预览信息。 */

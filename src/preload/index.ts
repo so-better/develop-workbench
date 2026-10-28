@@ -11,6 +11,7 @@ import type {
   AiArtifactStats
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
+import type { ProductGuideState } from '../types/product-guide'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
@@ -78,6 +79,14 @@ const electronAPI = {
    * 获取应用版本及 Electron、Chromium、Node.js 运行时信息。
    */
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:get-info'),
+
+  /** 读取产品使用手册的当前版本和已读版本。 */
+  getProductGuideState: (): Promise<ProductGuideState> =>
+    ipcRenderer.invoke('product-guide:get-state'),
+
+  /** 将当前产品手册版本标记为已读。 */
+  markProductGuideSeen: (): Promise<void> =>
+    ipcRenderer.invoke('product-guide:mark-seen'),
 
   /**
    * 获取链接预览信息。

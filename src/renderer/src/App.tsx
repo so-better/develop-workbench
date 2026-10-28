@@ -5,6 +5,7 @@ import AppTitleBar from './components/AppTitleBar/AppTitleBar'
 import QuickAccess from './components/QuickAccess/QuickAccess'
 import AppNavigation from './components/AppNavigation/AppNavigation'
 import LinkContextMenu from './components/LinkContextMenu/LinkContextMenu'
+import ProductGuide from './components/ProductGuide/ProductGuide'
 import { APP_PAGES } from './navigation'
 import type { AppPage } from './navigation'
 import EmbeddedBrowserDownloads from './components/EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
@@ -18,6 +19,7 @@ import type { AppInfo } from '../../types/app'
 import type { AuthExpiredEvent } from '../../types/auth'
 import type { LarkCliInfo, LarkUser } from '../../types/lark'
 import type { MeegleState } from '../../types/meegle'
+
 
 interface EnvironmentStatus {
   meegleAuthenticated: boolean
@@ -54,6 +56,8 @@ export default function App(): JSX.Element {
   const [browserVisible, setBrowserVisible] = useState(false)
   const [downloadsPanelOpen, setDownloadsPanelOpen] = useState(false)
   const [downloadsModalOpen, setDownloadsModalOpen] = useState(false)
+  const [guideOpen, setGuideOpen] = useState(false)
+  const [guideWelcome, setGuideWelcome] = useState(false)
 
   /**
    * 重新读取本地 CLI 安装和授权状态。
@@ -233,6 +237,31 @@ export default function App(): JSX.Element {
     setDownloadsModalOpen(false)
   }, [environmentLoading, environmentReady])
 
+  useEffect(() => {
+    if (environmentLoading || !environmentReady) return
+
+    let cancelled = false
+
+    window.electron
+      .getProductGuideState()
+      .then((state) => {
+        if (!cancelled && state.seenVersion < state.currentVersion) {
+          setGuideWelcome(true)
+          setGuideOpen(true)
+        }
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
+  }, [environmentLoading, environmentReady])
+
+  const closeGuide = useCallback((): void => {
+    setGuideOpen(false)
+    window.electron.markProductGuideSeen().catch(() => undefined)
+  }, [])
+
   return (
     <div className="app-shell">
       <AppTitleBar />
@@ -281,11 +310,21 @@ export default function App(): JSX.Element {
 
       <QuickAccess />
 
+      <ProductGuide
+        open={guideOpen}
+        welcome={guideWelcome}
+        onClose={closeGuide}
+      />
+
       <AppFooter
         appInfo={appInfo}
         onOpenSettings={() => openSettings()}
         downloadCount={activeCount}
         onOpenDownloads={handleOpenDownloads}
+        onOpenGuide={() => {
+          setGuideWelcome(false)
+          setGuideOpen(true)
+        }}
         onOpenQuickAccess={() => window.dispatchEvent(new Event('quick-access:open'))}
         onOpenAi={() =>
           openAiDialog({

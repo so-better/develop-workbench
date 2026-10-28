@@ -17,6 +17,7 @@ import { initializeLarkSearch } from './lark-search'
 import { initializeLinkPreview } from './link-preview'
 import { initializeMarkdownImages } from './markdown-images'
 import { initializeMeegle } from './meegle'
+import { initializeProductGuide } from './product-guide'
 import { initializeRepositories } from './repositories'
 import { initializeRequirementBindings } from './requirement-bindings'
 import { initializeRequirementStatuses } from './requirement-statuses'
@@ -61,6 +62,7 @@ if (!hasSingleInstanceLock) {
     // 各业务模块自行注册 IPC；先恢复主题，再创建窗口，避免启动时主题闪烁。
     initializeTheme()
     initializeSystem()
+    initializeProductGuide()
     initializeEmbeddedBrowser()
     initializeGit()
     initializeIde()
