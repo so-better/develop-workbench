@@ -199,6 +199,7 @@ export default function EmbeddedBrowserPanel({
       const target = event.target
 
       if (target instanceof Node && panelRef.current?.contains(target)) return
+      if (target instanceof Element && target.closest('.ant-popover')) return
 
       requestClose()
     }

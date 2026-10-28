@@ -580,10 +580,19 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
 
   webContents.on('before-input-event', (event, input) => {
     const key = input.key.toLowerCase()
+    const openQuickNotesShortcut =
+      (input.meta || input.control) && !input.alt && input.shift && key === 'k'
     const toggleDevToolsShortcut =
       key === 'f12' ||
       ((input.meta || input.control) && input.alt && key === 'i') ||
       (input.control && input.shift && key === 'i')
+
+    if (openQuickNotesShortcut && !input.isAutoRepeat) {
+      event.preventDefault()
+      entry.window.webContents.focus()
+      entry.window.webContents.send('quick-notes:open')
+      return
+    }
 
     if (toggleDevToolsShortcut && !input.isAutoRepeat) {
       event.preventDefault()

@@ -108,12 +108,13 @@ const CAPABILITIES: GuideCapability[] = [
     ]
   },
   {
-    title: '全局快速访问',
+    title: '快速访问与简记',
     icon: <SearchOutlined />,
     items: [
-      '搜索需求、缺陷、站点、飞书文档、消息和群聊',
+      'Cmd/Ctrl+K 搜索需求、缺陷、站点、飞书文档、消息和群聊',
+      'Cmd/Ctrl+Shift+K 打开待办简记，随手记录、完成和删除',
       '消息与群聊交给飞书 App，其他结果可在应用内打开',
-      '支持上下键选择、回车打开，全程键盘操作'
+      '搜索结果支持上下键选择、回车打开'
     ]
   },
   {
@@ -228,6 +229,11 @@ export default function ProductGuide({
       label: '打开全局快速访问'
     },
     {
+      key: 'quick-notes',
+      keys: isMac ? ['⌘', '⇧', 'K'] : ['Ctrl', 'Shift', 'K'],
+      label: '打开待办简记'
+    },
+    {
       key: 'navigate',
       keys: ['↑', '↓', 'Enter'],
       label: '选择并打开搜索结果'
@@ -320,7 +326,7 @@ export default function ProductGuide({
             <span className="product-guide-kicker">产品使用手册</span>
             <h2>AI 研发工作台</h2>
             <p>
-              把需求、缺陷、代码、站点、周报和 AI 放进同一个桌面工作台，减少在浏览器、IDE 和飞书之间来回切换。
+              把需求、缺陷、代码、站点、周报、待办和 AI 放进同一个桌面工作台，减少在浏览器、IDE 和飞书之间来回切换。
             </p>
           </div>
         </header>
@@ -393,7 +399,7 @@ export default function ProductGuide({
               </div>
 
               <footer className="product-guide-tip">
-                底部工具栏还提供下载管理、搜索、使用手册、飞书云文档、AI
+                底部工具栏还提供待办简记、下载管理、搜索、使用手册、飞书云文档、AI
                 助手、设置和主题切换。关闭后仍可从“使用手册”再次查看。
               </footer>
             </section>

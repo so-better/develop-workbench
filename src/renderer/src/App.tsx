@@ -6,6 +6,7 @@ import QuickAccess from './components/QuickAccess/QuickAccess'
 import AppNavigation from './components/AppNavigation/AppNavigation'
 import LinkContextMenu from './components/LinkContextMenu/LinkContextMenu'
 import ProductGuide from './components/ProductGuide/ProductGuide'
+import QuickNotes from './components/QuickNotes/QuickNotes'
 import { APP_PAGES } from './navigation'
 import type { AppPage } from './navigation'
 import EmbeddedBrowserDownloads from './components/EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
@@ -15,6 +16,7 @@ import SettingsModal from './components/SettingsModal/SettingsModal'
 import { useSettingsDialog } from './components/SettingsModal/SettingsDialogProvider'
 import { useAiChatDialog } from './hooks/useAiChatDialog'
 import { useEmbeddedDownloads } from './hooks/useEmbeddedDownloads'
+import { useQuickNotes } from './hooks/useQuickNotes'
 import type { AppInfo } from '../../types/app'
 import type { AuthExpiredEvent } from '../../types/auth'
 import type { LarkCliInfo, LarkUser } from '../../types/lark'
@@ -58,6 +60,8 @@ export default function App(): JSX.Element {
   const [downloadsModalOpen, setDownloadsModalOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
   const [guideWelcome, setGuideWelcome] = useState(false)
+  const [quickNotesOpen, setQuickNotesOpen] = useState(false)
+  const quickNotes = useQuickNotes()
 
   /**
    * 重新读取本地 CLI 安装和授权状态。
@@ -262,6 +266,18 @@ export default function App(): JSX.Element {
     window.electron.markProductGuideSeen().catch(() => undefined)
   }, [])
 
+  const openQuickNotes = useCallback((): void => {
+    if (browserVisible) {
+      window.electron.closeEmbeddedBrowser().catch(() => undefined)
+    }
+
+    setQuickNotesOpen(true)
+  }, [browserVisible])
+
+  const closeQuickNotes = useCallback((): void => {
+    setQuickNotesOpen(false)
+  }, [])
+
   return (
     <div className="app-shell">
       <AppTitleBar />
@@ -310,6 +326,19 @@ export default function App(): JSX.Element {
 
       <QuickAccess />
 
+      <QuickNotes
+        open={quickNotesOpen}
+        notes={quickNotes.notes}
+        loading={quickNotes.loading}
+        error={quickNotes.error}
+        onOpen={openQuickNotes}
+        onClose={closeQuickNotes}
+        onAdd={quickNotes.add}
+        onSetDone={quickNotes.setDone}
+        onRemove={quickNotes.remove}
+        onClearCompleted={quickNotes.clearCompleted}
+      />
+
       <ProductGuide
         open={guideOpen}
         welcome={guideWelcome}
@@ -320,7 +349,15 @@ export default function App(): JSX.Element {
         appInfo={appInfo}
         onOpenSettings={() => openSettings()}
         downloadCount={activeCount}
+        quickNoteCount={quickNotes.openCount}
         onOpenDownloads={handleOpenDownloads}
+        onOpenQuickNotes={() => {
+          if (quickNotesOpen) {
+            closeQuickNotes()
+          } else {
+            openQuickNotes()
+          }
+        }}
         onOpenGuide={() => {
           setGuideWelcome(false)
           setGuideOpen(true)

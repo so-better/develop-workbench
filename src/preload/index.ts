@@ -12,6 +12,7 @@ import type {
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
+import type { QuickNoteState } from '../types/quick-note'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
@@ -87,6 +88,39 @@ const electronAPI = {
   /** 将当前产品手册版本标记为已读。 */
   markProductGuideSeen: (): Promise<void> =>
     ipcRenderer.invoke('product-guide:mark-seen'),
+
+  /** 读取待办简记。 */
+  getQuickNoteState: (): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:get-state'),
+
+  /** 新增一条待办简记。 */
+  addQuickNote: (text: string): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:add', text),
+
+  /** 更新待办完成状态。 */
+  setQuickNoteDone: (id: string, done: boolean): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:set-done', id, done),
+
+  /** 删除一条待办。 */
+  removeQuickNote: (id: string): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:remove', id),
+
+  /** 清空已完成待办。 */
+  clearCompletedQuickNotes: (): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:clear-completed'),
+
+  /** 订阅主进程转发的待办简记打开事件。 */
+  onQuickNotesOpen: (listener: () => void): (() => void) => {
+    const handler = (): void => {
+      listener()
+    }
+
+    ipcRenderer.on('quick-notes:open', handler)
+
+    return () => {
+      ipcRenderer.removeListener('quick-notes:open', handler)
+    }
+  },
 
   /**
    * 获取链接预览信息。

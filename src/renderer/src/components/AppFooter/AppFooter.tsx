@@ -1,4 +1,5 @@
 import {
+  CheckSquareOutlined,
   CloudOutlined,
   DownloadOutlined,
   ReadOutlined,
@@ -14,7 +15,9 @@ interface AppFooterProps {
   appInfo: AppInfo | null
   onOpenSettings: () => void
   downloadCount: number
+  quickNoteCount: number
   onOpenDownloads: () => void
+  onOpenQuickNotes: () => void
   onOpenGuide: () => void
   onOpenAi: () => void
   onOpenCloudDocs: () => void
@@ -29,13 +32,16 @@ export default function AppFooter({
   appInfo,
   onOpenSettings,
   downloadCount,
+  quickNoteCount,
   onOpenDownloads,
+  onOpenQuickNotes,
   onOpenGuide,
   onOpenAi,
   onOpenCloudDocs,
   onOpenQuickAccess
 }: AppFooterProps): JSX.Element {
-  const quickAccessShortcut = window.electron.platform === 'darwin' ? '⌘K' : 'Ctrl K'
+  const isMac = window.electron.platform === 'darwin'
+  const quickAccessShortcut = isMac ? '⌘K' : 'Ctrl K'
   return (
     <footer className="app-footer">
       <div className="footer-leading">
@@ -45,6 +51,17 @@ export default function AppFooter({
             <Tag bordered={false}>v{appInfo.appVersion}</Tag>
           </span>
         ) : null}
+        <Badge count={quickNoteCount} size="small">
+          <Button
+            type="text"
+            size="small"
+            icon={<CheckSquareOutlined />}
+            data-quick-notes-trigger
+            onClick={onOpenQuickNotes}
+          >
+            待办简记
+          </Button>
+        </Badge>
         <Badge count={downloadCount} size="small">
           <Button
             type="text"

@@ -10,6 +10,7 @@ import type {
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
+import type { QuickNoteState } from '../types/quick-note'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
@@ -71,6 +72,18 @@ export interface ElectronAPI {
   getProductGuideState: () => Promise<ProductGuideState>
   /** 将当前产品手册版本标记为已读。 */
   markProductGuideSeen: () => Promise<void>
+  /** 读取待办简记。 */
+  getQuickNoteState: () => Promise<QuickNoteState>
+  /** 新增一条待办简记。 */
+  addQuickNote: (text: string) => Promise<QuickNoteState>
+  /** 更新待办完成状态。 */
+  setQuickNoteDone: (id: string, done: boolean) => Promise<QuickNoteState>
+  /** 删除一条待办。 */
+  removeQuickNote: (id: string) => Promise<QuickNoteState>
+  /** 清空已完成待办。 */
+  clearCompletedQuickNotes: () => Promise<QuickNoteState>
+  /** 订阅主进程转发的待办简记打开事件。 */
+  onQuickNotesOpen: (listener: () => void) => () => void
   /** 打开系统协议链接。 */
   openExternalUrl: (url: string) => Promise<void>
   /** 获取链接预览信息。 */

@@ -18,6 +18,7 @@ import { initializeLinkPreview } from './link-preview'
 import { initializeMarkdownImages } from './markdown-images'
 import { initializeMeegle } from './meegle'
 import { initializeProductGuide } from './product-guide'
+import { initializeQuickNotes } from './quick-notes'
 import { initializeRepositories } from './repositories'
 import { initializeRequirementBindings } from './requirement-bindings'
 import { initializeRequirementStatuses } from './requirement-statuses'
@@ -63,6 +64,7 @@ if (!hasSingleInstanceLock) {
     initializeTheme()
     initializeSystem()
     initializeProductGuide()
+    initializeQuickNotes()
     initializeEmbeddedBrowser()
     initializeGit()
     initializeIde()

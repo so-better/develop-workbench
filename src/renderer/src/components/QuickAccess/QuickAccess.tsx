@@ -363,7 +363,12 @@ export default function QuickAccess(): JSX.Element {
   /** Cmd/Ctrl+K 打开快速访问；浏览器已打开时优先关闭浏览器。 */
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === 'k'
+      ) {
         event.preventDefault()
         event.stopImmediatePropagation()
 
