@@ -110,6 +110,10 @@ const electronAPI = {
   reloadEmbeddedBrowser: (): Promise<void> =>
     ipcRenderer.invoke('embedded-browser:reload'),
 
+  /** 打开或关闭内嵌浏览器开发者工具。 */
+  toggleEmbeddedBrowserDevTools: (): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:toggle-devtools'),
+
   goBackEmbeddedBrowser: (): Promise<void> =>
     ipcRenderer.invoke('embedded-browser:go-back'),
 

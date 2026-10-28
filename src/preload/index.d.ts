@@ -85,6 +85,8 @@ export interface ElectronAPI {
   closeEmbeddedBrowser: () => Promise<void>
   /** 内嵌浏览器刷新。 */
   reloadEmbeddedBrowser: () => Promise<void>
+  /** 打开或关闭内嵌浏览器开发者工具。 */
+  toggleEmbeddedBrowserDevTools: () => Promise<void>
   /** 内嵌浏览器后退。 */
   goBackEmbeddedBrowser: () => Promise<void>
   /** 内嵌浏览器前进。 */

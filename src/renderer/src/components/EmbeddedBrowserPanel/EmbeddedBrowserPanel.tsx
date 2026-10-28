@@ -3,6 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import {
   ArrowLeftOutlined,
   ArrowRightOutlined,
+  BugOutlined,
   CloseOutlined,
   CompressOutlined,
   DownloadOutlined,
@@ -378,6 +379,13 @@ export default function EmbeddedBrowserPanel({
         </div>
 
         <div className="embedded-browser-actions">
+          <Button
+            type="text"
+            size="small"
+            icon={<BugOutlined />}
+            aria-label="开发者工具"
+            onClick={() => window.electron.toggleEmbeddedBrowserDevTools()}
+          />
           <Button
             type="text"
             size="small"

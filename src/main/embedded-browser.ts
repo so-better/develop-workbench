@@ -517,6 +517,20 @@ export const requestEmbeddedBrowserClose = (window: BrowserWindow): void => {
 export const isEmbeddedBrowserVisible = (window: BrowserWindow): boolean =>
   entries.get(window.id)?.visible ?? false
 
+/** 切换内嵌浏览器的独立开发者工具窗口。 */
+const toggleEntryDevTools = (entry: BrowserEntry): void => {
+  const webContents = entry.view.webContents
+
+  if (webContents.isDestroyed()) return
+
+  if (webContents.isDevToolsOpened()) {
+    webContents.closeDevTools()
+    return
+  }
+
+  webContents.openDevTools({ mode: 'detach', activate: true })
+}
+
 const getEntry = (window: BrowserWindow): BrowserEntry => {
   const existing = entries.get(window.id)
 
@@ -565,6 +579,18 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
   })
 
   webContents.on('before-input-event', (event, input) => {
+    const key = input.key.toLowerCase()
+    const toggleDevToolsShortcut =
+      key === 'f12' ||
+      ((input.meta || input.control) && input.alt && key === 'i') ||
+      (input.control && input.shift && key === 'i')
+
+    if (toggleDevToolsShortcut && !input.isAutoRepeat) {
+      event.preventDefault()
+      toggleEntryDevTools(entry)
+      return
+    }
+
     if (input.key === 'Escape' && !input.isAutoRepeat) {
       event.preventDefault()
       entry.window.webContents.send('embedded-browser:request-close')
@@ -797,6 +823,16 @@ export const initializeEmbeddedBrowser = (): void => {
     if (entry?.view.webContents.navigationHistory.canGoForward()) {
       entry.view.webContents.navigationHistory.goForward()
     }
+  })
+
+  ipcMain.handle('embedded-browser:toggle-devtools', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+
+    if (!window) return
+
+    const entry = entries.get(window.id)
+
+    if (entry) toggleEntryDevTools(entry)
   })
 
   ipcMain.handle('embedded-browser:close', (event) => {
