@@ -84,6 +84,17 @@ export default function QuickNotes({
     }
   }, [open])
 
+  // 全部完成后展开已完成列表，避免出现“空列表 + 100% 进度”的割裂感。
+  useEffect(() => {
+    if (!open) return
+
+    const hasPending = notes.some((note) => !note.done)
+
+    if (!hasPending && notes.length > 0) {
+      setShowCompleted(true)
+    }
+  }, [notes, open])
+
   // 点击面板外关闭；底部入口本身不触发关闭，避免按钮点击后立即重开。
   useEffect(() => {
     if (!open) return
@@ -205,6 +216,7 @@ export default function QuickNotes({
   const completedNotes = notes.filter((note) => note.done)
   const totalNotes = notes.length
   const completedCount = completedNotes.length
+  const allDone = totalNotes > 0 && pendingNotes.length === 0
   const progress = totalNotes > 0 ? (completedCount / totalNotes) * 100 : 0
 
   const renderNote = (note: QuickNote): JSX.Element => {
@@ -261,8 +273,11 @@ export default function QuickNotes({
           <div>
             <strong>待办简记</strong>
             <span aria-live="polite">
-              未完成 {pendingNotes.length} 项
-              {completedCount > 0 ? ` · 已完成 ${completedCount} 项` : ''}
+              {allDone
+                ? `全部完成 · 共 ${totalNotes} 项`
+                : `未完成 ${pendingNotes.length} 项${
+                    completedCount > 0 ? ` · 已完成 ${completedCount} 项` : ''
+                  }`}
             </span>
           </div>
         </div>
@@ -275,7 +290,7 @@ export default function QuickNotes({
         />
       </header>
 
-      {totalNotes > 0 ? (
+      {totalNotes > 0 && !allDone ? (
         <div
           className="quick-notes-progress"
           role="progressbar"
@@ -337,7 +352,10 @@ export default function QuickNotes({
                 {pendingNotes.map(renderNote)}
               </div>
             ) : (
-              <div className="quick-notes-all-done">今天的待办都完成了</div>
+              <div className="quick-notes-all-done">
+                <CheckCircleFilled />
+                <span>今天的待办都完成了</span>
+              </div>
             )}
 
             {completedNotes.length > 0 ? (

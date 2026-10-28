@@ -8170,10 +8170,19 @@ body {
 }
 
 .quick-notes-all-done {
-  padding: 24px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  padding: 22px 8px;
   color: var(--app-muted);
   font-size: 11px;
   text-align: center;
+}
+
+.quick-notes-all-done .anticon {
+  color: #12b76a;
+  font-size: 18px;
 }
 
 .quick-notes-completed {
