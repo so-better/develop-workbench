@@ -10,6 +10,7 @@ import { constants } from 'node:fs'
 import { access } from 'node:fs/promises'
 import { basename, isAbsolute, join } from 'node:path'
 import { homedir } from 'node:os'
+import { getCliEnvironment } from './cli-env'
 import { getPreferences, updatePreferences } from './preferences'
 import { getRepositoryLocalPath, prepareRepositoryForIde } from './repositories'
 import { IDE_PRESETS } from '../types/ide'
@@ -106,7 +107,8 @@ const findCommand = async (command: string): Promise<string | null> => {
     const locator = process.platform === 'win32' ? 'where' : 'which'
     const { stdout } = await execFileAsync(locator, [normalizedCommand], {
       timeout: 5_000,
-      encoding: 'utf8'
+      encoding: 'utf8',
+      env: getCliEnvironment(locator)
     })
 
     return stdout.trim().split(/\r?\n/)[0] || null
@@ -339,6 +341,7 @@ const spawnDetached = (
           ],
           {
             cwd,
+            env: getCliEnvironment(command),
             detached: true,
             stdio: 'ignore',
             windowsHide: true,
@@ -347,6 +350,7 @@ const spawnDetached = (
         )
       : spawn(command, args, {
           cwd,
+          env: getCliEnvironment(command),
           detached: true,
           stdio: 'ignore',
           windowsHide: true

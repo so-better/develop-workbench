@@ -11,7 +11,7 @@ import { access, mkdtemp, readFile, readdir, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
-import { getCliEnvironment } from './cli-env'
+import { getCliEnvironment, getCliInvocation } from './cli-env'
 import { getPreferences, updatePreferences } from './preferences'
 import { broadcastAuthExpired, isAuthExpiredError } from './auth-events'
 import type {
@@ -236,12 +236,16 @@ const runExecutable = async (
   args: string[],
   options: { cwd?: string; timeoutMs?: number } = {}
 ): Promise<string> => {
-  const { stdout } = await execFileAsync(executablePath, args, {
+  const invocation = getCliInvocation(executablePath, args)
+  const { stdout } = await execFileAsync(invocation.command, invocation.args, {
     timeout: options.timeoutMs ?? COMMAND_TIMEOUT_MS,
     maxBuffer: MAX_BUFFER_BYTES,
     encoding: 'utf8',
     env: getCliEnvironment(executablePath),
-    cwd: options.cwd
+    cwd: options.cwd,
+    ...(invocation.windowsVerbatimArguments
+      ? { windowsVerbatimArguments: true }
+      : {})
   })
 
   return stdout

@@ -13,6 +13,7 @@ import { access, open, readFile, readdir, realpath, rename, rm, stat } from 'nod
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
+import { getCliEnvironment } from './cli-env'
 import { getPreferences, updatePreferences } from './preferences'
 import { resolveGitPath } from './git'
 import { backupCorruptStore } from './store-backup'
@@ -211,7 +212,7 @@ const runGit = async (
     maxBuffer: MAX_BUFFER_BYTES,
     encoding: 'utf8',
     env: {
-      ...process.env,
+      ...getCliEnvironment(gitPath),
       GIT_TERMINAL_PROMPT: '0'
     }
   })
@@ -1013,7 +1014,7 @@ const runGitClone = async (url: string, targetPath: string): Promise<void> => {
   const gitPath = await resolveGitPath()
   const child = spawn(gitPath, ['clone', '--progress', '--', url, targetPath], {
     env: {
-      ...process.env,
+      ...getCliEnvironment(gitPath),
       GIT_TERMINAL_PROMPT: '0'
     },
     stdio: ['ignore', 'pipe', 'pipe']

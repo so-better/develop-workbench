@@ -10,6 +10,7 @@ import { constants } from 'node:fs'
 import { dirname, isAbsolute } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
+import { getCliEnvironment } from './cli-env'
 import { getPreferences, updatePreferences } from './preferences'
 import type { GitInfo, GitPathSource } from '../types/git'
 
@@ -49,7 +50,8 @@ const findCommandPath = async (command: string): Promise<string | null> => {
     const locator = process.platform === 'win32' ? 'where' : 'which'
     const { stdout } = await execFileAsync(locator, [command], {
       timeout: 5_000,
-      encoding: 'utf8'
+      encoding: 'utf8',
+      env: getCliEnvironment(locator)
     })
     const found = stdout.trim().split(/\r?\n/)[0]
 
@@ -148,7 +150,7 @@ const readVersion = async (executablePath: string): Promise<string | null> => {
       timeout: 5_000,
       encoding: 'utf8',
       env: {
-        ...process.env,
+        ...getCliEnvironment(executablePath),
         GIT_TERMINAL_PROMPT: '0'
       }
     })

@@ -10,7 +10,7 @@ import { access, readdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import QRCode from 'qrcode'
-import { getCliEnvironment } from './cli-env'
+import { getCliEnvironment, getCliInvocation } from './cli-env'
 import { getPreferences, updatePreferences } from './preferences'
 import { broadcastAuthExpired, isAuthExpiredError } from './auth-events'
 import type {
@@ -185,9 +185,13 @@ const runExecutable = (
   timeoutMs = MEEGLE_COMMAND_TIMEOUT_MS
 ): Promise<CommandResult> =>
   new Promise((resolve, reject) => {
-    const child = spawn(executablePath, args, {
+    const invocation = getCliInvocation(executablePath, args)
+    const child = spawn(invocation.command, invocation.args, {
       env: getCliEnvironment(executablePath),
-      stdio: ['ignore', 'pipe', 'pipe']
+      stdio: ['ignore', 'pipe', 'pipe'],
+      ...(invocation.windowsVerbatimArguments
+        ? { windowsVerbatimArguments: true }
+        : {})
     })
     let stdout = ''
     let stderr = ''

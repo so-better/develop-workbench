@@ -8,6 +8,7 @@ import { readFile, readdir, realpath, stat } from 'node:fs/promises'
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import matter from 'gray-matter'
 import { normalizeText } from '../../utils'
+import { getCliEnvironment } from '../cli-env'
 import { getPreferences } from '../preferences'
 
 // 技能声明文件名固定，扫描时只识别该文件。
@@ -367,7 +368,7 @@ const getScriptCommand = (scriptPath: string, args: string[]): ScriptCommand => 
     return {
       command: process.execPath,
       args: [scriptPath, ...args],
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }
+      env: { ELECTRON_RUN_AS_NODE: '1' }
     }
   }
 
@@ -417,11 +418,15 @@ export const runProjectSkillScript = async (
 
   const relativePath = relative(root, realTarget).split(sep).join('/')
   const { command, args: commandArgs, env } = getScriptCommand(realTarget, args)
+  const runtimeEnv = {
+    ...getCliEnvironment(command),
+    ...(env ?? {})
+  }
 
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, commandArgs, {
       cwd: skill.directory,
-      env: env ?? process.env,
+      env: runtimeEnv,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']
     })

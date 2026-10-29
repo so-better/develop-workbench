@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { app } from 'electron'
 import { spawn } from 'node:child_process'
-import { existsSync, readdirSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { delimiter, dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { tool } from 'ai'
 import type { ToolSet } from 'ai'
 import { z } from 'zod'
-import { getPreferences } from '../../preferences'
+import { getCliEnvironment } from '../../cli-env'
 
 const EXEC_TIMEOUT_MS = 10 * 60 * 1000
 const MAX_OUTPUT_LENGTH = 30_000
@@ -113,39 +113,8 @@ const buildInvocation = (command: string): { file: string; args: string[] } => {
   return { file, args: ['-c', command] }
 }
 
-/** 补全 GUI 启动时可能缺失的常用 CLI 目录。 */
-const getShellEnv = (): NodeJS.ProcessEnv => {
-  const pathKey = process.platform === 'win32' ? 'Path' : 'PATH'
-  const currentPath = process.env[pathKey] ?? ''
-  const extraPaths = [
-    join(homedir(), '.local/bin'),
-    join(homedir(), '.local/node/bin'),
-    join(homedir(), '.volta/bin'),
-    join(homedir(), '.asdf/shims'),
-    '/opt/homebrew/bin',
-    '/usr/local/bin'
-  ]
-  const nvmRoot = join(homedir(), '.nvm/versions/node')
-
-  try {
-    for (const version of readdirSync(nvmRoot)) {
-      extraPaths.push(join(nvmRoot, version, 'bin'))
-    }
-  } catch {
-    // 未安装 nvm 时忽略。
-  }
-
-  const preferences = getPreferences()
-
-  for (const cliPath of [preferences.larkCliPath, preferences.meegleCliPath]) {
-    if (cliPath) extraPaths.push(dirname(cliPath))
-  }
-
-  return {
-    ...process.env,
-    [pathKey]: [currentPath, ...extraPaths].filter(Boolean).join(delimiter)
-  }
-}
+/** AI 执行的命令与普通 CLI 使用同一套补全环境。 */
+const getShellEnv = (): NodeJS.ProcessEnv => getCliEnvironment()
 
 const truncate = (value: string): string =>
   value.length > MAX_OUTPUT_LENGTH
