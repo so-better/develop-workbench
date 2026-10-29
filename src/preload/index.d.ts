@@ -14,6 +14,11 @@ import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
 import type { QuickNoteState } from '../types/quick-note'
 import type {
+  UpdateCheckResult,
+  UpdateDownloadResult,
+  UpdatePackage
+} from '../types/updates'
+import type {
   StorageCleanupKind,
   StorageCleanupStats
 } from '../types/storage-cleanup'
@@ -382,6 +387,14 @@ export interface ElectronAPI {
   getAiArtifactStats: () => Promise<AiArtifactStats>
   /** 清空应用内 AI 产物。 */
   clearAiArtifacts: () => Promise<AiArtifactStats>
+  /** 通过飞书云盘检查新版本。 */
+  checkForUpdates: () => Promise<UpdateCheckResult>
+  /** 下载指定更新安装包到系统下载目录。 */
+  downloadUpdatePackage: (
+    item: UpdatePackage
+  ) => Promise<UpdateDownloadResult>
+  /** 打开已下载的更新安装包并退出应用。 */
+  installUpdateDownload: (downloadId: string) => Promise<void>
   /** 读取底部 AI 助手的历史会话。 */
   getAiAssistantSession: () => Promise<AiAssistantSessionState>
   /** 保存底部 AI 助手的历史会话。 */

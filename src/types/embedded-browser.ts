@@ -83,6 +83,6 @@ export interface EmbeddedBrowserDownload {
   /** 是否处于暂停状态。 */
   paused: boolean
 
-  /** 下载来源：浏览器下载或 AI 产物保存。 */
-  origin: 'browser' | 'ai'
+  /** 下载来源：浏览器下载、AI 产物保存或更新包下载。 */
+  origin: 'browser' | 'ai' | 'update'
 }

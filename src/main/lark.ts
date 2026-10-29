@@ -233,10 +233,10 @@ const resolveLarkCli = async (
 const runExecutable = async (
   executablePath: string,
   args: string[],
-  options: { cwd?: string } = {}
+  options: { cwd?: string; timeoutMs?: number } = {}
 ): Promise<string> => {
   const { stdout } = await execFileAsync(executablePath, args, {
-    timeout: COMMAND_TIMEOUT_MS,
+    timeout: options.timeoutMs ?? COMMAND_TIMEOUT_MS,
     maxBuffer: MAX_BUFFER_BYTES,
     encoding: 'utf8',
     env: process.env,
@@ -285,9 +285,12 @@ const getCommandErrorText = (error: unknown): string => {
 
 /**
  * 执行 lark-cli。
- * 导出给链接预览等只读业务复用。
+ * 导出给链接预览、更新检测等业务复用。
  */
-export const runLarkCli = async (args: string[]): Promise<string> => {
+export const runLarkCli = async (
+  args: string[],
+  options: { cwd?: string; timeoutMs?: number } = {}
+): Promise<string> => {
   const resolved = await resolveLarkCli()
 
   if (!resolved?.available) {
@@ -295,7 +298,7 @@ export const runLarkCli = async (args: string[]): Promise<string> => {
   }
 
   try {
-    return await runExecutable(resolved.path, args)
+    return await runExecutable(resolved.path, args, options)
   } catch (error) {
     // 状态查询、退出登录和用户资料补全失败由各自流程处理，不算业务授权过期。
     const isProfileCommand =

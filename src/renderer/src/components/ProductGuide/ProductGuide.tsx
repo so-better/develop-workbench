@@ -133,7 +133,7 @@ const CAPABILITIES: GuideCapability[] = [
     items: [
       '检测并登录本机 Lark CLI 和 Meegle CLI',
       '配置 Git、仓库根目录、IDE、AI 模型和技能目录',
-      '管理深浅主题、下载记录和 AI 临时产物'
+      '管理深浅主题、下载记录、缓存和临时数据'
     ]
   }
 ]

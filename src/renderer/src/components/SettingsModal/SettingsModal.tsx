@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { CopyOutlined } from '@ant-design/icons'
+import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Input, Modal, Spin, Tooltip } from 'antd'
 import type { AppInfo } from '../../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../../types/lark'
+import type { UpdateCheckResult } from '../../../../types/updates'
 import {
   DEFAULT_SETTINGS_SECTION
 } from '../../../../types/settings'
@@ -23,6 +24,7 @@ interface SettingsModalProps {
   initialSection?: SettingsSection
   appInfo: AppInfo | null
   onLarkCliUpdated: () => void
+  onOpenUpdatePrompt: (update: UpdateCheckResult) => void
   onClose: () => void
 }
 
@@ -68,13 +70,14 @@ const AI_CONFIG_FIELDS = [
 
 /**
  * 设置弹窗。
- * 当前包含模型配置和 lark-cli 路径，并在底部展示真实的应用运行信息。
+ * 统一承载环境、仓库、IDE、模型、技能、存储清理和应用信息。
  */
 export default function SettingsModal({
   open,
   initialSection = DEFAULT_SETTINGS_SECTION,
   appInfo,
   onLarkCliUpdated,
+  onOpenUpdatePrompt,
   onClose
 }: SettingsModalProps): JSX.Element {
   const { message } = App.useApp()
@@ -92,6 +95,7 @@ export default function SettingsModal({
   const [larkSaving, setLarkSaving] = useState(false)
   const [larkLoading, setLarkLoading] = useState(false)
   const [larkError, setLarkError] = useState<string | null>(null)
+  const [checkingUpdate, setCheckingUpdate] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -286,6 +290,27 @@ export default function SettingsModal({
       message.success('已复制')
     } catch {
       message.error('复制失败')
+    }
+  }
+
+  const handleCheckUpdates = async (): Promise<void> => {
+    if (checkingUpdate) return
+
+    setCheckingUpdate(true)
+
+    try {
+      const result = await window.electron.checkForUpdates()
+
+      if (result.hasUpdate) {
+        onOpenUpdatePrompt(result)
+        return
+      }
+
+      message.success(`当前已是最新版本 v${result.currentVersion}`)
+    } catch (checkError) {
+      message.error(getErrorMessage(checkError, '检查更新失败'))
+    } finally {
+      setCheckingUpdate(false)
     }
   }
 
@@ -593,6 +618,23 @@ export default function SettingsModal({
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="settings-update-row">
+                <div className="settings-update-copy">
+                  <strong>版本更新</strong>
+                  <span>
+                    当前版本 v{appInfo?.appVersion ?? '-'}，从飞书云盘检查最新安装包
+                  </span>
+                </div>
+                <Button
+                  type="primary"
+                  icon={<ReloadOutlined />}
+                  loading={checkingUpdate}
+                  onClick={() => handleCheckUpdates()}
+                >
+                  检查更新
+                </Button>
               </div>
             </>
           ) : null}

@@ -26,6 +26,7 @@ import { initializeRequirementStatuses } from './requirement-statuses'
 import { initializeRequirements } from './requirements'
 import { initializeSites } from './sites'
 import { initializeStorageCleanup } from './storage-cleanup'
+import { initializeUpdater } from './updater'
 import { initializeSkillSettings } from './skill-settings'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
@@ -82,6 +83,7 @@ if (!hasSingleInstanceLock) {
     initializeRequirementStatuses()
     initializeSites()
     initializeStorageCleanup()
+    initializeUpdater()
     initializeSkillSettings()
     initializeWeeklyReport()
     initializeAiConfig()

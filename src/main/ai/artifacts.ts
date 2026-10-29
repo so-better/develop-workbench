@@ -15,7 +15,7 @@ interface ArtifactRecord {
   size: number
 }
 
-/** 本轮应用生命周期内的 AI 产物索引。聊天不持久化，因此不需要跨重启索引。 */
+/** 本轮应用生命周期内的 AI 产物索引；重启后可按产物 ID 从磁盘恢复。 */
 const artifacts = new Map<string, ArtifactRecord>()
 
 const EXTENSION_BY_MIME: Record<string, string> = {

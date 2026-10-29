@@ -7,6 +7,7 @@ import AppNavigation from './components/AppNavigation/AppNavigation'
 import LinkContextMenu from './components/LinkContextMenu/LinkContextMenu'
 import ProductGuide from './components/ProductGuide/ProductGuide'
 import QuickNotes from './components/QuickNotes/QuickNotes'
+import UpdatePrompt from './components/UpdatePrompt/UpdatePrompt'
 import { APP_PAGES } from './navigation'
 import type { AppPage } from './navigation'
 import EmbeddedBrowserDownloads from './components/EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
@@ -21,6 +22,7 @@ import type { AppInfo } from '../../types/app'
 import type { AuthExpiredEvent } from '../../types/auth'
 import type { LarkCliInfo, LarkUser } from '../../types/lark'
 import type { MeegleState } from '../../types/meegle'
+import type { UpdateCheckResult } from '../../types/updates'
 
 
 interface EnvironmentStatus {
@@ -62,6 +64,9 @@ export default function App(): JSX.Element {
   const [guideWelcome, setGuideWelcome] = useState(false)
   const [quickNotesOpen, setQuickNotesOpen] = useState(false)
   const quickNotes = useQuickNotes()
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null)
+  const [updateOpen, setUpdateOpen] = useState(false)
+  const updateCheckRef = useRef(false)
 
   /**
    * 重新读取本地 CLI 安装和授权状态。
@@ -261,6 +266,31 @@ export default function App(): JSX.Element {
     }
   }, [environmentLoading, environmentReady])
 
+  useEffect(() => {
+    if (environmentLoading || !environmentReady || guideOpen) return
+    if (updateCheckRef.current) return
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      updateCheckRef.current = true
+
+      window.electron
+        .checkForUpdates()
+        .then((result) => {
+          if (cancelled || !result.hasUpdate) return
+
+          setUpdateInfo(result)
+          setUpdateOpen(true)
+        })
+        .catch(() => undefined)
+    }, 3000)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [environmentLoading, environmentReady, guideOpen])
+
   const closeGuide = useCallback((): void => {
     setGuideOpen(false)
     window.electron.markProductGuideSeen().catch(() => undefined)
@@ -345,6 +375,12 @@ export default function App(): JSX.Element {
         onClose={closeGuide}
       />
 
+      <UpdatePrompt
+        update={updateInfo}
+        open={updateOpen}
+        onClose={() => setUpdateOpen(false)}
+      />
+
       <AppFooter
         appInfo={appInfo}
         onOpenSettings={() => openSettings()}
@@ -384,6 +420,10 @@ export default function App(): JSX.Element {
         initialSection={settingsSection}
         appInfo={appInfo}
         onLarkCliUpdated={() => refreshEnvironment()}
+        onOpenUpdatePrompt={(update) => {
+          setUpdateInfo(update)
+          setUpdateOpen(true)
+        }}
         onClose={() => {
           closeSettings()
           refreshEnvironment()

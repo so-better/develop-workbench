@@ -1,4 +1,4 @@
-import { App, Button, Empty, Progress, Tag } from 'antd'
+import { App, Button, Empty, Popconfirm, Progress, Tag } from 'antd'
 import {
   CheckCircleFilled,
   CloseCircleFilled,
@@ -86,6 +86,14 @@ export default function EmbeddedBrowserDownloads({
     }
   }
 
+  const handleInstall = async (downloadId: string): Promise<void> => {
+    try {
+      await window.electron.installUpdateDownload(downloadId)
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '安装更新失败')
+    }
+  }
+
   const handleShow = async (downloadId: string): Promise<void> => {
     try {
       await window.electron.showEmbeddedBrowserDownload(downloadId)
@@ -147,8 +155,13 @@ export default function EmbeddedBrowserDownloads({
 
   return (
     <div className="embedded-browser-downloads">
-      {downloads.map((download) => {
+      <div className="embedded-browser-downloads-list">
+        {downloads.map((download) => {
         const isAiArtifact = download.origin === 'ai'
+        const isUpdate = download.origin === 'update'
+        const isInstallableUpdate =
+          isUpdate && /\.(dmg|exe)$/i.test(download.filename)
+        const isGenerated = download.origin !== 'browser'
         const baseStatus =
           download.status === 'progressing' && download.paused
             ? pausedStatusMeta
@@ -161,7 +174,15 @@ export default function EmbeddedBrowserDownloads({
               : download.status === 'interrupted'
                 ? { ...baseStatus, label: '保存失败' }
                 : baseStatus
-          : baseStatus
+          : isUpdate
+            ? download.status === 'progressing'
+              ? { ...baseStatus, label: '下载中' }
+              : download.status === 'completed'
+                ? { ...baseStatus, label: '已下载' }
+                : download.status === 'interrupted'
+                  ? { ...baseStatus, label: '下载失败' }
+                  : baseStatus
+            : baseStatus
         const percent =
           download.totalBytes > 0
             ? Math.min(
@@ -191,7 +212,10 @@ export default function EmbeddedBrowserDownloads({
               </div>
               <div className="embedded-browser-download-meta">
                 <span className="embedded-browser-download-size">
-                  {formatBytes(download.receivedBytes)}
+                  {isUpdate ? '已下载 ' : ''}
+                  {isUpdate && download.receivedBytes === 0
+                    ? '0 B'
+                    : formatBytes(download.receivedBytes)}
                   {download.totalBytes > 0
                     ? ` / ${formatBytes(download.totalBytes)}`
                     : ''}
@@ -216,17 +240,16 @@ export default function EmbeddedBrowserDownloads({
                   </span>
                 </div>
               ) : null}
-              {download.status === 'progressing' ? (
+              {download.status === 'progressing' && download.totalBytes > 0 ? (
                 <Progress
                   percent={percent}
                   size="small"
                   status={download.paused ? 'normal' : 'active'}
                   strokeColor={download.paused ? '#d97706' : undefined}
-                  showInfo={download.totalBytes > 0}
                 />
               ) : null}
               <div className="embedded-browser-download-actions">
-                {download.status === 'progressing' && !isAiArtifact ? (
+                {download.status === 'progressing' && !isGenerated ? (
                   <>
                     {download.paused ? (
                       <Button
@@ -261,7 +284,7 @@ export default function EmbeddedBrowserDownloads({
                     </Button>
                   </>
                 ) : null}
-                {download.status === 'interrupted' && !isAiArtifact ? (
+                {download.status === 'interrupted' && !isGenerated ? (
                   <Button
                     type="text"
                     size="small"
@@ -274,14 +297,33 @@ export default function EmbeddedBrowserDownloads({
                 ) : null}
                 {download.status === 'completed' ? (
                   <>
-                    <Button
-                      size="small"
-                      type="primary"
-                      className="embedded-browser-download-open"
-                      onClick={() => handleOpen(download.id)}
-                    >
-                      打开文件
-                    </Button>
+                    {isInstallableUpdate ? (
+                      <Popconfirm
+                        title="安装更新并退出应用？"
+                        description="将打开安装包并退出当前应用。"
+                        rootClassName="update-install-confirm"
+                        okText="安装"
+                        cancelText="取消"
+                        onConfirm={() => handleInstall(download.id)}
+                      >
+                        <Button
+                          size="small"
+                          type="primary"
+                          className="embedded-browser-download-install"
+                        >
+                          安装更新
+                        </Button>
+                      </Popconfirm>
+                    ) : (
+                      <Button
+                        size="small"
+                        type="primary"
+                        className="embedded-browser-download-open"
+                        onClick={() => handleOpen(download.id)}
+                      >
+                        打开文件
+                      </Button>
+                    )}
                     <Button
                       type="text"
                       size="small"
@@ -297,7 +339,8 @@ export default function EmbeddedBrowserDownloads({
             </div>
           </div>
         )
-      })}
+        })}
+      </div>
 
       <div className="embedded-browser-download-footer">
         <Button

@@ -10,7 +10,7 @@ import type {
 } from '../../../types/ai'
 import { getErrorMessage } from '../../../utils'
 
-/** 弹窗内部使用的消息结构，不持久化、不绑定会话。 */
+/** 弹窗内部使用的消息结构；底部助手的消息会额外持久化。 */
 export interface AiUiMessage {
   id: string
   role: 'user' | 'assistant'

@@ -168,7 +168,12 @@ const parseDownloadRecord = (value: unknown): EmbeddedBrowserDownload | null => 
     startedAt: item.startedAt,
     canResume: item.canResume,
     paused: false,
-    origin: item.origin === 'ai' ? 'ai' : 'browser'
+    origin:
+      item.origin === 'ai'
+        ? 'ai'
+        : item.origin === 'update'
+          ? 'update'
+          : 'browser'
   }
 }
 
@@ -700,12 +705,28 @@ export const openEmbeddedBrowser = (
 interface GeneratedDownloadHandle {
   id: string
   update: (receivedBytes: number) => void
-  complete: (savePath: string) => void
+  complete: (savePath: string, size?: number) => void
   fail: () => void
 }
 
+/** 获取已完成的更新包路径，供安装动作复用下载记录。 */
+export const getCompletedUpdateDownloadPath = (downloadId: string): string => {
+  const entry = downloads.get(downloadId)
+
+  if (
+    !entry ||
+    entry.state.origin !== 'update' ||
+    entry.state.status !== 'completed' ||
+    !entry.state.savePath
+  ) {
+    throw new Error('更新包尚未下载完成')
+  }
+
+  return entry.state.savePath
+}
+
 /**
- * 为 AI 产物创建一个由应用驱动的下载记录。
+ * 为 AI 产物或更新包创建一个由应用驱动的下载记录。
  * 该记录没有 DownloadItem，但可以持续更新进度并复用统一列表。
  */
 export const createGeneratedDownload = (input: {
@@ -713,6 +734,7 @@ export const createGeneratedDownload = (input: {
   path: string
   size: number
   source: string
+  origin?: 'ai' | 'update'
 }): GeneratedDownloadHandle => {
   const state: EmbeddedBrowserDownload = {
     id: randomUUID(),
@@ -726,13 +748,13 @@ export const createGeneratedDownload = (input: {
     startedAt: Date.now(),
     canResume: false,
     paused: false,
-    origin: 'ai'
+    origin: input.origin ?? 'ai'
   }
   const update = (receivedBytes: number): void => {
-    state.receivedBytes = Math.max(
-      0,
-      Math.min(Math.round(receivedBytes), state.totalBytes)
-    )
+    const next = Math.max(0, Math.round(receivedBytes))
+
+    state.receivedBytes =
+      state.totalBytes > 0 ? Math.min(next, state.totalBytes) : next
     broadcastDownloads()
   }
 
@@ -742,8 +764,13 @@ export const createGeneratedDownload = (input: {
   return {
     id: state.id,
     update,
-    complete: (savePath) => {
+    complete: (savePath, size) => {
       state.savePath = savePath
+
+      if (typeof size === 'number' && Number.isFinite(size) && size >= 0) {
+        state.totalBytes = size
+      }
+
       state.receivedBytes = state.totalBytes
       state.status = 'completed'
       state.bytesPerSecond = 0

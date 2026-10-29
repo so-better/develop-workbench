@@ -16,6 +16,11 @@ import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
 import type { QuickNoteState } from '../types/quick-note'
 import type {
+  UpdateCheckResult,
+  UpdateDownloadResult,
+  UpdatePackage
+} from '../types/updates'
+import type {
   StorageCleanupKind,
   StorageCleanupStats
 } from '../types/storage-cleanup'
@@ -853,6 +858,18 @@ const electronAPI = {
    */
   clearAiArtifacts: (): Promise<AiArtifactStats> =>
     ipcRenderer.invoke('ai:artifacts:clear'),
+
+  /** 通过飞书云盘检查新版本。 */
+  checkForUpdates: (): Promise<UpdateCheckResult> =>
+    ipcRenderer.invoke('updater:check'),
+
+  /** 下载指定更新安装包到系统下载目录。 */
+  downloadUpdatePackage: (item: UpdatePackage): Promise<UpdateDownloadResult> =>
+    ipcRenderer.invoke('updater:download', item),
+
+  /** 打开已下载的更新安装包并退出应用。 */
+  installUpdateDownload: (downloadId: string): Promise<void> =>
+    ipcRenderer.invoke('updater:install', downloadId),
 
   /** 读取底部 AI 助手的历史会话。 */
   getAiAssistantSession: (): Promise<AiAssistantSessionState> =>
