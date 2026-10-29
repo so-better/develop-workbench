@@ -10,6 +10,7 @@ import { access, readdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import QRCode from 'qrcode'
+import { getCliEnvironment } from './cli-env'
 import { getPreferences, updatePreferences } from './preferences'
 import { broadcastAuthExpired, isAuthExpiredError } from './auth-events'
 import type {
@@ -185,7 +186,7 @@ const runExecutable = (
 ): Promise<CommandResult> =>
   new Promise((resolve, reject) => {
     const child = spawn(executablePath, args, {
-      env: process.env,
+      env: getCliEnvironment(executablePath),
       stdio: ['ignore', 'pipe', 'pipe']
     })
     let stdout = ''
