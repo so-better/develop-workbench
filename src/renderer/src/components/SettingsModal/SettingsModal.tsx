@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { CopyOutlined, DeleteOutlined, FileTextOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Input, Modal, Popconfirm, Spin, Tooltip } from 'antd'
-import type { AiArtifactStats } from '../../../../types/ai'
+import { CopyOutlined } from '@ant-design/icons'
+import { Alert, App, Button, Input, Modal, Spin, Tooltip } from 'antd'
 import type { AppInfo } from '../../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../../types/lark'
 import {
@@ -15,6 +14,7 @@ import IdeSettings from '../IdeSettings/IdeSettings'
 import MeegleSettings from '../MeegleSettings/MeegleSettings'
 import RepositorySettings from '../RepositorySettings/RepositorySettings'
 import SkillSettings from '../SkillSettings/SkillSettings'
+import StorageCleanup from '../StorageCleanup/StorageCleanup'
 
 const CodeEditor = lazy(() => import('../CodeEditor/CodeEditor'))
 
@@ -24,14 +24,6 @@ interface SettingsModalProps {
   appInfo: AppInfo | null
   onLarkCliUpdated: () => void
   onClose: () => void
-}
-
-/** 把字节数格式化为设置页可读文本。 */
-const formatBytes = (bytes: number): string => {
-  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`
-
-  return `${Math.max(0, Math.round(bytes))} B`
 }
 
 const platformNames: Record<string, string> = {
@@ -100,10 +92,6 @@ export default function SettingsModal({
   const [larkSaving, setLarkSaving] = useState(false)
   const [larkLoading, setLarkLoading] = useState(false)
   const [larkError, setLarkError] = useState<string | null>(null)
-  const [artifactStats, setArtifactStats] = useState<AiArtifactStats | null>(null)
-  const [artifactLoading, setArtifactLoading] = useState(false)
-  const [artifactClearing, setArtifactClearing] = useState(false)
-  const [artifactError, setArtifactError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
@@ -154,33 +142,6 @@ export default function SettingsModal({
       mounted = false
     }
   }, [initialSection, open])
-
-  useEffect(() => {
-    if (!open || activeSection !== 'cleanup') return
-
-    let mounted = true
-
-    setArtifactLoading(true)
-    setArtifactError(null)
-
-    window.electron
-      .getAiArtifactStats()
-      .then((stats) => {
-        if (mounted) setArtifactStats(stats)
-      })
-      .catch((statsError) => {
-        if (mounted) {
-          setArtifactError(getErrorMessage(statsError, '读取 AI 产物统计失败'))
-        }
-      })
-      .finally(() => {
-        if (mounted) setArtifactLoading(false)
-      })
-
-    return () => {
-      mounted = false
-    }
-  }, [activeSection, open])
 
   /**
    * 模型配置 JSON 合法时防抖自动保存。
@@ -328,21 +289,6 @@ export default function SettingsModal({
     }
   }
 
-  const handleClearArtifacts = async (): Promise<void> => {
-    setArtifactClearing(true)
-    setArtifactError(null)
-
-    try {
-      const removed = await window.electron.clearAiArtifacts()
-      setArtifactStats({ count: 0, bytes: 0 })
-      message.success(`已清理 ${removed.count} 个 AI 产物`)
-    } catch (clearError) {
-      setArtifactError(getErrorMessage(clearError, '清理 AI 产物失败'))
-    } finally {
-      setArtifactClearing(false)
-    }
-  }
-
   return (
     <Modal
       title="设置"
@@ -417,7 +363,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'cleanup' ? 'page' : undefined}
             onClick={() => setActiveSection('cleanup')}
           >
-            内存清理
+            存储清理
           </button>
           <button
             type="button"
@@ -618,66 +564,7 @@ export default function SettingsModal({
             <IdeSettings />
           ) : null}
 
-          {activeSection === 'cleanup' ? (
-            <>
-              <div className="settings-panel-header">
-                <h3>内存清理</h3>
-                <p>清理应用内部生成的临时文件，不会删除已经保存到本机的文件。</p>
-              </div>
-
-              {artifactLoading ? (
-                <div className="settings-loading">
-                  <Spin />
-                </div>
-              ) : artifactError ? (
-                <Alert type="error" showIcon message={artifactError} />
-              ) : (
-                <div className="storage-cleanup-card">
-                  <div className="storage-cleanup-head">
-                    <span className="storage-cleanup-icon">
-                      <FileTextOutlined />
-                    </span>
-                    <div className="storage-cleanup-copy">
-                      <strong>AI 产物</strong>
-                      <span>对话中生成的内部临时文件</span>
-                    </div>
-                    <Popconfirm
-                      title="清理 AI 产物？"
-                      description="将删除对话中生成的内部缓存文件，已经保存到本机的文件不受影响。"
-                      okText="清理"
-                      cancelText="取消"
-                      onConfirm={handleClearArtifacts}
-                    >
-                      <Button
-                        danger
-                        size="small"
-                        icon={<DeleteOutlined />}
-                        loading={artifactClearing}
-                        disabled={!artifactStats?.count || artifactClearing}
-                      >
-                        清理
-                      </Button>
-                    </Popconfirm>
-                  </div>
-
-                  <div className="storage-cleanup-stats">
-                    <div className="storage-cleanup-stat">
-                      <span>文件数量</span>
-                      <strong>{artifactStats?.count ?? 0}</strong>
-                    </div>
-                    <div className="storage-cleanup-stat">
-                      <span>占用空间</span>
-                      <strong>{formatBytes(artifactStats?.bytes ?? 0)}</strong>
-                    </div>
-                  </div>
-
-                  <div className="storage-cleanup-note">
-                    清理后，当前对话中尚未下载的产物将失效；已经保存到本机的文件不受影响。
-                  </div>
-                </div>
-              )}
-            </>
-          ) : null}
+          {activeSection === 'cleanup' ? <StorageCleanup /> : null}
 
           {activeSection === 'app-info' ? (
             <>

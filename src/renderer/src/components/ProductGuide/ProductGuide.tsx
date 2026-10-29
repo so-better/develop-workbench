@@ -195,10 +195,10 @@ const SETTINGS_GROUPS: GuideSettingGroup[] = [
           '使用内置编码、图表、文件生成、需求分析、SQL、翻译和写作技能；也可添加多个绝对路径目录，扫描 SKILL.md、参考文件和脚本。'
       },
       {
-        title: '内存清理',
+        title: '存储清理',
         icon: <ClearOutlined />,
         description:
-          '查看并清理 AI 对话生成但尚未保存的临时产物；已经保存到本机的文件不会受影响。'
+          '清理 AI 产物、内置浏览器缓存、应用缓存、下载记录和损坏数据备份；不会删除业务配置、登录态或本机文件。'
       },
       {
         title: '应用信息',

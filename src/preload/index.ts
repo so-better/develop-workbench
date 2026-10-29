@@ -13,6 +13,10 @@ import type {
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
 import type { QuickNoteState } from '../types/quick-note'
+import type {
+  StorageCleanupKind,
+  StorageCleanupStats
+} from '../types/storage-cleanup'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
@@ -847,6 +851,14 @@ const electronAPI = {
    */
   clearAiArtifacts: (): Promise<AiArtifactStats> =>
     ipcRenderer.invoke('ai:artifacts:clear'),
+
+  /** 读取存储清理统计。 */
+  getStorageCleanupStats: (): Promise<StorageCleanupStats> =>
+    ipcRenderer.invoke('storage:get-stats'),
+
+  /** 清理指定存储分类并返回最新统计。 */
+  clearStorageCleanup: (kind: StorageCleanupKind): Promise<StorageCleanupStats> =>
+    ipcRenderer.invoke('storage:clear', kind),
 
   /**
    * 读取额外技能目录。

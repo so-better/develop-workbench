@@ -63,6 +63,15 @@ const getDownloadStates = (): EmbeddedBrowserDownload[] =>
     .sort((left, right) => right.startedAt - left.startedAt)
     .slice(0, MAX_DOWNLOADS)
 
+/** 统计可清理的下载历史记录，正在下载的任务不计入。 */
+export const getEmbeddedBrowserDownloadHistoryStats = (): {
+  count: number
+  bytes: number
+} => ({
+  count: getDownloadStates().filter((item) => item.status !== 'progressing').length,
+  bytes: 0
+})
+
 let persistTimer: NodeJS.Timeout | null = null
 let persistQueue: Promise<void> = Promise.resolve()
 
@@ -216,6 +225,25 @@ const broadcastDownloads = (): void => {
   }
 
   schedulePersistDownloads()
+}
+
+/** 清空已结束的下载历史，不删除已下载文件。返回清理的记录数。 */
+export const clearEmbeddedBrowserDownloadHistory = (): number => {
+  let removed = 0
+
+  for (const [id, entry] of downloads) {
+    if (entry.state.status === 'progressing') continue
+
+    downloads.delete(id)
+    removed += 1
+  }
+
+  if (removed > 0) {
+    broadcastDownloads()
+    persistDownloadsNow()
+  }
+
+  return removed
 }
 
 const syncDownloadState = (
@@ -982,12 +1010,7 @@ export const initializeEmbeddedBrowser = (): void => {
   )
 
   ipcMain.handle('embedded-browser:clear-downloads', () => {
-    for (const [id, entry] of downloads) {
-      if (entry.state.status !== 'progressing') downloads.delete(id)
-    }
-
-    broadcastDownloads()
-    persistDownloadsNow()
+    clearEmbeddedBrowserDownloadHistory()
   })
 
   ipcMain.handle('embedded-browser:pause-download', (_event, downloadId: unknown) => {

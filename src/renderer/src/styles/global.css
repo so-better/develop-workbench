@@ -600,6 +600,12 @@ body {
 }
 
 
+.storage-cleanup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .storage-cleanup-card {
   padding: 14px;
   background: var(--workbench-soft);
@@ -647,40 +653,13 @@ body {
   line-height: 1.5;
 }
 
-.storage-cleanup-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  padding-top: 12px;
-  margin-top: 14px;
-  border-top: 1px solid var(--workbench-divider);
-}
-
-.storage-cleanup-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.storage-cleanup-stat span {
-  color: var(--workbench-secondary);
-  font-size: 10px;
-}
-
-.storage-cleanup-stat strong {
-  color: var(--app-text);
-  font-size: 18px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.storage-cleanup-note {
+.storage-cleanup-meta {
   padding-top: 10px;
-  margin-top: 12px;
+  margin-top: 10px;
   color: var(--workbench-secondary);
-  font-size: 10px;
-  line-height: 1.6;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
   border-top: 1px solid var(--workbench-divider);
 }
 
@@ -8477,4 +8456,8 @@ body {
   box-shadow:
     0 2px 6px -2px rgba(0, 0, 0, 0.42),
     0 18px 40px -28px rgba(0, 0, 0, 0.95);
+}
+
+.storage-cleanup-error {
+  margin-bottom: 12px;
 }

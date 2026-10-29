@@ -11,6 +11,10 @@ import type {
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
 import type { QuickNoteState } from '../types/quick-note'
+import type {
+  StorageCleanupKind,
+  StorageCleanupStats
+} from '../types/storage-cleanup'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
@@ -376,6 +380,10 @@ export interface ElectronAPI {
   getAiArtifactStats: () => Promise<AiArtifactStats>
   /** 清空应用内 AI 产物。 */
   clearAiArtifacts: () => Promise<AiArtifactStats>
+  /** 读取存储清理统计。 */
+  getStorageCleanupStats: () => Promise<StorageCleanupStats>
+  /** 清理指定存储分类并返回最新统计。 */
+  clearStorageCleanup: (kind: StorageCleanupKind) => Promise<StorageCleanupStats>
   /** 读取额外技能目录。 */
   getSkillSettings: () => Promise<SkillSettingsState>
   /** 保存额外技能目录。 */
