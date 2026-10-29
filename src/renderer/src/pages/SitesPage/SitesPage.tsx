@@ -57,12 +57,16 @@ interface SiteFormValues {
 }
 
 const SITE_TAG_COLORS: Record<string, string> = {
-  飞书文档: 'geekblue',
-  飞书表格: 'cyan',
-  第三方网站: 'default',
-  公司平台: 'magenta',
-  业务系统: 'green',
-  技术平台: 'gold'
+  飞书文档: '#2f54eb',
+  飞书表格: '#13c2c2',
+  业务系统: '#079455',
+  技术平台: '#d48806',
+  开发工具: '#1677ff',
+  调试工具: '#722ed1',
+  'CI/CD': '#d4380d',
+  监控告警: '#d92d20',
+  数据平台: '#d46b08',
+  外部工具: '#c41d7f'
 }
 
 const SITE_ENV_OPTIONS: Array<{ value: SiteEnv; label: string }> = [
@@ -84,11 +88,27 @@ const SITE_ENV_TAG_COLORS: Record<SiteEnv, string> = {
 const DEFAULT_SITE_TAGS = [
   '飞书文档',
   '飞书表格',
-  '第三方网站',
-  '公司平台',
   '业务系统',
-  '技术平台'
+  '技术平台',
+  '开发工具',
+  '调试工具',
+  'CI/CD',
+  '监控告警',
+  '数据平台',
+  '外部工具'
 ]
+
+const DEFAULT_SITE_THEME_COLOR = '#1677ff'
+
+const getSiteThemeColor = (site: SiteLink): string => {
+  for (const tag of site.tags) {
+    const color = SITE_TAG_COLORS[tag]
+
+    if (color) return color
+  }
+
+  return DEFAULT_SITE_THEME_COLOR
+}
 
 const FREQUENT_CLICK_THRESHOLD = 2
 const FREQUENT_SITE_LIMIT = 8
@@ -116,7 +136,7 @@ function SiteCard({
   onRemove,
   dragHandle
 }: SiteCardProps): JSX.Element {
-  const accent = site.env ? SITE_ENV_TAG_COLORS[site.env] : '#1677ff'
+  const accent = getSiteThemeColor(site)
 
   return (
     <article

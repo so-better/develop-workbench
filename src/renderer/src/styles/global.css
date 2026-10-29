@@ -5692,7 +5692,7 @@ body {
   display: inline-flex;
   flex-shrink: 0;
   margin-left: 0;
-  color: #1677ff;
+  color: var(--site-accent);
   font-size: 10px;
   opacity: 0.7;
   transition:
@@ -5703,10 +5703,6 @@ body {
 .site-card:hover .site-card-link-icon {
   opacity: 1;
   transform: translate(1px, -1px);
-}
-
-:root[data-theme="dark"] .site-card-link-icon {
-  color: #69b1ff;
 }
 
 .site-card-footer {

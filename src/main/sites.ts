@@ -26,10 +26,6 @@ const normalizeSiteEnv = (value: unknown): SiteEnv | null => {
     : null
 }
 
-const LEGACY_TAG_LABELS: Record<string, string> = {
-  自研内部系统: '技术平台'
-}
-
 const normalizeTags = (value: unknown): string[] => {
   if (!Array.isArray(value)) return []
 
@@ -37,7 +33,6 @@ const normalizeTags = (value: unknown): string[] => {
     new Set(
       value
         .map((tag) => normalizeText(tag, MAX_TAG_LENGTH))
-        .map((tag) => LEGACY_TAG_LABELS[tag] ?? tag)
         .filter(Boolean)
     )
   ).slice(0, MAX_TAGS)
@@ -110,7 +105,12 @@ const writeSites = async (sites: SiteLink[]): Promise<void> => {
 
 const toInput = (
   input: SiteInput
-): { name: string; url: string; tags: string[]; env: SiteEnv | null } => {
+): {
+  name: string
+  url: string
+  tags: string[]
+  env: SiteEnv | null
+} => {
   if (!input || typeof input !== 'object') throw new Error('站点参数不合法')
 
   const name = normalizeText(input.name, MAX_NAME_LENGTH)
