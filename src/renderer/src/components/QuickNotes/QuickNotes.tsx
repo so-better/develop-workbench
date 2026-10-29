@@ -354,7 +354,7 @@ export default function QuickNotes({
             ) : (
               <div className="quick-notes-all-done">
                 <CheckCircleFilled />
-                <span>今天的待办都完成了</span>
+                <span>所有待办都完成了</span>
               </div>
             )}
 
