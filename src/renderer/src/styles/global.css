@@ -5656,6 +5656,30 @@ body {
   line-height: 1.5;
 }
 
+.site-env-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  color: var(--site-env-color);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  border: 1px solid;
+  border-radius: 5px;
+}
+
+.site-env-badge::before {
+  width: 5px;
+  height: 5px;
+  background: var(--site-env-color);
+  border-radius: 50%;
+  content: "";
+}
+
 .site-card-title .ant-tag {
   flex-shrink: 0;
   margin-inline-end: 0;

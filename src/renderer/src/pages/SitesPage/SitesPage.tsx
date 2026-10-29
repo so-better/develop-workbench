@@ -154,9 +154,18 @@ function SiteCard({
           <span className="site-card-title">
             {site.env ? (
               <Tooltip title={`环境：${site.env}`}>
-                <Tag color={SITE_ENV_TAG_COLORS[site.env]}>
+                <span
+                  className="site-env-badge"
+                  style={
+                    {
+                      '--site-env-color': SITE_ENV_TAG_COLORS[site.env],
+                      borderColor: `${SITE_ENV_TAG_COLORS[site.env]}55`,
+                      backgroundColor: `${SITE_ENV_TAG_COLORS[site.env]}12`
+                    } as CSSProperties
+                  }
+                >
                   {site.env.toUpperCase()}
-                </Tag>
+                </span>
               </Tooltip>
             ) : null}
             <Tooltip title={site.name}>
