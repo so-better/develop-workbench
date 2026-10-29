@@ -6,7 +6,9 @@ import type {
   AiChatAttachment,
   AiChatStartResult,
   AiConfigStatus,
-  AiArtifactStats
+  AiArtifactStats,
+  AiAssistantSessionState,
+  AiStoredMessage
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
@@ -380,6 +382,12 @@ export interface ElectronAPI {
   getAiArtifactStats: () => Promise<AiArtifactStats>
   /** 清空应用内 AI 产物。 */
   clearAiArtifacts: () => Promise<AiArtifactStats>
+  /** 读取底部 AI 助手的历史会话。 */
+  getAiAssistantSession: () => Promise<AiAssistantSessionState>
+  /** 保存底部 AI 助手的历史会话。 */
+  saveAiAssistantSession: (
+    messages: AiStoredMessage[]
+  ) => Promise<AiAssistantSessionState>
   /** 读取存储清理统计。 */
   getStorageCleanupStats: () => Promise<StorageCleanupStats>
   /** 清理指定存储分类并返回最新统计。 */

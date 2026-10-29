@@ -7,6 +7,7 @@ import {
   EditOutlined,
   FileTextOutlined,
   DownloadOutlined,
+  DeleteOutlined,
   DownOutlined,
   ImportOutlined,
   LoadingOutlined,
@@ -16,7 +17,17 @@ import {
   SettingOutlined,
   StopOutlined
 } from '@ant-design/icons'
-import { Alert, App, Button, Image, Input, Modal, Spin, Tooltip } from 'antd'
+import {
+  Alert,
+  App,
+  Button,
+  Image,
+  Input,
+  Modal,
+  Popconfirm,
+  Spin,
+  Tooltip
+} from 'antd'
 import type {
   AiChatArtifact,
   AiChatAttachment,
@@ -37,6 +48,8 @@ interface AiChatDialogProps {
   initialPrompt: string
   /** 是否自动发送 initialPrompt，默认开启。 */
   autoStart?: boolean
+  /** 关闭弹窗时保留当前会话。 */
+  persistOnClose?: boolean
   /** 只影响展示；onApplyResult 仍接收原始内容。 */
   formatContent?: (content: string) => string
   onClose: () => void
@@ -279,13 +292,14 @@ function ArtifactsList({
 
 /**
  * 通用 AI 对话弹窗。
- * 不保存会话、不选择模型，关闭后清除全部消息。
+ * 业务对话默认关闭后清除；persistOnClose 用于保留底部助手会话。
  */
 export default function AiChatDialog({
   open,
   title,
   initialPrompt,
   autoStart = true,
+  persistOnClose = false,
   formatContent,
   onClose,
   onApplyResult,
@@ -304,7 +318,7 @@ export default function AiChatDialog({
     regenerate,
     retry,
     editAndResend
-  } = useAiChat()
+  } = useAiChat({ persistAssistantSession: persistOnClose })
   const [input, setInput] = useState('')
   const [pendingAttachments, setPendingAttachments] = useState<AiChatAttachment[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -362,7 +376,7 @@ export default function AiChatDialog({
       setInput('')
       setPendingAttachments([])
       setEditingId(null)
-      reset()
+      if (!persistOnClose) reset()
       return
     }
 
@@ -378,7 +392,15 @@ export default function AiChatDialog({
 
     startedRef.current = true
     send(initialPrompt, [], { hidden: true })
-  }, [autoStart, configStatus?.configured, initialPrompt, open, reset, send])
+  }, [
+    autoStart,
+    configStatus?.configured,
+    initialPrompt,
+    open,
+    persistOnClose,
+    reset,
+    send
+  ])
 
   useEffect(() => {
     if (!open) return
@@ -388,14 +410,26 @@ export default function AiChatDialog({
   }, [messages, open, streaming])
 
   const handleClose = (): void => {
-    reset()
+    if (!persistOnClose) reset()
     onClose()
   }
 
   const handleOpenSettings = (): void => {
-    reset()
+    if (!persistOnClose) reset()
     onClose()
     openSettings('ai')
+  }
+
+  const handleClearMessages = (): void => {
+    if (streaming) return
+
+    reset()
+    setInput('')
+    setPendingAttachments([])
+    setEditingId(null)
+    setEditingContent('')
+    stickToBottomRef.current = true
+    antdMessage.success('对话已清空')
   }
 
   const handlePickAttachments = async (): Promise<void> => {
@@ -851,6 +885,24 @@ export default function AiChatDialog({
                 Enter 发送 · Shift + Enter 换行
               </span>
               <div className="ai-chat-dialog-footer-actions">
+                {messages.length > 0 ? (
+                  <Popconfirm
+                    title="清空当前对话？"
+                    okText="清空"
+                    cancelText="取消"
+                    onConfirm={handleClearMessages}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      className="ai-composer-clear"
+                      icon={<DeleteOutlined />}
+                      aria-label="清空当前对话"
+                      disabled={streaming}
+                    />
+                  </Popconfirm>
+                ) : null}
                 <Tooltip title="上传或粘贴附件：图片、PDF、Word、Excel、PPT">
                   <span>
                     <Button

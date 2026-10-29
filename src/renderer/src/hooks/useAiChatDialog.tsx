@@ -28,6 +28,8 @@ export interface AiChatDialogRequest {
   ) => void | Promise<void>
   /** 当前业务关闭弹窗后的回调。 */
   onClose?: () => void
+  /** 关闭弹窗后保留会话，用于底部 AI 助手。 */
+  persistSession?: boolean
 }
 
 interface ActiveRequest extends AiChatDialogRequest {
@@ -44,29 +46,48 @@ const AiChatDialogContext = createContext<AiChatDialogContextValue | null>(null)
 
 /**
  * 全局 AI 弹窗容器。
- * 业务页面只通过 useAiChatDialog 调用，不需要自己渲染弹窗。
+ * 业务请求使用一次性会话，底部助手使用持久会话。
  */
 export function AiChatDialogProvider({
   children
 }: {
   children: ReactNode
 }): JSX.Element {
-  const [open, setOpen] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [businessOpen, setBusinessOpen] = useState(false)
   const [request, setRequest] = useState<ActiveRequest | null>(null)
   const requestRef = useRef<ActiveRequest | null>(null)
   const requestIdRef = useRef(0)
 
   const openAiDialog = useCallback((next: AiChatDialogRequest): void => {
+    if (next.persistSession) {
+      if (businessOpen) requestRef.current?.onClose?.()
+      setBusinessOpen(false)
+      setAssistantOpen(true)
+      return
+    }
+
     requestIdRef.current += 1
     const active = { ...next, id: requestIdRef.current }
 
     requestRef.current = active
     setRequest(active)
-    setOpen(true)
+    setAssistantOpen(false)
+    setBusinessOpen(true)
+  }, [businessOpen])
+
+  const closeAssistantDialog = useCallback((): void => {
+    setAssistantOpen(false)
+  }, [])
+
+  const closeBusinessDialog = useCallback((): void => {
+    setBusinessOpen(false)
+    requestRef.current?.onClose?.()
   }, [])
 
   const closeAiDialog = useCallback((): void => {
-    setOpen(false)
+    setAssistantOpen(false)
+    setBusinessOpen(false)
     requestRef.current?.onClose?.()
   }, [])
 
@@ -74,25 +95,36 @@ export function AiChatDialogProvider({
     () => ({
       openAiDialog,
       closeAiDialog,
-      isOpen: open
+      isOpen: assistantOpen || businessOpen
     }),
-    [closeAiDialog, open, openAiDialog]
+    [assistantOpen, businessOpen, closeAiDialog, openAiDialog]
   )
 
   return (
     <AiChatDialogContext.Provider value={contextValue}>
       {children}
       <AiChatDialog
-        key={request?.id ?? 0}
-        open={open}
-        title={request?.title ?? 'AI 助手'}
-        initialPrompt={request?.prompt ?? ''}
-        autoStart={request?.autoStart ?? true}
-        formatContent={request?.formatContent}
-        applyLabel={request?.applyLabel ?? '应用到页面'}
-        onClose={closeAiDialog}
-        onApplyResult={request?.onApplyResult}
+        key="assistant"
+        open={assistantOpen}
+        title="AI 助手"
+        initialPrompt=""
+        autoStart={false}
+        persistOnClose
+        onClose={closeAssistantDialog}
       />
+      {request ? (
+        <AiChatDialog
+          key={request.id}
+          open={businessOpen}
+          title={request.title}
+          initialPrompt={request.prompt}
+          autoStart={request.autoStart ?? true}
+          formatContent={request.formatContent}
+          applyLabel={request.applyLabel ?? '应用到页面'}
+          onClose={closeBusinessDialog}
+          onApplyResult={request.onApplyResult}
+        />
+      ) : null}
     </AiChatDialogContext.Provider>
   )
 }

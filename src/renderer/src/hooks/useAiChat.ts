@@ -5,6 +5,7 @@ import type {
   AiChatEvent,
   AiChatMessage,
   AiChatSource,
+  AiStoredMessage,
   AiToolCall
 } from '../../../types/ai'
 import { getErrorMessage } from '../../../utils'
@@ -34,6 +35,63 @@ interface StreamState {
   /** 普通发送停止且无输出时，是否连同用户提问一起回退删除。 */
   rollbackUserOnEmptyStop: boolean
 }
+
+interface UseAiChatOptions {
+  /** 将当前会话持久化，用于底部 AI 助手。 */
+  persistAssistantSession?: boolean
+}
+
+const toStoredMessages = (messages: AiUiMessage[]): AiStoredMessage[] =>
+  messages
+    .filter(
+      (message) =>
+        message.role === 'user' ||
+        Boolean(
+          message.content.trim() ||
+            message.reasoning ||
+            message.tools?.length ||
+            message.sources?.length ||
+            message.artifacts?.length
+        )
+    )
+    .map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: message.content,
+      ...(message.reasoning ? { reasoning: message.reasoning } : {}),
+      ...(message.attachments?.length
+        ? {
+            // 本地会话完整保留图片 data URL 和文档提取文本。
+            attachments: message.attachments.map((attachment) => ({
+              ...attachment
+            }))
+          }
+        : {}),
+      ...(message.tools?.length
+        ? {
+            tools: message.tools.map((tool) => ({
+              id: tool.id,
+              name: tool.name,
+              label: tool.label,
+              // 应用退出时未完成的工具调用不能在重启后显示为“运行中”。
+              state: tool.state === 'call' ? 'error' : tool.state,
+              ...(tool.output ? { output: tool.output } : {})
+            }))
+          }
+        : {}),
+      ...(message.sources?.length
+        ? {
+            sources: message.sources.map((source) => ({
+              id: source.id,
+              title: source.title,
+              ...(source.url ? { url: source.url } : {})
+            }))
+          }
+        : {}),
+      ...(message.interrupted ? { interrupted: true } : {}),
+      ...(message.hidden ? { hidden: true } : {}),
+      createdAt: message.createdAt
+    }))
 
 export interface UseAiChatResult {
   messages: AiUiMessage[]
@@ -97,11 +155,13 @@ const toChatMessages = (messages: AiUiMessage[]): AiChatMessage[] => {
  * 通用 AI 对话状态。
  * 业务只负责传入用户消息，不需要处理流式协议、中止、重试和 reasoning 拼接。
  */
-export const useAiChat = (): UseAiChatResult => {
+export const useAiChat = (options: UseAiChatOptions = {}): UseAiChatResult => {
+  const { persistAssistantSession = false } = options
   const [messages, setMessages] = useState<AiUiMessage[]>([])
   const [streaming, setStreaming] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hydrated, setHydrated] = useState(!persistAssistantSession)
 
   const messagesRef = useRef<AiUiMessage[]>([])
   const streamingRef = useRef(false)
@@ -111,6 +171,7 @@ export const useAiChat = (): UseAiChatResult => {
   const requestVersionRef = useRef(0)
   /** 请求启动 IPC 返回前到达的事件，先暂存，拿到 requestId 后回放。 */
   const pendingEventsRef = useRef<AiChatEvent[]>([])
+  const startingRef = useRef(false)
 
   const updateMessages = useCallback((next: AiUiMessage[]): void => {
     messagesRef.current = next
@@ -121,6 +182,37 @@ export const useAiChat = (): UseAiChatResult => {
     streamingRef.current = next
     setStreaming(next)
   }, [])
+
+  useEffect(() => {
+    if (!persistAssistantSession) return
+
+    let active = true
+
+    window.electron
+      .getAiAssistantSession()
+      .then((state) => {
+        if (!active) return
+        if (messagesRef.current.length === 0) {
+          updateMessages(state.messages)
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setHydrated(true)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [persistAssistantSession, updateMessages])
+
+  useEffect(() => {
+    if (!persistAssistantSession || !hydrated || streaming) return
+
+    const stored = toStoredMessages(messages)
+
+    void window.electron.saveAiAssistantSession(stored).catch(() => undefined)
+  }, [hydrated, messages, persistAssistantSession, streaming])
 
   const flushStreamBuffer = useCallback((): void => {
     const stream = streamRef.current
@@ -328,7 +420,7 @@ export const useAiChat = (): UseAiChatResult => {
       const stream = streamRef.current
 
       if (!stream) {
-        pendingEventsRef.current.push(event)
+        if (startingRef.current) pendingEventsRef.current.push(event)
         return
       }
 
@@ -343,6 +435,7 @@ export const useAiChat = (): UseAiChatResult => {
   useEffect(() => {
     return () => {
       requestVersionRef.current += 1
+      startingRef.current = false
       pendingEventsRef.current = []
       if (rafRef.current !== null) {
         window.cancelAnimationFrame(rafRef.current)
@@ -372,6 +465,7 @@ export const useAiChat = (): UseAiChatResult => {
       setStopping(false)
       updateMessages(conversation)
       pendingEventsRef.current = []
+      startingRef.current = true
 
       try {
         const result = await window.electron.startAiChat({
@@ -380,6 +474,7 @@ export const useAiChat = (): UseAiChatResult => {
 
         // 请求启动期间弹窗可能已关闭或开始新一轮请求。
         if (requestVersion !== requestVersionRef.current) {
+          startingRef.current = false
           pendingEventsRef.current = []
           window.electron.abortAiChat(result.requestId)
           return
@@ -397,12 +492,14 @@ export const useAiChat = (): UseAiChatResult => {
           reasoning: '',
           rollbackUserOnEmptyStop
         }
+        startingRef.current = false
 
         // 回放 IPC 返回前已经到达的事件，避免首个 delta/done 丢失。
         for (const event of bufferedEvents) {
           handleStreamEvent(event)
         }
       } catch (sendError) {
+        startingRef.current = false
         if (requestVersion !== requestVersionRef.current) return
 
         pendingEventsRef.current = []
@@ -543,6 +640,7 @@ export const useAiChat = (): UseAiChatResult => {
       window.electron.abortAiChat(streamRef.current.requestId)
     }
 
+    startingRef.current = false
     pendingRef.current = { content: '', reasoning: '' }
     pendingEventsRef.current = []
     streamRef.current = null

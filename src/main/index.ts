@@ -6,6 +6,7 @@ import { app } from 'electron'
 import { join } from 'node:path'
 import { initializeAiArtifacts } from './ai/artifacts'
 import { initializeAiAttachments } from './ai/attachments'
+import { initializeAiAssistantSession } from './ai/session'
 import { initializeAiChat } from './ai/chat'
 import { initializeDefects } from './defects'
 import { initializeAiConfig } from './ai/config'
@@ -85,6 +86,7 @@ if (!hasSingleInstanceLock) {
     initializeWeeklyReport()
     initializeAiConfig()
     initializeAiAttachments()
+    initializeAiAssistantSession()
     initializeAiArtifacts()
     initializeAiChat()
     createMainWindow()

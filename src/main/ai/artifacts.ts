@@ -190,6 +190,40 @@ export const clearAiArtifacts = async (): Promise<AiArtifactStats> => {
   return stats
 }
 
+/** 从本地产物目录恢复已被会话记录持久化、但当前进程尚未登记的文件。 */
+const findPersistedArtifact = async (
+  id: string
+): Promise<ArtifactRecord | null> => {
+  if (!/^[a-zA-Z0-9-]+$/.test(id)) return null
+
+  const directory = join(getArtifactsRoot(), id)
+  let entries
+
+  try {
+    entries = await readdir(directory, { withFileTypes: true })
+  } catch {
+    return null
+  }
+
+  const file = entries.find((entry) => entry.isFile())
+
+  if (!file) return null
+
+  const path = join(directory, file.name)
+  const fileStat = await stat(path).catch(() => null)
+
+  if (!fileStat) return null
+
+  return {
+    path,
+    filename: file.name,
+    mimeType:
+      MIME_TYPES[extname(file.name).toLowerCase()] ??
+      'application/octet-stream',
+    size: fileStat.size
+  }
+}
+
 /**
  * 用户点击产物后，通过保存对话框选择本机路径，再登记到统一下载管理。
  */
@@ -197,9 +231,11 @@ export const downloadArtifact = async (
   window: BrowserWindow | null,
   id: string
 ): Promise<{ path: string; downloadId: string } | null> => {
-  const record = artifacts.get(id)
+  const record = artifacts.get(id) ?? (await findPersistedArtifact(id))
 
   if (!record) throw new Error('AI 产物不存在或已过期')
+
+  artifacts.set(id, record)
 
   const options = {
     title: '保存 AI 产物',

@@ -97,6 +97,28 @@ export interface AiChatArtifact {
   mimeType?: string
 }
 
+
+/** 持久化的 AI 助手消息，完整保留附件、工具输出和产物元信息。 */
+export interface AiStoredMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  reasoning?: string
+  attachments?: AiChatAttachment[]
+  tools?: AiToolCall[]
+  sources?: AiChatSource[]
+  artifacts?: AiChatArtifact[]
+  interrupted?: boolean
+  hidden?: boolean
+  createdAt: string
+}
+
+/** 底部 AI 助手会话。 */
+export interface AiAssistantSessionState {
+  messages: AiStoredMessage[]
+  updatedAt: string | null
+}
+
 /** 主进程发送给渲染进程的聊天事件。 */
 export type AiChatEvent =
   | {

@@ -367,7 +367,8 @@ export default function App(): JSX.Element {
           openAiDialog({
             title: 'AI 助手',
             prompt: '',
-            autoStart: false
+            autoStart: false,
+            persistSession: true
           })
         }
         onOpenCloudDocs={() =>

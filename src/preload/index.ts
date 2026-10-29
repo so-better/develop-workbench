@@ -8,7 +8,9 @@ import type {
   AiChatAttachment,
   AiChatStartResult,
   AiConfigStatus,
-  AiArtifactStats
+  AiArtifactStats,
+  AiAssistantSessionState,
+  AiStoredMessage
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
@@ -851,6 +853,16 @@ const electronAPI = {
    */
   clearAiArtifacts: (): Promise<AiArtifactStats> =>
     ipcRenderer.invoke('ai:artifacts:clear'),
+
+  /** 读取底部 AI 助手的历史会话。 */
+  getAiAssistantSession: (): Promise<AiAssistantSessionState> =>
+    ipcRenderer.invoke('ai:assistant-session:get'),
+
+  /** 保存底部 AI 助手的历史会话。 */
+  saveAiAssistantSession: (
+    messages: AiStoredMessage[]
+  ): Promise<AiAssistantSessionState> =>
+    ipcRenderer.invoke('ai:assistant-session:save', messages),
 
   /** 读取存储清理统计。 */
   getStorageCleanupStats: (): Promise<StorageCleanupStats> =>

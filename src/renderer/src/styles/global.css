@@ -6410,13 +6410,17 @@ body {
   align-items: center;
 }
 
-.ai-composer-attach.ant-btn {
+.ai-composer-attach.ant-btn,
+.ai-composer-clear.ant-btn {
   width: 26px;
   height: 26px;
   padding: 0;
-  color: var(--workbench-secondary);
   font-size: 13px;
   border-radius: 7px;
+}
+
+.ai-composer-attach.ant-btn {
+  color: var(--workbench-secondary);
 }
 
 .ai-composer-attach.ant-btn:hover {
