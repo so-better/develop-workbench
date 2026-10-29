@@ -486,6 +486,7 @@ export default function RequirementWorkbench({
   const [projects, setProjects] = useState<MeegleProject[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectSwitching, setProjectSwitching] = useState(false)
+  const projectSwitchRef = useRef(false)
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null)
   const [personalStatus, setPersonalStatus] = useState<RequirementPersonalStatus | null>(null)
   const [personalStatusLoading, setPersonalStatusLoading] = useState(false)
@@ -1024,6 +1025,7 @@ export default function RequirementWorkbench({
     if (!projectKey || projectKey === data?.project.projectKey) return
 
     setProjectSwitching(true)
+    projectSwitchRef.current = true
 
     try {
       const project = await window.electron.setMeegleProject(projectKey)
@@ -1048,9 +1050,33 @@ export default function RequirementWorkbench({
     } catch (switchError) {
       message.error(getErrorMessage(switchError))
     } finally {
+      projectSwitchRef.current = false
       setProjectSwitching(false)
     }
   }
+
+  useEffect(() => {
+    const handleProjectChanged = (): void => {
+      if (projectSwitchRef.current) return
+
+      localStorage.removeItem(SELECTED_REQUIREMENT_KEY)
+      setSelectedRequirementId(null)
+      setRequirementFilter('')
+      setStatusFilters([])
+      setIterationFilter(null)
+      setCollapsedGroupKeys(new Set())
+      setActivity(null)
+      setBindings([])
+      setData(null)
+      void loadRequirements()
+    }
+
+    window.addEventListener('meegle:project-changed', handleProjectChanged)
+
+    return () => {
+      window.removeEventListener('meegle:project-changed', handleProjectChanged)
+    }
+  }, [loadRequirements])
 
   /**
    * 刷新需求和流程节点。

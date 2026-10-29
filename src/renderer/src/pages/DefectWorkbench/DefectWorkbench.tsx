@@ -35,6 +35,7 @@ import type {
   MeegleMyDefects,
   UpdateDefectAssigneesInput
 } from '../../../../types/defects'
+import type { MeegleProject } from '../../../../types/requirements'
 import type { SettingsSection } from '../../../../types/settings'
 import { getErrorMessage } from '../../../../utils'
 import MarkdownContent from '../../components/MarkdownContent/MarkdownContent'
@@ -165,6 +166,9 @@ export default function DefectWorkbench({
   const [role, setRole] = useState<DefectRole | null>(null)
   const [data, setData] = useState<MeegleMyDefects | null>(null)
   const [loading, setLoading] = useState(true)
+  const [projects, setProjects] = useState<MeegleProject[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  const [projectSwitching, setProjectSwitching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -232,9 +236,78 @@ export default function DefectWorkbench({
   }, [load, reloadVersion])
 
   useEffect(() => {
+    let mounted = true
+
+    setProjectsLoading(true)
+    window.electron
+      .listMeegleProjects()
+      .then((items) => {
+        if (mounted) setProjects(items)
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (mounted) setProjectsLoading(false)
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const projectOptions = useMemo(() => {
+    const options = new Map(projects.map((project) => [project.projectKey, project]))
+
+    if (data?.project) {
+      options.set(data.project.projectKey, data.project)
+    }
+
+    return Array.from(options.values()).map((project) => ({
+      value: project.projectKey,
+      label: project.name
+    }))
+  }, [data?.project, projects])
+
+  const handleProjectChange = async (projectKey: string): Promise<void> => {
+    if (!projectKey || projectKey === data?.project.projectKey) return
+
+    setProjectSwitching(true)
+
+    try {
+      const project = await window.electron.setMeegleProject(projectKey)
+
+      setProjects((current) =>
+        current.some((item) => item.projectKey === project.projectKey)
+          ? current
+          : [...current, project]
+      )
+      setData(null)
+      setRole(null)
+      setSelectedId(null)
+      setSearch('')
+      setStatusFilters([])
+      setIterationFilter(null)
+      setDescriptionExpanded(false)
+      setAssigneesEditing(false)
+      setActiveTab('basic')
+      setCommentDraft('')
+      setReplyToComment(null)
+      setTransitionOpen(false)
+      setSelectedTransitionId(undefined)
+      setTransitionValues({})
+      window.dispatchEvent(new CustomEvent('meegle:project-changed'))
+      message.success(`已切换到 ${project.name}`)
+    } catch (switchError) {
+      message.error(getErrorMessage(switchError))
+    } finally {
+      setProjectSwitching(false)
+    }
+  }
+
+  useEffect(() => {
     const handleProjectChanged = (): void => {
       setRole(null)
       setSelectedId(null)
+      setSearch('')
       setStatusFilters([])
       setIterationFilter(null)
       setDescriptionExpanded(false)
@@ -837,7 +910,20 @@ export default function DefectWorkbench({
         <div className="workbench-brand">
           <div className="workbench-brand-text">
             <strong>缺陷工作台</strong>
-            <span>{data?.project.name ?? '我参与的缺陷'}</span>
+            <Select
+              size="small"
+              variant="borderless"
+              showSearch
+              className="workbench-project-select"
+              value={data?.project.projectKey}
+              placeholder="选择空间"
+              options={projectOptions}
+              loading={projectsLoading || projectSwitching}
+              disabled={projectSwitching}
+              optionFilterProp="label"
+              popupMatchSelectWidth={220}
+              onChange={(value: string) => handleProjectChange(value)}
+            />
           </div>
         </div>
 
