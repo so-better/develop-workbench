@@ -16,9 +16,10 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
-    "dist": "npm run build && electron-builder",
-    "dist:mac": "npm run build && electron-builder --mac",
-    "dist:win": "npm run build && electron-builder --win"
+    "dist": "npm run clean:release && npm run build && electron-builder",
+    "dist:mac": "npm run clean:release && npm run build && electron-builder --mac",
+    "dist:win": "npm run clean:release && npm run build && electron-builder --win",
+    "clean:release": "node scripts/clean-release.cjs"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "^3.0.78",
