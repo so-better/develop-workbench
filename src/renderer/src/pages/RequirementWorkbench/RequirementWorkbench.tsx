@@ -12,6 +12,7 @@ import {
   DeleteOutlined,
   DownOutlined,
   EditOutlined,
+  ExportOutlined,
   FolderOpenOutlined,
   InfoCircleOutlined,
   LinkOutlined,
@@ -22,6 +23,7 @@ import {
   PlusOutlined,
   PullRequestOutlined,
   ReloadOutlined,
+  RightOutlined,
   RollbackOutlined,
   SearchOutlined,
   TagOutlined
@@ -587,6 +589,7 @@ export default function RequirementWorkbench({
 
   // 需求描述折叠状态。
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const [moreFieldsOpen, setMoreFieldsOpen] = useState(false)
 
   // 需求描述编辑状态。
   const [descriptionEditing, setDescriptionEditing] = useState(false)
@@ -747,200 +750,218 @@ export default function RequirementWorkbench({
     newRepositoryId && branchLoadingIds.has(newRepositoryId)
   )
 
-  /** 基本信息 Tab 的分组字段。 */
-  const basicInfoGroups: BasicInfoGroup[] = selectedRequirement
+  /** 默认展示的需求关键信息。 */
+  const primaryInfoGroups: BasicInfoGroup[] = selectedRequirement
     ? [
-      {
-        title: '基础信息',
-        fields: [
-          {
-            label: '当前状态',
-            value: selectedRequirement.status ? (
-              <Tag
-                bordered={false}
-                className={`requirement-header-tag is-${getStatusTone(
-                  selectedRequirement.status
-                )}`}
-              >
-                {selectedRequirement.status}
-              </Tag>
-            ) : (
-              '未填写'
-            )
-          },
-          {
-            label: '优先级',
-            value: selectedRequirement.priority ? (
-              <Tag
-                bordered={false}
-                className={`requirement-header-tag is-${getPriorityTone(
-                  selectedRequirement.priority
-                )}`}
-              >
-                {selectedRequirement.priority}
-              </Tag>
-            ) : (
-              '未填写'
-            )
-          },
-          {
-            label: '需求类型',
-            value: renderInfoTags(
-              [formatRequirementType(selectedRequirement.requirementType) ?? ''].filter(Boolean),
-              'blue'
-            )
-          },
-          {
-            label: '产品线',
-            value: renderInfoTags(
-              selectedRequirement.productLines.length > 0
-                ? [selectedRequirement.productLines.join(' / ')]
-                : [],
-              'teal'
-            )
-          },
-          {
-            label: '所属迭代',
-            value: renderInfoTags([selectedGroup?.iterationName ?? '未规划迭代'], 'blue')
-          },
-          {
-            label: '需求文档',
-            value: selectedRequirement.documentUrl ? (
-              <Typography.Link
-                className="requirement-info-doc-link"
-                href={selectedRequirement.documentUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <LinkOutlined />
-                查看文档
-              </Typography.Link>
-            ) : (
-              '未填写'
-            )
-          },
-          {
-            label: '创建人',
-            value: renderPeople(
-              selectedRequirement.createdBy ? [selectedRequirement.createdBy] : []
-            )
-          }
-        ]
-      },
-      {
-        title: '参与人员',
-        fields: [
-          {
-            label: '参与人员',
-            wide: true,
-            hideLabel: true,
-            value: renderCollaborators(selectedRequirement.collaborators)
-          }
-        ]
-      },
-      {
-        title: '时间与版本',
-        fields: [
-          { label: '提出时间', value: selectedRequirement.proposedAt ?? '未填写' },
-          {
-            label: '预计上线时间',
-            value: selectedRequirement.expectedReleaseAt ?? '未填写'
-          },
-          { label: '完成日期', value: selectedRequirement.completedAt ?? '未填写' },
-          {
-            label: '规划版本',
-            value: renderInfoTags(selectedRequirement.planningVersions, 'purple')
-          },
-          {
-            label: '实际上车版本',
-            value: renderInfoTags(selectedRequirement.actualReleaseVersions, 'cyan')
-          }
-        ]
-      },
-      {
-        title: '研发属性',
-        fields: [
-          {
-            label: '需求等级',
-            value: renderInfoTags(
-              selectedRequirement.requirementLevel ? [selectedRequirement.requirementLevel] : [],
-              'orange'
-            )
-          },
-          {
-            label: '需求性质',
-            value: renderInfoTags(
-              selectedRequirement.requirementNature ? [selectedRequirement.requirementNature] : [],
-              'pink'
-            )
-          },
-          {
-            label: '需求复杂度',
-            value: renderInfoTags(
-              selectedRequirement.complexity !== null
-                ? [String(selectedRequirement.complexity)]
-                : [],
-              'gray'
-            )
-          },
-          {
-            label: '研发难度估分',
-            value: renderInfoTags(
-              selectedRequirement.developmentDifficulty !== null
-                ? [String(selectedRequirement.developmentDifficulty)]
-                : [],
-              'gray'
-            )
-          },
-          {
-            label: '预估开发量',
-            value: renderInfoTags(
-              selectedRequirement.estimatedWorkload ? [selectedRequirement.estimatedWorkload] : [],
-              'gray'
-            )
-          },
-          {
-            label: '技术方案',
-            value: selectedRequirement.technicalSolution ?? '未填写'
-          },
-          {
-            label: '应用',
-            value: renderInfoTags(
-              selectedRequirement.application ? [selectedRequirement.application] : [],
-              'teal'
-            )
-          },
-          { label: '标签', value: renderInfoTags(selectedRequirement.tags, 'green') },
-          {
-            label: '是否涉及权限',
-            value: selectedRequirement.permissionsInvolved
-              ? renderInfoTags(
-                [selectedRequirement.permissionsInvolved],
-                getBooleanTagTone(selectedRequirement.permissionsInvolved)
+        {
+          title: '需求信息',
+          fields: [
+            {
+              label: '需求类型',
+              value: renderInfoTags(
+                [
+                  formatRequirementType(
+                    selectedRequirement.requirementType
+                  ) ?? ''
+                ].filter(Boolean),
+                'blue'
               )
-              : '未填写'
-          },
-          {
-            label: '是否涉及历史数据',
-            value: selectedRequirement.historicalDataInvolved
-              ? renderInfoTags(
-                [selectedRequirement.historicalDataInvolved],
-                getBooleanTagTone(selectedRequirement.historicalDataInvolved)
+            },
+            {
+              label: '产品线',
+              value: renderInfoTags(
+                selectedRequirement.productLines.length > 0
+                  ? [selectedRequirement.productLines.join(' / ')]
+                  : [],
+                'teal'
               )
-              : '未填写'
-          },
-          {
-            label: '是否涉及性能测试',
-            value: selectedRequirement.performanceTestInvolved
-              ? renderInfoTags(
-                [selectedRequirement.performanceTestInvolved],
-                getBooleanTagTone(selectedRequirement.performanceTestInvolved)
+            },
+            {
+              label: '需求文档',
+              value: selectedRequirement.documentUrl ? (
+                <Typography.Link
+                  className="requirement-info-doc-link"
+                  href={selectedRequirement.documentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <LinkOutlined />
+                  查看文档
+                </Typography.Link>
+              ) : (
+                '未填写'
               )
-              : '未填写'
-          }
-        ]
-      }
-    ]
+            }
+          ]
+        },
+        {
+          title: '参与人员',
+          fields: [
+            {
+              label: '参与人员',
+              wide: true,
+              hideLabel: true,
+              value: renderCollaborators(selectedRequirement.collaborators)
+            }
+          ]
+        },
+        {
+          title: '研发与版本',
+          fields: [
+            {
+              label: '技术方案',
+              wide: true,
+              value: selectedRequirement.technicalSolution ?? '未填写'
+            },
+            {
+              label: '应用',
+              value: renderInfoTags(
+                selectedRequirement.application
+                  ? [selectedRequirement.application]
+                  : [],
+                'teal'
+              )
+            },
+            {
+              label: '标签',
+              value: renderInfoTags(selectedRequirement.tags, 'green')
+            },
+            {
+              label: '预计上线时间',
+              value: selectedRequirement.expectedReleaseAt ?? '未填写'
+            },
+            {
+              label: '规划版本',
+              value: renderInfoTags(
+                selectedRequirement.planningVersions,
+                'purple'
+              )
+            }
+          ]
+        }
+      ]
+    : []
+
+  /** 默认折叠的低频飞书字段。 */
+  const moreInfoGroups: BasicInfoGroup[] = selectedRequirement
+    ? [
+        {
+          title: '其他信息',
+          fields: [
+            {
+              label: '创建人',
+              value: renderPeople(
+                selectedRequirement.createdBy
+                  ? [selectedRequirement.createdBy]
+                  : []
+              )
+            },
+            {
+              label: '提出时间',
+              value: selectedRequirement.proposedAt ?? '未填写'
+            },
+            {
+              label: '完成日期',
+              value: selectedRequirement.completedAt ?? '未填写'
+            },
+            {
+              label: '实际上车版本',
+              value: renderInfoTags(
+                selectedRequirement.actualReleaseVersions,
+                'cyan'
+              )
+            }
+          ]
+        },
+        {
+          title: '研发属性',
+          fields: [
+            {
+              label: '需求等级',
+              value: renderInfoTags(
+                selectedRequirement.requirementLevel
+                  ? [selectedRequirement.requirementLevel]
+                  : [],
+                'orange'
+              )
+            },
+            {
+              label: '需求性质',
+              value: renderInfoTags(
+                selectedRequirement.requirementNature
+                  ? [selectedRequirement.requirementNature]
+                  : [],
+                'pink'
+              )
+            },
+            {
+              label: '需求复杂度',
+              value: renderInfoTags(
+                selectedRequirement.complexity !== null
+                  ? [String(selectedRequirement.complexity)]
+                  : [],
+                'gray'
+              )
+            },
+            {
+              label: '研发难度估分',
+              value: renderInfoTags(
+                selectedRequirement.developmentDifficulty !== null
+                  ? [String(selectedRequirement.developmentDifficulty)]
+                  : [],
+                'gray'
+              )
+            },
+            {
+              label: '预估开发量',
+              value: renderInfoTags(
+                selectedRequirement.estimatedWorkload
+                  ? [selectedRequirement.estimatedWorkload]
+                  : [],
+                'gray'
+              )
+            }
+          ]
+        },
+        {
+          title: '质量属性',
+          fields: [
+            {
+              label: '是否涉及权限',
+              value: selectedRequirement.permissionsInvolved
+                ? renderInfoTags(
+                    [selectedRequirement.permissionsInvolved],
+                    getBooleanTagTone(
+                      selectedRequirement.permissionsInvolved
+                    )
+                  )
+                : '未填写'
+            },
+            {
+              label: '是否涉及历史数据',
+              value: selectedRequirement.historicalDataInvolved
+                ? renderInfoTags(
+                    [selectedRequirement.historicalDataInvolved],
+                    getBooleanTagTone(
+                      selectedRequirement.historicalDataInvolved
+                    )
+                  )
+                : '未填写'
+            },
+            {
+              label: '是否涉及性能测试',
+              value: selectedRequirement.performanceTestInvolved
+                ? renderInfoTags(
+                    [selectedRequirement.performanceTestInvolved],
+                    getBooleanTagTone(
+                      selectedRequirement.performanceTestInvolved
+                    )
+                  )
+                : '未填写'
+            }
+          ]
+        }
+      ]
     : []
 
   /**
@@ -1827,6 +1848,7 @@ export default function RequirementWorkbench({
     setDescriptionExpanded(false)
     setDescriptionEditing(false)
     setDescriptionDraft('')
+    setMoreFieldsOpen(false)
   }, [selectedRequirementId])
 
   /**
@@ -2803,31 +2825,42 @@ export default function RequirementWorkbench({
                     ) : null}
                   </div>
                 </div>
-                {requirementUrl ? (
-                  <div className="workbench-feishu-row">
-                    <div className="workbench-feishu-callout">
-                      <InfoCircleOutlined className="workbench-feishu-callout-icon" />
-                      <span className="workbench-feishu-callout-text">
-                        飞书详情页包含更完整的操作，需要时可在应用内打开完整页面。
+                <div className="workbench-header-actions">
+                  <div className="workbench-scope-note">
+                    <span className="workbench-scope-note-icon">
+                      <InfoCircleOutlined />
+                    </span>
+                    <div className="workbench-scope-note-copy">
+                      <strong>研发执行视图</strong>
+                      <span>
+                        完整字段、附件、审批和复杂流程请前往飞书处理。
                       </span>
-                      <a
-                        className="workbench-feishu-callout-action"
-                        href={requirementUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        打开完整飞书详情页 →
-                      </a>
                     </div>
-                    <Button
-                      type="primary"
-                      icon={<RobotMark />}
-                      onClick={handleAnalyzeRequirement}
-                    >
-                      AI 分析
-                    </Button>
+                    <div className="workbench-scope-note-actions">
+                      {requirementUrl ? (
+                        <Button
+                          type="primary"
+                          icon={<ExportOutlined />}
+                          onClick={() =>
+                            window.electron.openEmbeddedBrowser(
+                              requirementUrl
+                            )
+                          }
+                        >
+                          在飞书中处理
+                        </Button>
+                      ) : null}
+                      <Button
+                        type="primary"
+                        ghost
+                        icon={<RobotMark />}
+                        onClick={handleAnalyzeRequirement}
+                      >
+                        AI 分析
+                      </Button>
+                    </div>
                   </div>
-                ) : null}
+                </div>
               </div>
             </header>
 
@@ -3313,6 +3346,20 @@ export default function RequirementWorkbench({
               </section>
 
               <section className="requirement-flow-section">
+                <div className="requirement-section-heading">
+                  <h2>流程节点</h2>
+                  {requirementUrl ? (
+                    <Typography.Link
+                      className="requirement-info-feishu-link"
+                      href={requirementUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExportOutlined />
+                      在飞书中编辑
+                    </Typography.Link>
+                  ) : null}
+                </div>
                 {activityError ? (
                   <Alert
                     type="error"
@@ -3721,16 +3768,23 @@ export default function RequirementWorkbench({
                           </div>
 
                           <div className="requirement-info-groups">
-                            {basicInfoGroups.map((group) => (
-                              <section className="requirement-info-group" key={group.title}>
+                            {primaryInfoGroups.map((group) => (
+                              <section
+                                className="requirement-info-group"
+                                key={group.title}
+                              >
                                 <h4>{group.title}</h4>
                                 <dl className="requirement-info-grid">
                                   {group.fields.map((field) => (
                                     <div
                                       key={field.label}
-                                      className={field.wide ? 'is-wide' : undefined}
+                                      className={
+                                        field.wide ? 'is-wide' : undefined
+                                      }
                                     >
-                                      {field.hideLabel ? null : <dt>{field.label}</dt>}
+                                      {field.hideLabel ? null : (
+                                        <dt>{field.label}</dt>
+                                      )}
                                       <dd>{field.value}</dd>
                                     </div>
                                   ))}
@@ -3738,12 +3792,85 @@ export default function RequirementWorkbench({
                               </section>
                             ))}
                           </div>
+
+                          <div className="requirement-info-more">
+                            <div className="requirement-info-more-head">
+                              <button
+                                type="button"
+                                className="requirement-info-more-toggle"
+                                aria-expanded={moreFieldsOpen}
+                                aria-controls="requirement-more-fields"
+                                onClick={() =>
+                                  setMoreFieldsOpen((value) => !value)
+                                }
+                              >
+                                {moreFieldsOpen ? (
+                                  <DownOutlined className="requirement-info-more-chevron" />
+                                ) : (
+                                  <RightOutlined className="requirement-info-more-chevron" />
+                                )}
+                                更多飞书字段
+                              </button>
+                              {requirementUrl ? (
+                                <Typography.Link
+                                  className="requirement-info-feishu-link"
+                                  href={requirementUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <ExportOutlined />
+                                  在飞书中编辑
+                                </Typography.Link>
+                              ) : null}
+                            </div>
+                            {moreFieldsOpen ? (
+                              <div
+                                id="requirement-more-fields"
+                                className="requirement-info-groups requirement-info-more-groups"
+                              >
+                                {moreInfoGroups.map((group) => (
+                                  <section
+                                    className="requirement-info-group"
+                                    key={group.title}
+                                  >
+                                    <h4>{group.title}</h4>
+                                    <dl className="requirement-info-grid">
+                                      {group.fields.map((field) => (
+                                        <div
+                                          key={field.label}
+                                          className={
+                                            field.wide
+                                              ? 'is-wide'
+                                              : undefined
+                                          }
+                                        >
+                                          {field.hideLabel ? null : (
+                                            <dt>{field.label}</dt>
+                                          )}
+                                          <dd>{field.value}</dd>
+                                        </div>
+                                      ))}
+                                    </dl>
+                                  </section>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
                       )
                     },
                     {
                       key: 'comments',
-                      label: '评论/备注',
+                      label: (
+                        <span className="requirement-info-tab-label">
+                          评论/备注
+                          {activity && activity.commentsTotal > 0 ? (
+                            <span className="requirement-info-tab-count">
+                              {activity.commentsTotal}
+                            </span>
+                          ) : null}
+                        </span>
+                      ),
                       children: (
                         <div className="requirement-info-tab">
                           {selectedRequirement.remark ? (
