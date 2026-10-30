@@ -8591,3 +8591,13 @@ body {
   font-size: 11px;
   line-height: 1.5;
 }
+
+.workbench-show-closed {
+  padding-left: 2px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.workbench-show-closed .ant-checkbox + span {
+  font-size: 12px;
+}

@@ -266,7 +266,7 @@ export interface ElectronAPI {
     notifyUserKeys?: string[]
   ) => Promise<void>
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
-  getMyRequirements: () => Promise<MeegleMyRequirements>
+  getMyRequirements: (includeClosed?: boolean) => Promise<MeegleMyRequirements>
   /** 按关键词搜索当前空间内的全部需求。 */
   searchRequirements: (keyword: string) => Promise<MeegleMyRequirements>
   /** 读取用户可访问的 Meegle 空间。 */

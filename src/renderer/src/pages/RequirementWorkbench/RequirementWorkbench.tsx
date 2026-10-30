@@ -496,6 +496,7 @@ export default function RequirementWorkbench({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [requirementFilter, setRequirementFilter] = useState('')
+  const [showClosedRequirements, setShowClosedRequirements] = useState(false)
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [iterationFilter, setIterationFilter] = useState<string | null>(null)
 
@@ -973,7 +974,9 @@ export default function RequirementWorkbench({
     setError(null)
 
     try {
-      const result = await window.electron.getMyRequirements()
+      const result = await window.electron.getMyRequirements(
+        showClosedRequirements
+      )
       const storedId = localStorage.getItem(SELECTED_REQUIREMENT_KEY)
 
       setData(result)
@@ -992,7 +995,7 @@ export default function RequirementWorkbench({
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [showClosedRequirements])
 
   useEffect(() => {
     loadRequirements()
@@ -2621,6 +2624,16 @@ export default function RequirementWorkbench({
                 />
               </Tooltip>
             ) : null}
+            <Checkbox
+              className="workbench-show-closed"
+              checked={showClosedRequirements}
+              disabled={loading || !data}
+              onChange={(event) =>
+                setShowClosedRequirements(event.target.checked)
+              }
+            >
+              显示已结束
+            </Checkbox>
           </span>
         </div>
 

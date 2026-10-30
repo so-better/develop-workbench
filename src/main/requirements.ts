@@ -114,6 +114,16 @@ interface RoleMetaResponse {
   error?: CliError
 }
 
+interface StatusMetaResponse {
+  list?: Array<{
+    field_name?: string
+    option?: Array<{
+      option_name?: string
+    }> | null
+  }> | null
+  error?: CliError
+}
+
 interface WorkflowRawNode {
   basic?: {
     node_key?: string
@@ -213,6 +223,9 @@ let cachedProject: { value: MeegleProject; expiresAt: number } | null = null
 /** 工作项角色配置缓存，按空间隔离。 */
 const roleCache = new Map<string, string[]>()
 
+/** 需求状态配置缓存，按空间隔离。 */
+const statusCache = new Map<string, string[]>()
+
 /** 用户信息缓存，避免节点和评论反复解析同一批 user_key。 */
 const userCache = new Map<string, MeegleRequirementOwner>()
 
@@ -288,6 +301,7 @@ const toMeegleProject = (
 const clearProjectScopedCaches = (): void => {
   cachedProject = null
   roleCache.clear()
+  statusCache.clear()
   cachedRootTeams = null
 }
 
@@ -710,6 +724,44 @@ const buildCurrentUserRoleCondition = (roleNames: string[]): string =>
   roleNames
     .map((role) => `\`__${role.replace(/`/g, '')}\` = current_login_user()`)
     .join(' OR ')
+
+/** 读取当前空间真实存在的需求状态名称。 */
+const fetchStoryStatusNames = async (project: MeegleProject): Promise<string[]> => {
+  const cached = statusCache.get(project.projectKey)
+
+  if (cached) return cached
+
+  const result = await runMeegle(
+    [
+      'workitem',
+      'meta-fields',
+      '--project-key',
+      project.key,
+      '--work-item-type',
+      'story',
+      '--field-query',
+      '状态',
+      '--format',
+      'json'
+    ],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+  const response = parseCommandJson<StatusMetaResponse>(result, '读取需求状态配置')
+  const statusField =
+    (response.list ?? []).find((field) => field.field_name?.trim() === '状态') ??
+    response.list?.[0]
+  const names = Array.from(
+    new Set(
+      (statusField?.option ?? [])
+        .map((option) => option.option_name?.trim())
+        .filter((name): name is string => Boolean(name))
+    )
+  )
+
+  statusCache.set(project.projectKey, names)
+
+  return names
+}
 
 /**
  * 执行 MQL 查询并读取全部分页。
@@ -1678,6 +1730,28 @@ export const updateRequirementNode = async (
 
 }
 
+/** 需求终态，默认不进入待办列表。 */
+const REQUIREMENT_CLOSED_STATUSES = [
+  '结束',
+  '上线完成',
+  '已终止',
+  '已完成',
+  '已关闭',
+  '已取消'
+]
+
+const buildRequirementClosedCondition = (statusNames: string[]): string => {
+  const closedStatuses = statusNames.filter((status) =>
+    REQUIREMENT_CLOSED_STATUSES.includes(status)
+  )
+
+  if (closedStatuses.length === 0) return ''
+
+  return `\`状态\` not in (${closedStatuses
+    .map((status) => `'${status.replace(/'/g, "''")}'`)
+    .join(', ')})`
+}
+
 /** 关键词搜索使用的需求字段。 */
 const REQUIREMENT_SEARCH_FIELDS =
   '`工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `产品线`, `需求等级`, `需求性质`, `标签`, risk_label()'
@@ -1733,12 +1807,19 @@ export const searchRequirements = async (query: string): Promise<MeegleMyRequire
 }
 
 /**
- * 读取当前用户通过任意角色参与的未结束需求，并按迭代分组。
+ * 读取当前用户通过任意角色参与的需求，并按迭代分组。
+ * includeClosed 为 false 时只返回未结束需求。
  */
-export const getMyRequirements = async (): Promise<MeegleMyRequirements> => {
+export const getMyRequirements = async (
+  includeClosed = false
+): Promise<MeegleMyRequirements> => {
   const project = await getProject()
-  const roleNames = await fetchStoryRoleNames(project)
+  const [roleNames, statusNames] = await Promise.all([
+    fetchStoryRoleNames(project),
+    fetchStoryStatusNames(project).catch(() => [] as string[])
+  ])
   const roleCondition = buildCurrentUserRoleCondition(roleNames)
+  const closedCondition = buildRequirementClosedCondition(statusNames)
   const requirements =
     roleNames.length > 0
       ? (
@@ -1747,7 +1828,11 @@ export const getMyRequirements = async (): Promise<MeegleMyRequirements> => {
             [
               'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `提出时间`, `预计上线时间`, `完成日期`, `规划版本`, `实际上车版本`, `产品线`, `需求等级`, `需求性质`, `需求复杂度`, `研发难度估分`, `预估开发量`, `技术方案`, `应用`, `标签`, `是否涉及权限`, `是否涉及历史数据`, `是否涉及性能测试`, `备注`, risk_label(), `__产品经理`, `__产品负责人`, `__研发负责人`, `__前端负责人`, `__前端开发`, `__前端APP负责人`, `__前端APP开发`, `__后端负责人`, `__后端开发`, `__数仓开发`, `__QA`, `__QA负责人`, `__测试owner`, `__测试组长`, `__性能测试负责人`, `__UI&UX`, `__PMO项目经理`, `__技术专家`, `__研发总监`',
               `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
-              `WHERE (${roleCondition}) AND \`状态\` != '结束'`,
+              `WHERE (${roleCondition})${
+                includeClosed || !closedCondition
+                  ? ''
+                  : ` AND ${closedCondition}`
+              }`,
               'ORDER BY `更新时间` DESC'
             ].join(' ')
           )
@@ -1912,7 +1997,9 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
  * 注册需求工作台 IPC。
  */
 export const initializeRequirements = (): void => {
-  ipcMain.handle('requirements:get-my', () => getMyRequirements())
+  ipcMain.handle('requirements:get-my', (_event, includeClosed: unknown) =>
+    getMyRequirements(includeClosed === true)
+  )
   ipcMain.handle('requirements:search', (_event, query: unknown) =>
     searchRequirements(typeof query === 'string' ? query : '')
   )
