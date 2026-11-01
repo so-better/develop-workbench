@@ -2655,15 +2655,7 @@ export default function RequirementWorkbench({
                 : null
 
           if (!productContact) {
-            return (
-              <span className="workbench-requirement-item-owner is-empty">
-                <span
-                  className="workbench-requirement-item-owner-empty-dot"
-                  aria-hidden="true"
-                />
-                待补充产品经理
-              </span>
-            )
+            return null
           }
 
           return (

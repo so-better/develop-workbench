@@ -2162,20 +2162,6 @@ body {
   text-align: right;
 }
 
-.workbench-requirement-item-owner.is-empty {
-  color: var(--workbench-secondary);
-  font-size: 10px;
-}
-
-.workbench-requirement-item-owner-empty-dot {
-  flex-shrink: 0;
-  width: 5px;
-  height: 5px;
-  border: 1px solid currentColor;
-  border-radius: 50%;
-  opacity: 0.55;
-}
-
 .workbench-requirement-item-owner-text {
   overflow: hidden;
   text-overflow: ellipsis;
