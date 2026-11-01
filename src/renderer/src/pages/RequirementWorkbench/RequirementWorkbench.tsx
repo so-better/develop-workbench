@@ -2766,6 +2766,7 @@ export default function RequirementWorkbench({
           <h2>需求信息</h2>
           <div className="local-requirement-actions">
             <Button
+              type="primary"
               size="small"
               icon={<EditOutlined />}
               disabled={localDeleting}
@@ -2782,6 +2783,7 @@ export default function RequirementWorkbench({
               onConfirm={() => void handleDeleteLocalRequirement()}
             >
               <Button
+                type="primary"
                 size="small"
                 danger
                 icon={<DeleteOutlined />}

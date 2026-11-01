@@ -55,7 +55,7 @@ interface LocalRequirementFormValues {
   versionKey: string
   status: LocalRequirementStatus
   priority: LocalRequirementPriority | null
-  productManagerKey: string | null
+  productManagerKey: string | null | undefined
   description: string
 }
 
@@ -255,10 +255,11 @@ export default function LocalRequirementModal({
         iterationName: null,
         iterationDate: null
       }
-    const productManager =
-      personOptions.find(
-        (person) => getPersonKey(person) === values.productManagerKey
-      ) ?? initialRequirement?.productManagers[0] ?? null
+    const productManager = values.productManagerKey
+      ? personOptions.find(
+          (person) => getPersonKey(person) === values.productManagerKey
+        ) ?? initialRequirement?.productManagers[0] ?? null
+      : null
 
     await onSubmit({
       name: values.name.trim(),
@@ -316,15 +317,12 @@ export default function LocalRequirementModal({
           />
         </Form.Item>
 
-        <Form.Item
-          label="产品"
-          name="productManagerKey"
-          rules={[{ required: true, message: '请选择产品负责人' }]}
-        >
+        <Form.Item label="产品" name="productManagerKey">
           <Select
             showSearch
+            allowClear
             filterOption={false}
-            placeholder="搜索姓名或邮箱"
+            placeholder="可选，搜索姓名或邮箱"
             loading={personSearching}
             onSearch={handlePersonSearch}
             notFoundContent={personSearching ? '搜索中...' : '未找到产品'}
