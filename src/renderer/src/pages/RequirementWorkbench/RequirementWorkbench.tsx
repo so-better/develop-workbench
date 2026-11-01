@@ -52,6 +52,7 @@ import {
 import type { InputRef } from 'antd'
 import type { Dayjs } from 'dayjs'
 import type { RequirementRepoBinding } from '../../../../types/bindings'
+import type { LocalRequirementInput } from '../../../../types/local-requirements'
 import type { RequirementPersonalStatus } from '../../../../types/requirement-status'
 import type { LarkUser } from '../../../../types/lark'
 import { getErrorMessage } from '../../../../utils'
@@ -68,6 +69,8 @@ import type {
 } from '../../../../types/requirements'
 import type { SettingsSection } from '../../../../types/settings'
 import RobotMark from '../../components/RobotMark/RobotMark'
+import LocalRequirementModal from '../../components/LocalRequirementModal/LocalRequirementModal'
+import type { LocalRequirementVersionOption } from '../../components/LocalRequirementModal/LocalRequirementModal'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import MarkdownContent from '../../components/MarkdownContent/MarkdownContent'
 import MarkdownEditor from '../../components/MarkdownEditor/MarkdownEditor'
@@ -172,8 +175,14 @@ const BranchRow = ({
   </div>
 )
 
+/** 判断是否为本地临时需求。 */
+const isLocalRequirementId = (id: string | null): boolean =>
+  Boolean(id?.startsWith('local:'))
+
 /** 记住上次选择需求的 localStorage key。 */
 const SELECTED_REQUIREMENT_KEY = 'develop-workbench:selected-requirement'
+/** 打开已结束本地需求时的一次性标记。 */
+const OPEN_CLOSED_REQUIREMENT_KEY = 'develop-workbench:open-closed-requirement'
 /** 记住是否预置 IDE 会话的 localStorage key。 */
 const IDE_SESSION_PROMPT_KEY = 'develop-workbench:ide-session-prompt'
 
@@ -496,9 +505,16 @@ export default function RequirementWorkbench({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [requirementFilter, setRequirementFilter] = useState('')
-  const [showClosedRequirements, setShowClosedRequirements] = useState(false)
+  const [showClosedRequirements, setShowClosedRequirements] = useState(
+    () => localStorage.getItem(OPEN_CLOSED_REQUIREMENT_KEY) === '1'
+  )
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [iterationFilter, setIterationFilter] = useState<string | null>(null)
+  const [localModalOpen, setLocalModalOpen] = useState(false)
+  const [localModalRequirement, setLocalModalRequirement] =
+    useState<MeegleRequirement | null>(null)
+  const [localSaving, setLocalSaving] = useState(false)
+  const [localDeleting, setLocalDeleting] = useState(false)
 
   // 默认全部展开，只记录被用户主动收起的迭代。
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(() => new Set())
@@ -535,6 +551,32 @@ export default function RequirementWorkbench({
     data?.groups.find((group) =>
       group.requirements.some((requirement) => requirement.id === selectedRequirementId)
     ) ?? null
+
+  /** 当前选中的是否为本地临时需求。 */
+  const selectedRequirementIsLocal = isLocalRequirementId(selectedRequirementId)
+
+  /** 新建/编辑临时需求时可选的现有迭代。 */
+  const localVersionOptions = useMemo<LocalRequirementVersionOption[]>(() => {
+    const options = (data?.groups ?? []).map((group) => ({
+      key: group.key,
+      label: group.iterationName,
+      iterationId: group.iterationId,
+      iterationName: group.key === 'unplanned' ? null : group.iterationName,
+      iterationDate: group.releaseDate
+    }))
+
+    if (!options.some((option) => option.key === 'unplanned')) {
+      options.push({
+        key: 'unplanned',
+        label: '未规划迭代',
+        iterationId: null,
+        iterationName: null,
+        iterationDate: null
+      })
+    }
+
+    return options
+  }, [data])
 
   // 流程节点单独加载，避免拖慢左侧需求列表。
   const [activity, setActivity] = useState<MeegleRequirementActivity | null>(null)
@@ -651,7 +693,7 @@ export default function RequirementWorkbench({
 
   /** 飞书需求详情页地址。 */
   const requirementUrl =
-    selectedRequirement && data
+    selectedRequirement && data && !selectedRequirementIsLocal
       ? `https://project.feishu.cn/${encodeURIComponent(
         data.project.key
       )}/story/detail/${encodeURIComponent(selectedRequirement.id)}`
@@ -697,12 +739,26 @@ export default function RequirementWorkbench({
       title: 'AI 需求分析',
       autoStart: true,
       prompt: [
-        '请分析下面这个飞书需求。',
+        selectedRequirementIsLocal
+          ? '请分析下面这个本地临时需求。'
+          : '请分析下面这个飞书需求。',
         '',
-        `Story ID：${selectedRequirement.id}`,
-        `Story 链接：${requirementUrl ?? '暂无'}`,
-        '',
-        '请优先使用 getRequirementDetail 工具通过 Story ID 读取需求详情，再读取相关需求文档和后端文档，结合绑定的本地仓库代码输出分析报告。',
+        ...(selectedRequirementIsLocal
+          ? [
+              `需求名称：${selectedRequirement.name}`,
+              `所属版本：${selectedRequirement.iterationName ?? '未规划迭代'}`,
+              `状态：${selectedRequirement.status ?? '未知'}`,
+              `优先级：${selectedRequirement.priority ?? '未设置'}`,
+              `需求描述：${selectedRequirement.description?.trim() || '暂无描述'}`,
+              '',
+              '该需求只保存在本机，不在 Meegle 中，不要调用 getRequirementDetail 工具。'
+            ]
+          : [
+              `Story ID：${selectedRequirement.id}`,
+              `Story 链接：${requirementUrl ?? '暂无'}`,
+              '',
+              '请优先使用 getRequirementDetail 工具通过 Story ID 读取需求详情，再读取相关需求文档和后端文档，结合绑定的本地仓库代码输出分析报告。'
+            ]),
         '',
         '已绑定的代码仓库：',
         ...(repositoryLines.length > 0 ? repositoryLines : ['- 暂无可用仓库']),
@@ -719,6 +775,87 @@ export default function RequirementWorkbench({
     })
   }
 
+  /** 打开新建临时需求弹窗。 */
+  const handleOpenCreateLocalRequirement = (): void => {
+    setLocalModalRequirement(null)
+    setLocalModalOpen(true)
+  }
+
+  /** 打开编辑临时需求弹窗。 */
+  const handleOpenEditLocalRequirement = (): void => {
+    if (!selectedRequirement || !selectedRequirementIsLocal) return
+
+    setLocalModalRequirement(selectedRequirement)
+    setLocalModalOpen(true)
+  }
+
+  /** 保存临时需求。 */
+  const handleSubmitLocalRequirement = async (
+    input: LocalRequirementInput
+  ): Promise<void> => {
+    const projectKey = data?.project.projectKey
+
+    if (!projectKey) {
+      message.warning('当前 Meegle 空间不可用')
+      return
+    }
+
+    const editing = Boolean(localModalRequirement)
+
+    setLocalSaving(true)
+
+    try {
+      const saved = localModalRequirement
+        ? await window.electron.updateLocalRequirement(
+            projectKey,
+            localModalRequirement.id,
+            input
+          )
+        : await window.electron.addLocalRequirement(projectKey, input)
+
+      if (saved.closed && !showClosedRequirements) {
+        setShowClosedRequirements(true)
+      }
+
+      setLocalModalOpen(false)
+      setLocalModalRequirement(null)
+      await loadRequirements()
+      setSelectedRequirementId(saved.id)
+      message.success(editing ? '临时需求已更新' : '临时需求已创建')
+    } catch (saveError) {
+      message.error(getErrorMessage(saveError, '保存临时需求失败'))
+    } finally {
+      setLocalSaving(false)
+    }
+  }
+
+  /** 删除当前临时需求。 */
+  const handleDeleteLocalRequirement = async (): Promise<void> => {
+    const projectKey = data?.project.projectKey
+
+    if (!projectKey || !selectedRequirement || !selectedRequirementIsLocal) return
+
+    setLocalDeleting(true)
+
+    try {
+      await window.electron.removeRequirementBindingWorkspace(
+        selectedRequirement.id
+      )
+      await window.electron.removeLocalRequirement(
+        projectKey,
+        selectedRequirement.id
+      )
+      localStorage.removeItem(SELECTED_REQUIREMENT_KEY)
+      setSelectedRequirementId(null)
+      await loadRequirements()
+      message.success('临时需求已删除')
+    } catch (removeError) {
+      message.error(getErrorMessage(removeError, '删除临时需求失败'))
+    } finally {
+      setLocalDeleting(false)
+    }
+  }
+
   /** 已绑定的仓库 ID，用于过滤新增下拉框。 */
   const boundRepositoryIds = useMemo(
     () => new Set(bindings.map((binding) => binding.repositoryId)),
@@ -729,9 +866,12 @@ export default function RequirementWorkbench({
   const availableRepositories = useMemo(
     () =>
       repositories.filter(
-        (repository) => repository.available && !boundRepositoryIds.has(repository.id)
+        (repository) =>
+          repository.available &&
+          !boundRepositoryIds.has(repository.id) &&
+          (!selectedRequirementIsLocal || !repository.qingzhouEnabled)
       ),
-    [boundRepositoryIds, repositories]
+    [boundRepositoryIds, repositories, selectedRequirementIsLocal]
   )
 
   /** 是否展示新增绑定表单。 */
@@ -1081,6 +1221,35 @@ export default function RequirementWorkbench({
     }
   }, [loadRequirements])
 
+  /** 快速访问选中本地需求时，切换到对应需求。 */
+  useEffect(() => {
+    const handleOpenRequirement = (event: Event): void => {
+      const detail = (
+        event as CustomEvent<{ id?: string; includeClosed?: boolean }>
+      ).detail
+      const id = detail?.id
+
+      localStorage.removeItem(OPEN_CLOSED_REQUIREMENT_KEY)
+
+      if (detail?.includeClosed) {
+        setShowClosedRequirements(true)
+      }
+
+      if (id) setSelectedRequirementId(id)
+    }
+
+    window.addEventListener('workbench:open-requirement', handleOpenRequirement)
+
+    return () => {
+      window.removeEventListener('workbench:open-requirement', handleOpenRequirement)
+    }
+  }, [])
+
+  /** 清除快速访问留下的一次性标记，避免影响下次启动。 */
+  useEffect(() => {
+    localStorage.removeItem(OPEN_CLOSED_REQUIREMENT_KEY)
+  }, [])
+
   /**
    * 刷新需求和流程节点。
    */
@@ -1100,9 +1269,10 @@ export default function RequirementWorkbench({
    * 选中需求后读取流程节点。
    */
   useEffect(() => {
-    if (!selectedRequirementId) {
+    if (!selectedRequirementId || isLocalRequirementId(selectedRequirementId)) {
       activityRequirementIdRef.current = null
       setActivity(null)
+      setActivityLoading(false)
       setSelectedNodeKey(null)
       setActivityError(null)
       return
@@ -1157,7 +1327,11 @@ export default function RequirementWorkbench({
     setPersonalStatusEditing(false)
     setPersonalStatusDraft('')
 
-    if (!selectedRequirementId || !projectKey) {
+    if (
+      !selectedRequirementId ||
+      !projectKey ||
+      isLocalRequirementId(selectedRequirementId)
+    ) {
       setPersonalStatus(null)
       setPersonalStatusLoading(false)
       return
@@ -1368,6 +1542,11 @@ export default function RequirementWorkbench({
       return
     }
 
+    if (selectedRequirementIsLocal && newRepositoryIsQingzhou) {
+      message.warning('临时需求不支持轻舟绑定')
+      return
+    }
+
     if (!newRepositoryIsQingzhou && !newBranchName) {
       message.warning('请选择开发分支')
       return
@@ -1526,10 +1705,16 @@ export default function RequirementWorkbench({
         ? repository.defaultBranch
         : branches[0] ?? null
 
+    const requirementToken = selectedRequirementId
+      ? isLocalRequirementId(selectedRequirementId)
+        ? selectedRequirementId.slice('local:'.length, 'local:'.length + 8)
+        : selectedRequirementId
+      : ''
+
     setCreateBranchBase(preferredBase)
     setCreateBranchName(
-      selectedRequirementId
-        ? `feat/${getUserNameInitials(larkUser?.name)}/${selectedRequirementId}`
+      requirementToken
+        ? `feat/${getUserNameInitials(larkUser?.name)}/${requirementToken}`
         : ''
     )
     setCreateBranchOpen(true)
@@ -2510,12 +2695,18 @@ export default function RequirementWorkbench({
       </span>
       <span className="workbench-requirement-item-footer">
         <span className="workbench-requirement-item-tags">
+          {requirement.source === 'local' ? (
+            <Tag className="local-requirement-tag" bordered={false}>
+              临时
+            </Tag>
+          ) : null}
           {requirement.riskLabels.length > 0 ? (
             <Tooltip title={requirement.riskLabels.join('、')}>
               <span className="workbench-requirement-risk">{requirement.riskLabels[0]}</span>
             </Tooltip>
           ) : null}
-          {formatRequirementType(requirement.requirementType) ? (
+          {requirement.source !== 'local' &&
+          formatRequirementType(requirement.requirementType) ? (
             <span className="workbench-requirement-type">
               {formatRequirementType(requirement.requirementType)}
             </span>
@@ -2566,6 +2757,129 @@ export default function RequirementWorkbench({
   }
 
   const projectName = data?.project.name ?? 'Meegle'
+
+  /** 本地临时需求的详情卡片。 */
+  const localRequirementDetail =
+    selectedRequirement && selectedRequirementIsLocal ? (
+      <section className="requirement-info-section local-requirement-section">
+        <div className="requirement-section-heading">
+          <h2>需求信息</h2>
+          <div className="local-requirement-actions">
+            <Button
+              size="small"
+              icon={<EditOutlined />}
+              disabled={localDeleting}
+              onClick={handleOpenEditLocalRequirement}
+            >
+              编辑
+            </Button>
+            <Popconfirm
+              title="删除临时需求？"
+              description="删除后无法恢复，代码仓库绑定也会一并解除。"
+              okText="删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => void handleDeleteLocalRequirement()}
+            >
+              <Button
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                loading={localDeleting}
+              >
+                删除
+              </Button>
+            </Popconfirm>
+          </div>
+        </div>
+
+        <div className="requirement-info-description">
+          <div className="requirement-info-description-head">
+            <h3>需求描述</h3>
+          </div>
+          <div className="requirement-description-box">
+            <MarkdownContent
+              content={
+                cleanMarkdownContent(selectedRequirement.description ?? '') ||
+                '暂无需求描述'
+              }
+              className="requirement-description-markdown"
+            />
+          </div>
+        </div>
+
+        <dl className="requirement-info-grid local-requirement-grid">
+          <div>
+            <dt>所属版本</dt>
+            <dd>{selectedRequirement.iterationName ?? '未规划迭代'}</dd>
+          </div>
+          <div>
+            <dt>产品</dt>
+            <dd>
+              {selectedRequirement.productManagers[0] ? (
+                <span className="local-requirement-product">
+                  <Avatar
+                    size={20}
+                    src={selectedRequirement.productManagers[0].avatarUrl ?? undefined}
+                  >
+                    {selectedRequirement.productManagers[0].name.slice(0, 1)}
+                  </Avatar>
+                  <span>{selectedRequirement.productManagers[0].name}</span>
+                </span>
+              ) : (
+                '未设置'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>状态</dt>
+            <dd>
+              <Tag
+                className={`local-requirement-status is-${getStatusTone(
+                  selectedRequirement.status
+                )}`}
+                bordered={false}
+              >
+                <span
+                  className={`requirement-status-dot is-${getStatusTone(
+                    selectedRequirement.status
+                  )}`}
+                />
+                {selectedRequirement.status ?? '待处理'}
+              </Tag>
+            </dd>
+          </div>
+          <div>
+            <dt>优先级</dt>
+            <dd>
+              {selectedRequirement.priority ? (
+                <Tag
+                  className={`requirement-header-tag is-${getPriorityTone(
+                    selectedRequirement.priority
+                  )}`}
+                >
+                  {selectedRequirement.priority}
+                </Tag>
+              ) : (
+                '未设置'
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>创建时间</dt>
+            <dd>
+              {dayjs(selectedRequirement.proposedAt).format('YYYY-MM-DD HH:mm')}
+            </dd>
+          </div>
+          <div>
+            <dt>更新时间</dt>
+            <dd>
+              {dayjs(selectedRequirement.updatedAt).format('YYYY-MM-DD HH:mm')}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    ) : null
 
   return (
     <div className="workbench">
@@ -2637,6 +2951,18 @@ export default function RequirementWorkbench({
           </span>
         </div>
 
+        <Button
+          block
+          type="dashed"
+          size="small"
+          className="workbench-add-local"
+          icon={<PlusOutlined />}
+          disabled={!data}
+          onClick={handleOpenCreateLocalRequirement}
+        >
+          新建临时需求
+        </Button>
+
         <div className="workbench-filter-stack">
           <Input
             ref={searchInputRef}
@@ -2701,7 +3027,7 @@ export default function RequirementWorkbench({
         </div>
 
         <p className="workbench-sidebar-footnote">
-          数据来自 Meegle 我负责的需求
+          数据来自 Meegle 与本地临时需求
           {data ? ` · 同步于 ${formatFetchedAt(data.fetchedAt)}` : ''}
         </p>
       </aside>
@@ -2802,13 +3128,19 @@ export default function RequirementWorkbench({
                       {selectedRequirement.priority}
                     </Tag>
                   ) : null}
+                  {selectedRequirementIsLocal ? (
+                    <Tag className="local-requirement-tag" bordered={false}>
+                      临时
+                    </Tag>
+                  ) : null}
                   <span className="workbench-updated-at">
                     {formatUpdatedAt(selectedRequirement.updatedAt)}
                   </span>
-                  <div className="workbench-personal-status">
-                    <span className="workbench-personal-status-icon">
-                      <TagOutlined />
-                    </span>
+                  {!selectedRequirementIsLocal ? (
+                    <div className="workbench-personal-status">
+                      <span className="workbench-personal-status-icon">
+                        <TagOutlined />
+                      </span>
                     <div className="workbench-personal-status-body">
                       {personalStatusLoading ? (
                         <span className="workbench-personal-status-value is-placeholder">
@@ -2862,7 +3194,8 @@ export default function RequirementWorkbench({
                         />
                       </Tooltip>
                     ) : null}
-                  </div>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="workbench-header-actions">
                   <div className="workbench-scope-note">
@@ -2870,9 +3203,13 @@ export default function RequirementWorkbench({
                       <InfoCircleOutlined />
                     </span>
                     <div className="workbench-scope-note-copy">
-                      <strong>研发执行视图</strong>
+                      <strong>
+                        {selectedRequirementIsLocal ? '本地临时需求' : '研发执行视图'}
+                      </strong>
                       <span>
-                        完整字段、附件、审批和复杂流程请前往飞书处理。
+                        {selectedRequirementIsLocal
+                          ? '仅保存在本机，不会同步到 Meegle。'
+                          : '完整字段、附件、审批和复杂流程请前往飞书处理。'}
                       </span>
                     </div>
                     <div className="workbench-scope-note-actions">
@@ -3384,6 +3721,10 @@ export default function RequirementWorkbench({
                 )}
               </section>
 
+              {localRequirementDetail}
+
+              {selectedRequirementIsLocal ? null : (
+                <>
               <section className="requirement-flow-section">
                 <div className="requirement-section-heading">
                   <h2>流程节点</h2>
@@ -4040,6 +4381,8 @@ export default function RequirementWorkbench({
                   ]}
                 />
               </section>
+                </>
+              )}
             </div>
           </>
         ) : (
@@ -4308,6 +4651,18 @@ export default function RequirementWorkbench({
           />
         </div>
       </Modal>
+
+      <LocalRequirementModal
+        open={localModalOpen}
+        initialRequirement={localModalRequirement}
+        versions={localVersionOptions}
+        saving={localSaving}
+        onCancel={() => {
+          setLocalModalOpen(false)
+          setLocalModalRequirement(null)
+        }}
+        onSubmit={handleSubmitLocalRequirement}
+      />
     </div>
   )
 }

@@ -218,6 +218,19 @@ export default function App(): JSX.Element {
     setWorkspace(page)
   }, [])
 
+  /** 快速访问打开本地需求时切换到需求页。 */
+  useEffect(() => {
+    const handleOpenRequirement = (): void => {
+      handlePageChange('requirements')
+    }
+
+    window.addEventListener('workbench:open-requirement', handleOpenRequirement)
+
+    return () => {
+      window.removeEventListener('workbench:open-requirement', handleOpenRequirement)
+    }
+  }, [handlePageChange])
+
   const handleOpenDownloads = (): void => {
     if (browserVisible) {
       setDownloadsPanelOpen((value) => !value)

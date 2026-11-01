@@ -44,6 +44,9 @@ export interface MeegleRequirementCollaborator {
  * 当前用户负责的需求。
  */
 export interface MeegleRequirement {
+  /** 需求来源：Meegle 或本地临时需求。 */
+  source: 'meegle' | 'local'
+
   /** 需求工作项 ID。 */
   id: string
 

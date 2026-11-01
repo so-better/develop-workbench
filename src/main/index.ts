@@ -15,6 +15,7 @@ import { initializeGit } from './git'
 import { initializeIde } from './ide'
 import { initializeLark } from './lark'
 import { initializeLarkSearch } from './lark-search'
+import { initializeLocalRequirements } from './local-requirements'
 import { initializeLinkPreview } from './link-preview'
 import { initializeMarkdownImages } from './markdown-images'
 import { initializeMeegle } from './meegle'
@@ -78,6 +79,7 @@ if (!hasSingleInstanceLock) {
     initializeMeegle()
     initializeRepositories()
     initializeRequirements()
+    initializeLocalRequirements()
     initializeDefects()
     initializeRequirementBindings()
     initializeRequirementStatuses()

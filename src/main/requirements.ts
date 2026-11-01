@@ -3,6 +3,11 @@
  * 读取当前登录用户负责的未结束需求，并按所属迭代分组后注册 IPC。
  */
 import { ipcMain } from 'electron'
+import {
+  listLocalRequirements,
+  searchLocalRequirements,
+  toMeegleRequirement
+} from './local-requirements'
 import { runMeegle } from './meegle'
 import { getPreferences, updatePreferences } from './preferences'
 import type {
@@ -848,6 +853,7 @@ const parseRequirement = (row: MoqlRow): MeegleRequirement | null => {
   const description = readString(fields, 'description')?.trim() || null
 
   return {
+    source: 'meegle',
     id,
     name,
     status: readString(fields, 'work_item_status'),
@@ -1774,7 +1780,7 @@ const buildRequirementSearchCondition = (value: unknown): string => {
 export const searchRequirements = async (query: string): Promise<MeegleMyRequirements> => {
   const project = await getProject()
   const condition = buildRequirementSearchCondition(query)
-  const requirements = condition
+  const remoteRequirements = condition
     ? (
         await fetchMqlRows(
           project,
@@ -1791,6 +1797,12 @@ export const searchRequirements = async (query: string): Promise<MeegleMyRequire
         .map(parseRequirement)
         .filter((requirement): requirement is MeegleRequirement => requirement !== null)
     : []
+  const localRequirements = condition
+    ? (await searchLocalRequirements(project.projectKey, query)).map(
+        toMeegleRequirement
+      )
+    : []
+  const requirements = [...remoteRequirements, ...localRequirements]
 
   try {
     await enrichRequirementAvatars(project, requirements)
@@ -1814,13 +1826,14 @@ export const getMyRequirements = async (
   includeClosed = false
 ): Promise<MeegleMyRequirements> => {
   const project = await getProject()
-  const [roleNames, statusNames] = await Promise.all([
+  const [roleNames, statusNames, localRequirements] = await Promise.all([
     fetchStoryRoleNames(project),
-    fetchStoryStatusNames(project).catch(() => [] as string[])
+    fetchStoryStatusNames(project).catch(() => [] as string[]),
+    listLocalRequirements(project.projectKey, includeClosed)
   ])
   const roleCondition = buildCurrentUserRoleCondition(roleNames)
   const closedCondition = buildRequirementClosedCondition(statusNames)
-  const requirements =
+  const remoteRequirements =
     roleNames.length > 0
       ? (
           await fetchMqlRows(
@@ -1840,6 +1853,10 @@ export const getMyRequirements = async (
           .map(parseRequirement)
           .filter((requirement): requirement is MeegleRequirement => requirement !== null)
       : []
+  const requirements = [
+    ...remoteRequirements,
+    ...localRequirements.map(toMeegleRequirement)
+  ]
 
   try {
     await enrichRequirementAvatars(project, requirements)

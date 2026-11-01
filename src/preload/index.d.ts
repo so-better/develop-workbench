@@ -41,6 +41,10 @@ import type {
 } from '../types/defects'
 import type { RequirementPersonalStatusState } from '../types/requirement-status'
 import type {
+  LocalRequirement,
+  LocalRequirementInput
+} from '../types/local-requirements'
+import type {
   LarkCliInfo,
   LarkChatSearchResult,
   LarkDocSearchResult,
@@ -269,6 +273,19 @@ export interface ElectronAPI {
   getMyRequirements: (includeClosed?: boolean) => Promise<MeegleMyRequirements>
   /** 按关键词搜索当前空间内的全部需求。 */
   searchRequirements: (keyword: string) => Promise<MeegleMyRequirements>
+  /** 新建本地临时需求。 */
+  addLocalRequirement: (
+    projectKey: string,
+    input: LocalRequirementInput
+  ) => Promise<LocalRequirement>
+  /** 更新本地临时需求。 */
+  updateLocalRequirement: (
+    projectKey: string,
+    id: string,
+    input: LocalRequirementInput
+  ) => Promise<LocalRequirement>
+  /** 删除本地临时需求。 */
+  removeLocalRequirement: (projectKey: string, id: string) => Promise<void>
   /** 读取用户可访问的 Meegle 空间。 */
   listMeegleProjects: () => Promise<MeegleProject[]>
   /** 切换当前 Meegle 空间。 */
@@ -310,6 +327,10 @@ export interface ElectronAPI {
   removeRequirementBinding: (
     requirementId: string,
     bindingId: string
+  ) => Promise<RequirementBindingState>
+  /** 删除需求下的全部仓库绑定。 */
+  removeRequirementBindingWorkspace: (
+    requirementId: string
   ) => Promise<RequirementBindingState>
   /** 读取需求流程节点和评论。 */
   getRequirementActivity: (workItemId: string) => Promise<MeegleRequirementActivity>

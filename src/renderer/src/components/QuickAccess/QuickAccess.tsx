@@ -44,6 +44,8 @@ interface QuickAccessItem {
   url: string
   appUrl?: string | null
   siteId?: string
+  localRequirement?: boolean
+  localClosed?: boolean
 }
 
 /** 只展示日期部分，避免搜索结果里的时间信息过长。 */
@@ -449,14 +451,23 @@ export default function QuickAccess(): JSX.Element {
               .filter(Boolean)
               .join(' · '),
             meta: [
-              requirement.owners.map((owner) => owner.name).join('、'),
+              requirement.source === 'local'
+                ? '本地临时需求'
+                : requirement.owners.map((owner) => owner.name).join('、'),
               formatDate(requirement.updatedAt)
                 ? `更新于 ${formatDate(requirement.updatedAt)}`
                 : null
             ]
               .filter(Boolean)
               .join(' · '),
-            url: getRequirementUrl(requirementData, requirement.id)
+            url:
+              requirement.source === 'local'
+                ? ''
+                : getRequirementUrl(requirementData, requirement.id),
+            localRequirement: requirement.source === 'local',
+            localClosed:
+              requirement.source === 'local' &&
+              (requirement.status === '已完成' || requirement.status === '已取消')
           }))
       : []
 
@@ -565,6 +576,33 @@ export default function QuickAccess(): JSX.Element {
 
   const handleOpen = async (item: QuickAccessItem): Promise<void> => {
     try {
+      if (item.localRequirement) {
+        const requirementId = item.id.replace(/^requirement:/, '')
+
+        localStorage.setItem(
+          'develop-workbench:selected-requirement',
+          requirementId
+        )
+
+        if (item.localClosed) {
+          localStorage.setItem(
+            'develop-workbench:open-closed-requirement',
+            '1'
+          )
+        }
+
+        window.dispatchEvent(
+          new CustomEvent('workbench:open-requirement', {
+            detail: {
+              id: requirementId,
+              includeClosed: item.localClosed === true
+            }
+          })
+        )
+        setOpen(false)
+        return
+      }
+
       if (item.appUrl) {
         try {
           await window.electron.openExternalUrl(item.appUrl)
@@ -699,7 +737,7 @@ export default function QuickAccess(): JSX.Element {
                       <a
                         key={item.id}
                         className={`quick-access-item${index === activeIndex ? ' is-active' : ''}`}
-                        href={item.url}
+                        href={item.url || undefined}
                         onClick={(event) => {
                           event.preventDefault()
                           void handleOpen(item)
@@ -715,6 +753,15 @@ export default function QuickAccess(): JSX.Element {
                             >
                               {QUICK_ACCESS_TYPE_META[item.type].label}
                             </Tag>
+                            {item.localRequirement ? (
+                              <Tag
+                                className="quick-access-local-tag"
+                                color="orange"
+                                bordered={false}
+                              >
+                                本地
+                              </Tag>
+                            ) : null}
                             <strong>{item.title}</strong>
                           </span>
                           <span>{item.subtitle}</span>

@@ -6,6 +6,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { open, readFile, rename, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { isLocalRequirementId } from './local-requirements'
 import { getProject } from './requirements'
 import { getRepositoryState, listRepositoryBranches } from './repositories'
 import { backupCorruptStore } from './store-backup'
@@ -25,6 +26,10 @@ interface BindingStore {
 }
 
 const STORE_FILE = 'requirement-bindings.json'
+
+/** 普通绑定支持 Meegle 数字 ID 和本地临时需求 ID。 */
+const isValidRequirementId = (value: string): boolean =>
+  /^\d+$/.test(value) || isLocalRequirementId(value)
 
 /**
  * 绑定数据文件路径。
@@ -231,7 +236,9 @@ const updateBindings = (
   updater: (bindings: RequirementRepoBinding[]) => RequirementRepoBinding[]
 ): Promise<RequirementBindingState> =>
   enqueueBindingWrite(async () => {
-    if (!/^\d+$/.test(requirementId)) throw new Error('需求 ID 不合法')
+    if (!isValidRequirementId(requirementId)) {
+      throw new Error('需求 ID 不合法')
+    }
 
     const project = await getProject()
     const store = await readStore()
@@ -423,6 +430,9 @@ export const addQingzhouRequirementBinding = async (
   requirementId: string,
   repositoryId: string
 ): Promise<RequirementBindingState> => {
+  if (isLocalRequirementId(requirementId)) {
+    throw new Error('临时需求不支持轻舟绑定')
+  }
   if (!/^\d+$/.test(requirementId)) throw new Error('需求 ID 不合法')
   if (!repositoryId.trim()) throw new Error('仓库 ID 不合法')
 
@@ -546,6 +556,13 @@ export const removeRequirementBinding = async (
   )
 
 /**
+ * 删除需求下的全部仓库绑定。
+ */
+export const removeRequirementBindingWorkspace = (
+  requirementId: string
+): Promise<RequirementBindingState> => updateBindings(requirementId, () => [])
+
+/**
  * 注册需求仓库绑定 IPC。
  */
 export const initializeRequirementBindings = (): void => {
@@ -609,4 +626,10 @@ export const initializeRequirementBindings = (): void => {
       return removeRequirementBinding(requirementId, bindingId)
     }
   )
+
+  ipcMain.handle('bindings:remove-workspace', (_event, requirementId: unknown) => {
+    if (typeof requirementId !== 'string') throw new Error('需求 ID 不合法')
+
+    return removeRequirementBindingWorkspace(requirementId)
+  })
 }

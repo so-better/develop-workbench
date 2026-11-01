@@ -43,6 +43,10 @@ import type {
 } from '../types/defects'
 import type { RequirementPersonalStatusState } from '../types/requirement-status'
 import type {
+  LocalRequirement,
+  LocalRequirementInput
+} from '../types/local-requirements'
+import type {
   LarkCliInfo,
   LarkChatSearchResult,
   LarkDocSearchResult,
@@ -515,6 +519,25 @@ const electronAPI = {
   searchRequirements: (keyword: string): Promise<MeegleMyRequirements> =>
     ipcRenderer.invoke('requirements:search', keyword),
 
+  /** 新建本地临时需求。 */
+  addLocalRequirement: (
+    projectKey: string,
+    input: LocalRequirementInput
+  ): Promise<LocalRequirement> =>
+    ipcRenderer.invoke('local-requirements:add', projectKey, input),
+
+  /** 更新本地临时需求。 */
+  updateLocalRequirement: (
+    projectKey: string,
+    id: string,
+    input: LocalRequirementInput
+  ): Promise<LocalRequirement> =>
+    ipcRenderer.invoke('local-requirements:update', projectKey, id, input),
+
+  /** 删除本地临时需求。 */
+  removeLocalRequirement: (projectKey: string, id: string): Promise<void> =>
+    ipcRenderer.invoke('local-requirements:remove', projectKey, id),
+
   /**
    * 读取当前用户参与的缺陷，可按缺陷角色过滤。
    */
@@ -650,6 +673,12 @@ const electronAPI = {
     bindingId: string
   ): Promise<RequirementBindingState> =>
     ipcRenderer.invoke('bindings:remove', requirementId, bindingId),
+
+  /** 删除需求下的全部仓库绑定。 */
+  removeRequirementBindingWorkspace: (
+    requirementId: string
+  ): Promise<RequirementBindingState> =>
+    ipcRenderer.invoke('bindings:remove-workspace', requirementId),
 
   /**
    * 读取需求流程节点和评论。
