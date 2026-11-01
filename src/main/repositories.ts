@@ -213,7 +213,9 @@ const runGit = async (
     encoding: 'utf8',
     env: {
       ...getCliEnvironment(gitPath),
-      GIT_TERMINAL_PROMPT: '0'
+      GIT_TERMINAL_PROMPT: '0',
+      // 只读命令不要刷新 .git/index，避免触发仓库监听后反复刷新状态。
+      GIT_OPTIONAL_LOCKS: '0'
     }
   })
 
@@ -399,7 +401,7 @@ const scheduleWatcherScan = (): void => {
 
 /**
  * 监听根目录中的 Git 元数据变化。
- * 只关注 .git 相关路径，避免代码文件保存时频繁扫描。
+ * 只关注会影响仓库信息或分支引用的 .git 路径，避免索引刷新触发频繁扫描。
  */
 const startRepositoryWatcher = (root: string | null): void => {
   stopRepositoryWatcher()
@@ -412,8 +414,10 @@ const startRepositoryWatcher = (root: string | null): void => {
 
       const normalized = filename.toString().replaceAll('\\', '/')
       const segments = normalized.split('/')
+      const name = segments[segments.length - 1]
 
       if (!segments.includes('.git') && !normalized.endsWith('.git')) return
+      if (name === 'index' || name === 'index.lock') return
 
       scheduleWatcherScan()
     })
