@@ -13,6 +13,7 @@ import {
   App,
   Avatar,
   Button,
+  Checkbox,
   Empty,
   Input,
   Modal,
@@ -174,6 +175,7 @@ export default function DefectWorkbench({
   const [search, setSearch] = useState('')
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [iterationFilter, setIterationFilter] = useState<string | null>(null)
+  const [showClosedDefects, setShowClosedDefects] = useState(false)
   const [reloadVersion, setReloadVersion] = useState(0)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
@@ -210,7 +212,7 @@ export default function DefectWorkbench({
     setError(null)
 
     try {
-      const next = await window.electron.getMyDefects(role)
+      const next = await window.electron.getMyDefects(role, showClosedDefects)
 
       if (requestId !== loadRequestRef.current) return
 
@@ -229,7 +231,7 @@ export default function DefectWorkbench({
         setLoading(false)
       }
     }
-  }, [role])
+  }, [role, showClosedDefects])
 
   useEffect(() => {
     load()
@@ -946,6 +948,14 @@ export default function DefectWorkbench({
                 onClick={handleRefresh}
               />
             </Tooltip>
+            <Checkbox
+              className="workbench-show-closed"
+              checked={showClosedDefects}
+              disabled={loading}
+              onChange={(event) => setShowClosedDefects(event.target.checked)}
+            >
+              显示已结束
+            </Checkbox>
           </span>
         </div>
 
@@ -1100,7 +1110,13 @@ export default function DefectWorkbench({
           ) : (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={data?.total === 0 ? '当前没有未解决缺陷' : '没有匹配的缺陷'}
+              description={
+                data?.total === 0
+                  ? showClosedDefects
+                    ? '当前没有缺陷'
+                    : '当前没有未解决缺陷'
+                  : '没有匹配的缺陷'
+              }
             />
           )}
         </div>

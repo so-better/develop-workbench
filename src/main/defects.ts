@@ -522,9 +522,10 @@ export const searchDefects = async (query: string): Promise<MeegleMyDefects> => 
   }
 }
 
-/** 读取当前用户参与的缺陷，可按角色过滤。 */
+/** 读取当前用户参与的缺陷，可按角色过滤；includeClosed 为 true 时包含已结束缺陷。 */
 export const getMyDefects = async (
-  role: DefectRole | null = null
+  role: DefectRole | null = null,
+  includeClosed = false
 ): Promise<MeegleMyDefects> => {
   const project = await getProject()
   const roleFields = DEFECT_ROLES.map((item) => `\`__${item}\``).join(', ')
@@ -533,9 +534,13 @@ export const getMyDefects = async (
     [
       `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
       `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
-      `WHERE (${buildRoleCondition(role)}) AND \`状态\` not in (${DEFECT_DONE_STATUSES.map(
-        (status) => `'${status.replace(/'/g, "''")}'`
-      ).join(', ')})`,
+      `WHERE (${buildRoleCondition(role)})${
+        includeClosed
+          ? ''
+          : ` AND \`状态\` not in (${DEFECT_DONE_STATUSES.map(
+              (status) => `'${status.replace(/'/g, "''")}'`
+            ).join(', ')})`
+      }`,
       'ORDER BY `更新时间` DESC'
     ].join(' ')
   )
@@ -1215,15 +1220,21 @@ export const initializeDefects = (): void => {
     searchDefects(typeof query === 'string' ? query : '')
   )
 
-  ipcMain.handle('defects:get-my', (_event, role: unknown) => {
-    if (role !== null && role !== undefined && typeof role !== 'string') {
-      throw new Error('缺陷角色参数不合法')
-    }
+  ipcMain.handle(
+    'defects:get-my',
+    (_event, role: unknown, includeClosed: unknown) => {
+      if (role !== null && role !== undefined && typeof role !== 'string') {
+        throw new Error('缺陷角色参数不合法')
+      }
 
-    if (typeof role === 'string' && role && !isDefectRole(role)) {
-      throw new Error('缺陷角色不存在')
-    }
+      if (typeof role === 'string' && role && !isDefectRole(role)) {
+        throw new Error('缺陷角色不存在')
+      }
 
-    return getMyDefects(role ? (role as DefectRole) : null)
-  })
+      return getMyDefects(
+        role ? (role as DefectRole) : null,
+        includeClosed === true
+      )
+    }
+  )
 }

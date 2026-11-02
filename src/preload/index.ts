@@ -541,8 +541,11 @@ const electronAPI = {
   /**
    * 读取当前用户参与的缺陷，可按缺陷角色过滤。
    */
-  getMyDefects: (role?: DefectRole | null): Promise<MeegleMyDefects> =>
-    ipcRenderer.invoke('defects:get-my', role ?? null),
+  getMyDefects: (
+    role?: DefectRole | null,
+    includeClosed = false
+  ): Promise<MeegleMyDefects> =>
+    ipcRenderer.invoke('defects:get-my', role ?? null, includeClosed),
 
   /** 按关键词搜索当前空间内的全部缺陷。 */
   searchDefects: (keyword: string): Promise<MeegleMyDefects> =>

@@ -245,7 +245,7 @@ export interface ElectronAPI {
   /** 提交飞书个人工作周报。 */
   submitWeeklyReport: (input: SubmitWeeklyReportInput) => Promise<WeeklyReportState>
   /** 读取当前 Meegle 用户参与的缺陷，可按缺陷角色过滤。 */
-  getMyDefects: (role?: DefectRole | null) => Promise<MeegleMyDefects>
+  getMyDefects: (role?: DefectRole | null, includeClosed?: boolean) => Promise<MeegleMyDefects>
   /** 按关键词搜索当前空间内的全部缺陷。 */
   searchDefects: (keyword: string) => Promise<MeegleMyDefects>
   /** 更新 BUG 处理人。 */
