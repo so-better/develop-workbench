@@ -600,6 +600,15 @@ export const getWeeklyRepositoryCommits = async (
   }
 }
 
+/** 需求分析仓库请求。 */
+export interface RepositoryContextRequest {
+  /** 仓库绝对路径。 */
+  path: string
+
+  /** 要分析的分支；不传时使用当前分支。 */
+  branch?: string | null
+}
+
 /** 需求分析使用的仓库上下文。 */
 export interface RepositoryContextFile {
   /** 文件绝对路径。 */
@@ -644,8 +653,11 @@ export interface RepositoryContext {
   /** 仓库绝对路径。 */
   repositoryPath: string
 
-  /** 当前分支。 */
+  /** 实际读取的分支。 */
   branch: string | null
+
+  /** 指定分支不可用时的回退提示；正常时为 null。 */
+  branchWarning: string | null
 
   /** 仓库顶层目录和文件。 */
   topLevel: string[]
@@ -671,6 +683,9 @@ export interface RepositoryFileContent {
   /** 相对仓库根目录的路径。 */
   relativePath: string
 
+  /** 内容所属分支；读取工作区时为 null。 */
+  branch: string | null
+
   /** 本次读取到的 UTF-8 文本。 */
   content: string
 
@@ -694,6 +709,9 @@ export interface RepositoryFileReadRequest {
 
   /** 从第几个字节开始读取；默认 0。 */
   offset?: number
+
+  /** 要读取的分支；不传时读取当前工作区。 */
+  branch?: string | null
 }
 
 /** 未读取的文件及原因。 */
@@ -805,6 +823,82 @@ const readFilePrefix = async (
   }
 }
 
+/** 从 Git 分支引用读取文件片段。 */
+const readGitFilePrefix = async (
+  cwd: string,
+  ref: string,
+  relativePath: string,
+  maxBytes: number,
+  offset = 0
+): Promise<{
+  content: string
+  offset: number
+  nextOffset: number
+  size: number
+  truncated: boolean
+} | null> => {
+  const output = await runGit(['show', `${ref}:${relativePath}`], { cwd })
+  const buffer = Buffer.from(output, 'utf8')
+  const start = Math.max(0, Math.min(offset, buffer.length))
+  const length = Math.max(0, Math.min(maxBytes, buffer.length - start))
+  const slice = buffer.subarray(start, start + length)
+  const completeBytes =
+    start + length < buffer.length
+      ? trimIncompleteUtf8Tail(slice, slice.length)
+      : slice.length
+
+  return {
+    content: slice.subarray(0, completeBytes).toString('utf8'),
+    offset: start,
+    nextOffset: start + completeBytes,
+    size: buffer.length,
+    truncated: start + completeBytes < buffer.length
+  }
+}
+
+/** 读取 Git blob 字节数，用于给出更准确的跳过原因。 */
+const readGitBlobSize = async (
+  cwd: string,
+  ref: string,
+  relativePath: string
+): Promise<number | null> => {
+  try {
+    const output = await runGit(['cat-file', '-s', `${ref}:${relativePath}`], {
+      cwd
+    })
+    const size = Number.parseInt(output.trim(), 10)
+
+    return Number.isFinite(size) ? size : null
+  } catch {
+    return null
+  }
+}
+
+/** 按路径字符串查找所属仓库，不要求文件当前存在。 */
+const findRepositoryByPath = (
+  repositories: RepositoryState['repositories'],
+  filePath: string
+): { repository: Repository; root: string; resolvedPath: string; relativePath: string } | null => {
+  const resolvedPath = resolve(filePath)
+
+  for (const repository of repositories) {
+    if (!repository.available) continue
+
+    const root = resolve(repository.localPath)
+    const relativePath = relative(root, resolvedPath)
+
+    if (
+      relativePath &&
+      !relativePath.startsWith('..') &&
+      !isAbsolute(relativePath)
+    ) {
+      return { repository, root, resolvedPath, relativePath }
+    }
+  }
+
+  return null
+}
+
 /** 已解析真实路径的文件位置。 */
 interface RepositoryFileLocation {
   repository: Repository
@@ -873,12 +967,84 @@ const parseContextLog = (output: string): RepositoryContextCommit[] =>
         : []
     })
 
+/** 解析本地或 origin 分支引用。 */
+const resolveBranchRef = async (
+  cwd: string,
+  branch: string
+): Promise<string | null> => {
+  const normalized = branch.trim()
+
+  if (!normalized) return null
+
+  for (const ref of [
+    `refs/heads/${normalized}`,
+    `refs/remotes/origin/${normalized}`
+  ]) {
+    try {
+      await runGit(['rev-parse', '--verify', '--quiet', ref], { cwd })
+      return ref
+    } catch {
+      // 继续尝试下一个引用。
+    }
+  }
+
+  return null
+}
+
+/** 获取实际分析的分支引用；未指定时使用当前 HEAD。 */
+const resolveAnalysisRef = async (
+  cwd: string,
+  requestedBranch?: string | null
+): Promise<{
+  branch: string | null
+  ref: string
+  branchWarning: string | null
+}> => {
+  const currentBranch = await runGit(['branch', '--show-current'], { cwd })
+    .then((value) => value.trim() || null)
+    .catch(() => null)
+
+  if (requestedBranch?.trim()) {
+    const ref = await resolveBranchRef(cwd, requestedBranch)
+
+    if (ref) {
+      return { branch: requestedBranch.trim(), ref, branchWarning: null }
+    }
+
+    return {
+      branch: currentBranch,
+      ref: currentBranch ? `refs/heads/${currentBranch}` : 'HEAD',
+      branchWarning: `分支不存在：${requestedBranch}，已回退当前分支 ${
+        currentBranch ?? 'HEAD'
+      }`
+    }
+  }
+
+  return {
+    branch: currentBranch,
+    ref: currentBranch ? `refs/heads/${currentBranch}` : 'HEAD',
+    branchWarning: null
+  }
+}
+
+/** 按 UTF-8 字符边界截取字符串前缀。 */
+const truncateUtf8 = (value: string, maxBytes: number): string => {
+  const buffer = Buffer.from(value, 'utf8')
+
+  if (buffer.length <= maxBytes) return value
+
+  const length = trimIncompleteUtf8Tail(buffer, maxBytes)
+
+  return buffer.subarray(0, length).toString('utf8')
+}
+
 /**
  * 一次读取仓库结构、关键词命中文件、代码匹配和近期提交。
+ * 支持按请求指定分支，用于分析需求绑定的开发分支。
  * 用于减少需求分析时逐文件调用 executeShell。
  */
 export const getRepositoryContext = async (
-  pathValues: string[],
+  requests: RepositoryContextRequest[],
   keywordValues: string[]
 ): Promise<RepositoryContext[]> => {
   const state = await getRepositoryState()
@@ -894,31 +1060,60 @@ export const getRepositoryContext = async (
   const keywords = normalizeContextKeywords(keywordValues)
   const results: RepositoryContext[] = []
 
-  for (const pathValue of new Set(pathValues)) {
-    const repository = repositoryByPath.get(resolve(pathValue))
+  for (const request of requests) {
+    const repository = repositoryByPath.get(resolve(request.path))
 
     if (!repository) continue
 
     const cwd = repository.localPath
-    const [branch, logOutput, fileOutput, topLevelEntries] = await Promise.all([
-      runGit(['branch', '--show-current'], { cwd })
-        .then((value) => value.trim() || null)
-        .catch(() => null),
-      runGit(
-        [
-          'log',
-          '--no-merges',
-          `--max-count=${CONTEXT_MAX_COMMITS}`,
-          '--format=%h%x00%s%x00%an%x00%cI'
-        ],
-        { cwd }
-      ).catch(() => ''),
-      runGit(['ls-files'], { cwd }).catch(() => ''),
-      readdir(cwd, { withFileTypes: true }).catch(() => [])
-    ])
-    const files = fileOutput
-      .split(/\r?\n/)
-      .filter(Boolean)
+    const { branch, ref, branchWarning } = await resolveAnalysisRef(
+      cwd,
+      request.branch
+    )
+    const [logOutput, fileOutput, grepOutput, manifestOutput] =
+      await Promise.all([
+        runGit(
+          [
+            'log',
+            ref,
+            '--no-merges',
+            `--max-count=${CONTEXT_MAX_COMMITS}`,
+            '--format=%h%x00%s%x00%an%x00%cI'
+          ],
+          { cwd }
+        ).catch(() => ''),
+        runGit(['ls-tree', '-r', '--name-only', ref], { cwd }).catch(() => ''),
+        keywords.length
+          ? runGit(
+              [
+                'grep',
+                '-n',
+                '-I',
+                '--no-color',
+                '-m',
+                '2',
+                '-F',
+                ...keywords.flatMap((keyword) => ['-e', keyword]),
+                ref
+              ],
+              { cwd }
+            ).catch(() => '')
+          : Promise.resolve(''),
+        runGit(['show', `${ref}:package.json`], { cwd }).catch(() => '')
+      ])
+    const trackedFiles = fileOutput.split(/\r?\n/).filter(Boolean)
+    const topLevel = new Map<string, boolean>()
+
+    for (const file of trackedFiles) {
+      const segments = file.split('/')
+      const name = segments[0]
+
+      if (!name || SKIP_DIRECTORIES.has(name)) continue
+
+      topLevel.set(name, topLevel.get(name) === true || segments.length > 1)
+    }
+
+    const files = trackedFiles
       .filter((file) => {
         if (!keywords.length) return false
 
@@ -933,69 +1128,50 @@ export const getRepositoryContext = async (
         path: join(cwd, relativePath),
         relativePath
       }))
-    let contentMatches: RepositoryContextContentMatch[] = []
+    const contentMatches: RepositoryContextContentMatch[] = []
+    const refPrefix = `${ref}:`
 
-    if (keywords.length) {
-      const args = [
-        'grep',
-        '-n',
-        '-I',
-        '--no-color',
-        '-m',
-        '2',
-        '-F',
-        ...keywords.flatMap((keyword) => ['-e', keyword])
-      ]
-      const output = await runGit(args, { cwd }).catch(() => '')
+    for (const line of grepOutput.split(/\r?\n/).filter(Boolean)) {
+      if (contentMatches.length >= CONTEXT_MAX_MATCHES) break
 
-      contentMatches = output
-        .split(/\r?\n/)
-        .filter(Boolean)
-        .slice(0, CONTEXT_MAX_MATCHES)
-        .flatMap((line) => {
-          const match = /^(.+?):(\d+):(.*)$/.exec(line)
+      const normalizedLine = line.startsWith(refPrefix)
+        ? line.slice(refPrefix.length)
+        : line
+      const match = /^(.+?):(\d+):(.*)$/.exec(normalizedLine)
 
-          if (!match) return []
+      if (!match) continue
 
-          const relativePath = match[1]
-          const lineNumber = Number.parseInt(match[2], 10)
+      const relativePath = match[1]
+      const lineNumber = Number.parseInt(match[2], 10)
 
-          if (!Number.isFinite(lineNumber)) return []
+      if (!Number.isFinite(lineNumber)) continue
 
-          return [
-            {
-              path: join(cwd, relativePath),
-              relativePath,
-              line: lineNumber,
-              text: match[3].trim().slice(0, 240)
-            }
-          ]
-        })
+      contentMatches.push({
+        path: join(cwd, relativePath),
+        relativePath,
+        line: lineNumber,
+        text: match[3].trim().slice(0, 240)
+      })
     }
 
-    const manifestPath = join(cwd, 'package.json')
-    const manifest = await readFilePrefix(
-      manifestPath,
-      CONTEXT_MANIFEST_BYTES
-    ).catch(() => null)
+    const manifest = manifestOutput
+      ? {
+          path: join(cwd, 'package.json'),
+          content: truncateUtf8(manifestOutput, CONTEXT_MANIFEST_BYTES)
+        }
+      : null
 
     results.push({
       repositoryId: repository.id,
       repositoryName: repository.name,
       repositoryPath: cwd,
       branch,
-      topLevel: topLevelEntries
-        .filter(
-          (entry) =>
-            !SKIP_DIRECTORIES.has(entry.name) &&
-            !entry.name.startsWith('.git')
-        )
-        .map((entry) => `${entry.name}${entry.isDirectory() ? '/' : ''}`)
+      branchWarning,
+      topLevel: Array.from(topLevel.entries())
+        .map(([name, isDirectory]) => `${name}${isDirectory ? '/' : ''}`)
         .sort((left, right) => left.localeCompare(right, 'zh-CN'))
         .slice(0, 80),
-      manifest: manifest
-        ? { path: manifestPath, content: manifest.content }
-        : null,
+      manifest,
       files,
       contentMatches,
       recentCommits: parseContextLog(logOutput)
@@ -1007,6 +1183,7 @@ export const getRepositoryContext = async (
 
 /**
  * 批量读取仓库文件，单文件默认返回 64KB。
+ * 指定 branch 时从 Git 分支读取，否则读取当前工作区。
  * 截断时可通过 nextOffset 继续读取；只允许读取已配置仓库目录。
  */
 export const readRepositoryFiles = async (
@@ -1032,23 +1209,77 @@ export const readRepositoryFiles = async (
       continue
     }
 
-    const location = await findRepositoryFile(state.repositories, pathValue)
+    const requestedBranch = request.branch?.trim() || null
+    let resolvedPath: string
+    let root: string
+    let relativePath: string
+    let content: Awaited<ReturnType<typeof readFilePrefix>> | null = null
 
-    if (!location) {
-      skipped.push({
-        path: pathValue,
-        reason: '文件不存在、无法访问或不在已配置的代码仓库内'
-      })
-      continue
+    if (requestedBranch) {
+      const repositoryLocation = findRepositoryByPath(state.repositories, pathValue)
+
+      if (!repositoryLocation) {
+        skipped.push({
+          path: pathValue,
+          reason: '文件路径不在已配置的代码仓库内'
+        })
+        continue
+      }
+
+      resolvedPath = repositoryLocation.resolvedPath
+      root = repositoryLocation.root
+      relativePath = repositoryLocation.relativePath
+
+      const ref = await resolveBranchRef(root, requestedBranch)
+
+      if (!ref) {
+        skipped.push({
+          path: pathValue,
+          reason: `分支不存在：${requestedBranch}`
+        })
+        continue
+      }
+
+      content = await readGitFilePrefix(
+        root,
+        ref,
+        relativePath,
+        CONTEXT_FILE_BYTES,
+        request.offset ?? 0
+      ).catch(() => null)
+
+      if (!content) {
+        const size = await readGitBlobSize(root, ref, relativePath)
+
+        skipped.push({
+          path: pathValue,
+          reason:
+            size !== null && size > MAX_BUFFER_BYTES
+              ? `文件过大（${size} 字节），超出 Git 读取上限`
+              : '文件不存在、不是普通文件或无法读取'
+        })
+        continue
+      }
+    } else {
+      const location = await findRepositoryFile(state.repositories, pathValue)
+
+      if (!location) {
+        skipped.push({
+          path: pathValue,
+          reason: '文件不存在、无法访问或不在已配置的代码仓库内'
+        })
+        continue
+      }
+
+      resolvedPath = location.resolvedPath
+      root = location.root
+      relativePath = relative(root, resolvedPath)
+      content = await readFilePrefix(
+        resolvedPath,
+        CONTEXT_FILE_BYTES,
+        request.offset ?? 0
+      ).catch(() => null)
     }
-
-    const { resolvedPath, root } = location
-    const relativePath = relative(root, resolvedPath)
-    const content = await readFilePrefix(
-      resolvedPath,
-      CONTEXT_FILE_BYTES,
-      request.offset ?? 0
-    ).catch(() => null)
 
     if (!content) {
       skipped.push({
@@ -1061,6 +1292,7 @@ export const readRepositoryFiles = async (
     files.push({
       path: resolvedPath,
       relativePath,
+      branch: requestedBranch,
       ...content
     })
   }

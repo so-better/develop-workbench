@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Alert, App, Button, Input, Spin } from 'antd'
+import { Alert, App, Spin } from 'antd'
 import type { GitInfo, GitPathSource } from '../../../../types/git'
+import ExecutablePathField from '../ExecutablePathField/ExecutablePathField'
 
 const gitSourceNames: Record<GitPathSource, string> = {
   settings: '应用设置',
@@ -162,40 +163,23 @@ export default function GitSettings(): JSX.Element {
             />
           ) : null}
 
-          <div className="lark-path-field">
-            <label htmlFor="git-path">Git 可执行文件</label>
-            <div className="lark-path-controls">
-              <Input
-                id="git-path"
-                value={pathDraft}
-                onChange={(event) => {
-                  setPathDraft(event.target.value)
-                  setPathDirty(true)
-                }}
-                onBlur={() => {
-                  if (pathDirty) savePath()
-                }}
-                onPressEnter={() => {
-                  if (pathDirty) savePath()
-                }}
-                placeholder="输入路径或选择文件"
-                spellCheck={false}
-              />
-              <Button variant="filled" onClick={() => handleChooseFile()}>
-                选择文件
-              </Button>
-              <Button
-                variant="filled"
-                onClick={() => handleAutoDetect()}
-                loading={detecting}
-              >
-                自动检测
-              </Button>
-            </div>
-            <p className="settings-help">
-              选择文件、自动检测或输入后失焦会立即保存。清空路径可恢复自动检测。
-            </p>
-          </div>
+          <ExecutablePathField
+            id="git-path"
+            label="Git 可执行文件"
+            value={pathDraft}
+            placeholder="输入路径或选择文件"
+            help="选择文件、自动检测或输入后失焦会立即保存。清空路径可恢复自动检测。"
+            detecting={detecting}
+            onChange={(value) => {
+              setPathDraft(value)
+              setPathDirty(true)
+            }}
+            onSave={() => {
+              if (pathDirty) savePath()
+            }}
+            onChoose={() => handleChooseFile()}
+            onDetect={() => handleAutoDetect()}
+          />
         </>
       )}
     </>

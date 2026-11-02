@@ -199,9 +199,12 @@ const writeStore = async (store: BindingStore): Promise<void> => {
 }
 
 /**
- * 获取需求绑定状态。
+ * 读取指定需求的仓库绑定状态。
+ * 供 AI 工具读取关联需求和代码上下文，不修改绑定数据。
  */
-const getState = async (requirementId: string): Promise<RequirementBindingState> => {
+export const getRequirementBindingState = async (
+  requirementId: string
+): Promise<RequirementBindingState> => {
   const project = await getProject()
   const store = await readStore()
   const workspace = store.workspaces.find(
@@ -447,7 +450,7 @@ export const addQingzhouRequirementBinding = async (
   if (!repository) throw new Error('仓库不存在')
   if (!repository.qingzhouEnabled) throw new Error('该仓库未接入轻舟')
 
-  const existing = await getState(requirementId)
+  const existing = await getRequirementBindingState(requirementId)
 
   if (existing.bindings.some((binding) => binding.repositoryId === repositoryId)) {
     throw new Error('该仓库已经绑定')
@@ -496,7 +499,7 @@ export const syncQingzhouRequirementBinding = async (
   requirementId: string,
   bindingId: string
 ): Promise<RequirementBindingState> => {
-  const state = await getState(requirementId)
+  const state = await getRequirementBindingState(requirementId)
   const binding = state.bindings.find((item) => item.id === bindingId)
 
   if (!binding) throw new Error('绑定记录不存在')
@@ -568,7 +571,7 @@ export const removeRequirementBindingWorkspace = (
 export const initializeRequirementBindings = (): void => {
   ipcMain.handle('bindings:get', (_event, requirementId: unknown) => {
     if (typeof requirementId !== 'string') throw new Error('需求 ID 不合法')
-    return getState(requirementId)
+    return getRequirementBindingState(requirementId)
   })
 
   ipcMain.handle(

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { CopyOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Input, Modal, Spin, Tooltip } from 'antd'
+import { Alert, App, Button, Modal, Spin, Tabs, Tooltip } from 'antd'
 import type { AppInfo } from '../../../../types/app'
 import type { LarkCliInfo, LarkCliPathSource } from '../../../../types/lark'
 import type { UpdateCheckResult } from '../../../../types/updates'
@@ -9,6 +9,7 @@ import {
 } from '../../../../types/settings'
 import type { SettingsSection } from '../../../../types/settings'
 import { getErrorMessage } from '../../../../utils'
+import ExecutablePathField from '../ExecutablePathField/ExecutablePathField'
 import GitSettings from '../GitSettings/GitSettings'
 import LarkAuth from '../LarkAuth/LarkAuth'
 import IdeSettings from '../IdeSettings/IdeSettings'
@@ -89,7 +90,9 @@ export default function SettingsModal({
     'idle' | 'saving' | 'saved' | 'invalid' | 'error'
   >('idle')
   const [aiSaveError, setAiSaveError] = useState<string | null>(null)
+  const [aiSettingsTab, setAiSettingsTab] = useState('model')
   const lastSavedDraftRef = useRef('')
+  const aiSaveTimerRef = useRef<number | null>(null)
   const [larkInfo, setLarkInfo] = useState<LarkCliInfo | null>(null)
   const [larkPathDraft, setLarkPathDraft] = useState('')
   const [larkSaving, setLarkSaving] = useState(false)
@@ -103,6 +106,7 @@ export default function SettingsModal({
     let mounted = true
 
     setActiveSection(initialSection)
+    setAiSettingsTab(initialSection === 'skills' ? 'skills' : 'model')
     setLoading(true)
     setError(null)
     setDraft('')
@@ -158,7 +162,9 @@ export default function SettingsModal({
     }
 
     let cancelled = false
-    const timer = window.setTimeout(async () => {
+    aiSaveTimerRef.current = window.setTimeout(async () => {
+      aiSaveTimerRef.current = null
+
       try {
         JSON.parse(draft)
       } catch {
@@ -189,9 +195,42 @@ export default function SettingsModal({
 
     return () => {
       cancelled = true
-      window.clearTimeout(timer)
+
+      if (aiSaveTimerRef.current) {
+        window.clearTimeout(aiSaveTimerRef.current)
+        aiSaveTimerRef.current = null
+      }
     }
   }, [draft, error, loading])
+
+  /** 关闭设置前先冲刷尚未执行的模型配置自动保存。 */
+  const handleClose = async (): Promise<void> => {
+    if (aiSaveTimerRef.current) {
+      window.clearTimeout(aiSaveTimerRef.current)
+      aiSaveTimerRef.current = null
+    }
+
+    if (!loading && !error && draft !== lastSavedDraftRef.current) {
+      try {
+        JSON.parse(draft)
+      } catch {
+        message.warning('模型配置 JSON 格式错误，本次修改未保存')
+        onClose()
+        return
+      }
+
+      try {
+        const document = await window.electron.writeAiConfig(draft)
+
+        lastSavedDraftRef.current = document.content
+      } catch (saveError) {
+        message.error(getErrorMessage(saveError, '模型配置保存失败，未关闭设置'))
+        return
+      }
+    }
+
+    onClose()
+  }
 
   /**
    * 自动检测 Lark Cli，检测成功后立即保存。
@@ -320,7 +359,7 @@ export default function SettingsModal({
       width={1040}
       centered
       open={open}
-      onCancel={onClose}
+      onCancel={() => void handleClose()}
       maskClosable
       footer={null}
     >
@@ -368,19 +407,22 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
-            className={`settings-nav-item${activeSection === 'ai' ? ' is-active' : ''}`}
-            aria-current={activeSection === 'ai' ? 'page' : undefined}
-            onClick={() => setActiveSection('ai')}
+            className={`settings-nav-item${
+              activeSection === 'ai' || activeSection === 'skills'
+                ? ' is-active'
+                : ''
+            }`}
+            aria-current={
+              activeSection === 'ai' || activeSection === 'skills'
+                ? 'page'
+                : undefined
+            }
+            onClick={() => {
+              setActiveSection('ai')
+              setAiSettingsTab('model')
+            }}
           >
-            模型配置
-          </button>
-          <button
-            type="button"
-            className={`settings-nav-item${activeSection === 'skills' ? ' is-active' : ''}`}
-            aria-current={activeSection === 'skills' ? 'page' : undefined}
-            onClick={() => setActiveSection('skills')}
-          >
-            技能
+            模型与技能
           </button>
           <button
             type="button"
@@ -401,91 +443,112 @@ export default function SettingsModal({
         </nav>
 
         <section className="settings-panel">
-          {activeSection === 'ai' ? (
+          {activeSection === 'ai' || activeSection === 'skills' ? (
             <>
               <div className="settings-panel-header">
-                <h3>模型配置</h3>
+                <h3>模型与技能</h3>
                 <p>
-                  仅支持 OpenAI Chat Completions 接口。按字段说明填写，格式正确时自动保存。
+                  配置 OpenAI Chat Completions 兼容模型和额外技能目录。
                 </p>
-                {aiSaveState !== 'idle' ? (
-                  <p
-                    className={`settings-autosave-status is-${aiSaveState}`}
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {aiSaveState === 'saving'
-                      ? '正在自动保存...'
-                      : aiSaveState === 'saved'
-                        ? '已自动保存'
-                        : aiSaveState === 'invalid'
-                          ? (aiSaveError ?? 'JSON 格式错误，修正后会自动保存')
-                          : (aiSaveError ?? '自动保存失败')}
-                  </p>
-                ) : null}
               </div>
 
-              {loading ? (
-                <div className="settings-loading">
-                  <Spin />
-                </div>
-              ) : error ? (
-                <Alert type="error" showIcon message={error} />
-              ) : (
-                <div className="ai-config-layout">
-                  <div className="ai-config-editor">
-                    <Suspense
-                      fallback={
-                        <div className="settings-loading">
-                          <Spin />
-                        </div>
-                      }
-                    >
-                      <CodeEditor
-                        className="config-editor"
-                        language="json"
-                        height={360}
-                        value={draft}
-                        onChange={setDraft}
-                      />
-                    </Suspense>
-                  </div>
+              <Tabs
+                className="settings-ai-tabs"
+                activeKey={aiSettingsTab}
+                onChange={setAiSettingsTab}
+                items={[
+                  {
+                    key: 'model',
+                    label: '模型配置',
+                    children: (
+                      <>
+                        {aiSaveState !== 'idle' ? (
+                          <p
+                            className={`settings-autosave-status is-${aiSaveState}`}
+                            role="status"
+                            aria-live="polite"
+                          >
+                            {aiSaveState === 'saving'
+                              ? '正在自动保存...'
+                              : aiSaveState === 'saved'
+                                ? '已自动保存'
+                                : aiSaveState === 'invalid'
+                                  ? (aiSaveError ?? 'JSON 格式错误，修正后会自动保存')
+                                  : (aiSaveError ?? '自动保存失败')}
+                          </p>
+                        ) : null}
 
-                  <aside
-                    className="ai-config-guide"
-                    aria-label="模型配置字段说明"
-                  >
-                    <div className="ai-config-guide-heading">
-                      <div>
-                        <strong>字段说明</strong>
-                        <span>复制示例后替换 API Key 即可使用</span>
-                      </div>
-                      <Button
-                        type="text"
-                        size="small"
-                        icon={<CopyOutlined />}
-                        onClick={() => copyValue(AI_CONFIG_EXAMPLE)}
-                      >
-                        复制示例
-                      </Button>
-                    </div>
-
-                    <div className="ai-config-guide-body">
-                      <section className="ai-config-guide-section">
-                        <h4>模型字段</h4>
-                        <dl>
-                          {AI_CONFIG_FIELDS.map(([name, description]) => (
-                            <div className="ai-config-field" key={name}>
-                              <dt><code>{name}</code></dt>
-                              <dd>{description}</dd>
+                        {loading ? (
+                          <div className="settings-loading">
+                            <Spin />
+                          </div>
+                        ) : error ? (
+                          <Alert type="error" showIcon message={error} />
+                        ) : (
+                          <div className="ai-config-layout">
+                            <div className="ai-config-editor">
+                              <Suspense
+                                fallback={
+                                  <div className="settings-loading">
+                                    <Spin />
+                                  </div>
+                                }
+                              >
+                                <CodeEditor
+                                  className="config-editor"
+                                  language="json"
+                                  height={360}
+                                  value={draft}
+                                  onChange={setDraft}
+                                />
+                              </Suspense>
                             </div>
-                          ))}
-                        </dl>
-                      </section>
-                    </div>
-                  </aside>
-                </div>
-              )}
+
+                            <aside
+                              className="ai-config-guide"
+                              aria-label="模型配置字段说明"
+                            >
+                              <div className="ai-config-guide-heading">
+                                <div>
+                                  <strong>字段说明</strong>
+                                  <span>复制示例后替换 API Key 即可使用</span>
+                                </div>
+                                <Button
+                                  type="text"
+                                  size="small"
+                                  icon={<CopyOutlined />}
+                                  onClick={() => copyValue(AI_CONFIG_EXAMPLE)}
+                                >
+                                  复制示例
+                                </Button>
+                              </div>
+
+                              <div className="ai-config-guide-body">
+                                <section className="ai-config-guide-section">
+                                  <h4>模型字段</h4>
+                                  <dl>
+                                    {AI_CONFIG_FIELDS.map(([name, description]) => (
+                                      <div className="ai-config-field" key={name}>
+                                        <dt><code>{name}</code></dt>
+                                        <dd>{description}</dd>
+                                      </div>
+                                    ))}
+                                  </dl>
+                                </section>
+                              </div>
+                            </aside>
+                          </div>
+                        )}
+                      </>
+                    )
+                  },
+                  {
+                    key: 'skills',
+                    label: '技能目录',
+                    children: <SkillSettings />
+                  }
+                ]}
+              />
             </>
           ) : activeSection === 'lark-cli' ? (
             <>
@@ -537,35 +600,18 @@ export default function SettingsModal({
                     />
                   ) : null}
 
-                  <div className="lark-path-field">
-                    <label htmlFor="lark-cli-path">Lark Cli 可执行文件</label>
-                    <div className="lark-path-controls">
-                      <Input
-                        id="lark-cli-path"
-                        value={larkPathDraft}
-                        onChange={(event) => {
-                          setLarkPathDraft(event.target.value)
-                        }}
-                        onBlur={() => persistLarkPath()}
-                        onPressEnter={() => persistLarkPath()}
-                        placeholder="输入路径或选择文件"
-                        spellCheck={false}
-                      />
-                      <Button variant="filled" onClick={() => handleChooseLarkCli()}>
-                        选择文件
-                      </Button>
-                      <Button
-                        variant="filled"
-                        onClick={() => handleAutoDetect()}
-                        loading={larkSaving}
-                      >
-                        自动检测
-                      </Button>
-                    </div>
-                    <p className="settings-help">
-                      选择文件、自动检测或输入后失焦会立即保存。
-                    </p>
-                  </div>
+                  <ExecutablePathField
+                    id="lark-cli-path"
+                    label="Lark Cli 可执行文件"
+                    value={larkPathDraft}
+                    placeholder="输入路径或选择文件"
+                    help="选择文件、自动检测或输入后失焦会立即保存。"
+                    detecting={larkSaving}
+                    onChange={setLarkPathDraft}
+                    onSave={() => persistLarkPath()}
+                    onChoose={() => handleChooseLarkCli()}
+                    onDetect={() => handleAutoDetect()}
+                  />
 
                   <LarkAuth available={Boolean(larkInfo?.available)} />
                 </>
@@ -573,7 +619,6 @@ export default function SettingsModal({
             </>
           ) : null}
 
-          {activeSection === 'skills' ? <SkillSettings /> : null}
 
           {activeSection === 'git' ? (
             <GitSettings />

@@ -1,4 +1,6 @@
 import { app, clipboard, ipcMain, shell } from 'electron'
+import { stat } from 'node:fs/promises'
+import { isAbsolute } from 'node:path'
 
 /**
  * 注册应用级系统能力 IPC。
@@ -31,6 +33,29 @@ export const initializeSystem = (): void => {
     }
 
     await shell.openExternal(url.toString())
+  })
+
+  // 在系统文件管理器中打开指定目录。
+  ipcMain.handle('system:open-directory', async (_event, rawPath: unknown) => {
+    if (typeof rawPath !== 'string' || !rawPath.trim()) {
+      throw new Error('目录路径不合法')
+    }
+
+    const targetPath = rawPath.trim()
+
+    if (!isAbsolute(targetPath)) {
+      throw new Error('目录路径必须是绝对路径')
+    }
+
+    const info = await stat(targetPath).catch(() => null)
+
+    if (!info?.isDirectory()) {
+      throw new Error('目录不存在或不可访问')
+    }
+
+    const error = await shell.openPath(targetPath)
+
+    if (error) throw new Error(error)
   })
 
   // 将文本写入系统剪贴板，供渲染进程复制应用信息等只读内容。

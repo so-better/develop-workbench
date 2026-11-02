@@ -49,7 +49,6 @@ import {
   Tooltip,
   Typography
 } from 'antd'
-import type { InputRef } from 'antd'
 import type { Dayjs } from 'dayjs'
 import type { RequirementRepoBinding } from '../../../../types/bindings'
 import type { LocalRequirementInput } from '../../../../types/local-requirements'
@@ -519,8 +518,7 @@ export default function RequirementWorkbench({
   // 默认全部展开，只记录被用户主动收起的迭代。
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(() => new Set())
 
-  // 搜索框引用用于快捷键聚焦、Esc 清空和清空后的焦点恢复。
-  const searchInputRef = useRef<InputRef>(null)
+  const loadRequestRef = useRef(0)
 
   /** 当前用户全部需求，用于保持选中项和生成头部信息。 */
   const allRequirements = useMemo(
@@ -781,9 +779,10 @@ export default function RequirementWorkbench({
         '10. 待确认问题：只列真正影响实现或验收的问题。',
         '',
         '代码分析流程：',
-        '- 先调用 getRepositoryContext，把所有绑定仓库路径和需求关键词一次性传入，获取目录、命中文件和近期提交。',
-        '- 需要查看具体实现时，用 readRepositoryFiles 批量读取命中的文件，一次最多 8 个，不要逐个 cat。',
-        '- 如果返回 truncated=true，说明单文件超过 64KB，使用同一个 path 和 nextOffset 继续读取剩余部分。',
+        '- 先调用 getRepositoryContext，把绑定仓库作为 repositories 传入，每项包含 path 和需求分支 branch；一次性传入需求关键词，获取目录、命中文件和近期提交。',
+        '- 需要查看具体实现时，用 readRepositoryFiles 批量读取命中的文件，分支内容同时传 branch，一次最多 8 个，不要逐个 cat。',
+        '- 如果返回 truncated=true，说明单文件超过 64KB，使用同一个 path、branch 和 nextOffset 继续读取剩余部分。',
+        '- 如果返回 branchWarning，说明指定分支不存在并已回退当前分支，分析时要明确说明。',
         '- 只有这两个工具无法覆盖时（例如读取非当前分支），才使用 executeShell；调用次数尽量不超过 2 次，并合并成一条命令。',
         '- 不要为每个目录、文件或提交单独调用 executeShell。',
         '',
@@ -1137,6 +1136,8 @@ export default function RequirementWorkbench({
    * 读取当前用户负责的需求，并尽量保留已有选择。
    */
   const loadRequirements = useCallback(async (): Promise<void> => {
+    const requestId = ++loadRequestRef.current
+
     setLoading(true)
     setError(null)
 
@@ -1144,6 +1145,9 @@ export default function RequirementWorkbench({
       const result = await window.electron.getMyRequirements(
         showClosedRequirements
       )
+
+      if (requestId !== loadRequestRef.current) return
+
       const storedId = localStorage.getItem(SELECTED_REQUIREMENT_KEY)
 
       setData(result)
@@ -1158,9 +1162,13 @@ export default function RequirementWorkbench({
         )
       })
     } catch (loadError) {
-      setError(getErrorMessage(loadError))
+      if (requestId === loadRequestRef.current) {
+        setError(getErrorMessage(loadError))
+      }
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestRef.current) {
+        setLoading(false)
+      }
     }
   }, [showClosedRequirements])
 
@@ -2986,15 +2994,9 @@ export default function RequirementWorkbench({
 
         <div className="workbench-filter-stack">
           <Input
-            ref={searchInputRef}
             className="workbench-requirement-search"
             prefix={<SearchOutlined />}
-            placeholder={
-              window.electron.platform === 'darwin'
-                ? '搜索需求、状态或迭代  ⌘K'
-                : '搜索需求、状态或迭代  Ctrl K'
-            }
-            aria-keyshortcuts="Meta+K Control+K"
+            placeholder="搜索需求、状态或迭代"
             value={requirementFilter}
             onChange={(event) => setRequirementFilter(event.target.value)}
             allowClear

@@ -101,6 +101,8 @@ export interface ElectronAPI {
   onQuickNotesOpen: (listener: () => void) => () => void
   /** 打开系统协议链接。 */
   openExternalUrl: (url: string) => Promise<void>
+  /** 在系统文件管理器中打开目录。 */
+  openDirectory: (path: string) => Promise<void>
   /** 获取链接预览信息。 */
   getLinkPreview: (url: string) => Promise<LinkPreview>
   /** 通过应用内浏览器登录态获取飞书 Markdown 图片。 */

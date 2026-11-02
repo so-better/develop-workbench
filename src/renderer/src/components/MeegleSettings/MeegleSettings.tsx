@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { LogoutOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Input, Popconfirm, Spin, Tag } from 'antd'
+import { Alert, App, Button, Popconfirm, Spin, Tag } from 'antd'
+import ExecutablePathField from '../ExecutablePathField/ExecutablePathField'
 import type {
   MeegleCliPathSource,
   MeegleLoginSession,
@@ -271,37 +272,24 @@ export default function MeegleSettings(): JSX.Element {
           ) : null}
         </div>
 
-        <label className="meegle-field-label" htmlFor="meegle-cli-path">
-          Meegle CLI 可执行文件
-        </label>
-        <div className="meegle-path-row">
-          <Input
-            id="meegle-cli-path"
-            value={cliPathDraft}
-            onChange={(event) => {
-              setCliPathDraft(event.target.value)
-              setCliPathDirty(true)
-              setCliPathPending(true)
-            }}
-            onBlur={() => {
-              if (cliPathDirty) saveCliPath()
-            }}
-            onPressEnter={() => {
-              if (cliPathDirty) saveCliPath()
-            }}
-            placeholder="选择或输入 Meegle CLI 路径"
-            spellCheck={false}
-          />
-          <Button variant="filled" onClick={() => chooseCliPath()}>
-            选择文件
-          </Button>
-          <Button variant="filled" loading={savingPath} onClick={() => detectCliPath()}>
-            自动检测
-          </Button>
-        </div>
-        <p className="settings-help">
-          选择文件、自动检测或输入后失焦会立即保存。
-        </p>
+        <ExecutablePathField
+          id="meegle-cli-path"
+          label="Meegle CLI 可执行文件"
+          value={cliPathDraft}
+          placeholder="选择或输入 Meegle CLI 路径"
+          help="选择文件、自动检测或输入后失焦会立即保存。"
+          detecting={savingPath}
+          onChange={(value) => {
+            setCliPathDraft(value)
+            setCliPathDirty(true)
+            setCliPathPending(true)
+          }}
+          onSave={() => {
+            if (cliPathDirty) saveCliPath()
+          }}
+          onChoose={() => chooseCliPath()}
+          onDetect={() => detectCliPath()}
+        />
         {!state.cli.available ? (
           <Alert
             type="warning"

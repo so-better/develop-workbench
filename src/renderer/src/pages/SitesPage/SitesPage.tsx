@@ -542,9 +542,13 @@ export default function SitesPage(): JSX.Element {
         {error ? (
           <Alert
             className="sites-error"
-            type="error"
+            type={sites.length > 0 ? 'warning' : 'error'}
             showIcon
-            message="无法读取站点配置"
+            message={
+              sites.length > 0
+                ? '刷新站点失败，当前展示上次同步结果'
+                : '无法读取站点配置'
+            }
             description={error}
             action={
               <Button size="small" onClick={() => loadSites()}>
@@ -552,12 +556,14 @@ export default function SitesPage(): JSX.Element {
               </Button>
             }
           />
-        ) : loading ? (
+        ) : null}
+
+        {loading && sites.length === 0 ? (
           <div className="sites-loading">
             <Spin />
           </div>
         ) : sites.length === 0 ? (
-          <div className="sites-empty">
+          error ? null : <div className="sites-empty">
             <div className="sites-empty-visual" aria-hidden="true">
               <GlobalOutlined />
             </div>

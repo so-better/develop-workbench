@@ -378,6 +378,7 @@ export default function App(): JSX.Element {
         loading={quickNotes.loading}
         error={quickNotes.error}
         onOpen={openQuickNotes}
+        onReload={() => void quickNotes.reload()}
         onClose={closeQuickNotes}
         onAdd={quickNotes.add}
         onSetDone={quickNotes.setDone}

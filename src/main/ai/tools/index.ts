@@ -1,4 +1,5 @@
 import type { ToolSet } from 'ai'
+import { defectTools } from './defects'
 import { fileTools } from './files'
 import { shellTools } from './shell'
 import { siteTools } from './sites'
@@ -13,6 +14,7 @@ export { getToolArtifact } from './files'
 export const localTools: ToolSet = {
   ...skillTools,
   ...requirementTools,
+  ...defectTools,
   ...repositoryContextTools,
   ...shellTools,
   ...siteTools,

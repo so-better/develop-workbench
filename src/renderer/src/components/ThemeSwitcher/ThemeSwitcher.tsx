@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
 import { Button, Dropdown } from 'antd'
 import type { MenuProps } from 'antd'
@@ -19,16 +20,50 @@ const themeMenuItems: MenuProps['items'] = themeOptions.map((option) => ({
 
 /**
  * 主题模式切换控件。
- * 使用单一图标按钮和向上弹出的菜单，避免占用 Footer 横向空间。
+ * 支持点击、键盘操作和 Cmd/Ctrl+Shift+L 快捷切换。
  */
 export default function ThemeSwitcher(): JSX.Element {
   const { mode, setMode } = useTheme()
   const activeOption = themeOptions.find((option) => option.value === mode) ?? themeOptions[0]
 
+  /** Cmd/Ctrl+Shift+L 依次切换跟随系统、浅色和深色。 */
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (
+        !(event.metaKey || event.ctrlKey) ||
+        !event.shiftKey ||
+        event.altKey ||
+        event.key.toLowerCase() !== 'l'
+      ) {
+        return
+      }
+
+      const target = event.target
+
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopImmediatePropagation()
+      const currentIndex = themeOptions.findIndex((option) => option.value === mode)
+      const next = themeOptions[(currentIndex + 1) % themeOptions.length]
+      setMode(next.value)
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [mode, setMode])
+
   return (
     <Dropdown
       placement="topRight"
-      trigger={['hover']}
+      trigger={['click', 'hover']}
       menu={{
         items: themeMenuItems,
         selectable: true,
@@ -40,7 +75,8 @@ export default function ThemeSwitcher(): JSX.Element {
         type="text"
         size="middle"
         icon={activeOption.icon}
-        aria-label={`主题：${activeOption.label}`}
+        aria-label={`主题：${activeOption.label}，快捷键 Cmd/Ctrl+Shift+L`}
+        aria-haspopup="menu"
       />
     </Dropdown>
   )

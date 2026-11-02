@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { DeleteOutlined, FolderOpenOutlined, PlusOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Input, Popconfirm, Spin } from 'antd'
+import { Alert, App, Button, Input, Popconfirm, Spin, Tooltip } from 'antd'
 import { getErrorMessage } from '../../../../utils'
 
 /** 判断路径是否为绝对路径，支持 POSIX、Windows 盘符和 UNC。 */
@@ -77,6 +77,14 @@ export default function SkillSettings(): JSX.Element {
   }
 
   /** 选择目录后直接加入列表并保存。 */
+  const openDirectory = async (directory: string): Promise<void> => {
+    try {
+      await window.electron.openDirectory(directory)
+    } catch (openError) {
+      message.error(getErrorMessage(openError, '打开技能目录失败'))
+    }
+  }
+
   const chooseDirectory = async (): Promise<void> => {
     try {
       const selected = await window.electron.selectSkillDirectory()
@@ -96,7 +104,6 @@ export default function SkillSettings(): JSX.Element {
   return (
     <>
       <div className="settings-panel-header">
-        <h3>技能目录</h3>
         <p>添加额外目录后会扫描其中的 SKILL.md 和脚本，保存后立即生效。</p>
       </div>
 
@@ -147,26 +154,38 @@ export default function SkillSettings(): JSX.Element {
             {directories.map((directory) => (
               <div className="skill-directory-row" key={directory}>
                 <span className="skill-directory-path">{directory}</span>
-                <Popconfirm
-                  title="移除这个技能目录？"
-                  description="只停止扫描，不会删除目录中的文件。"
-                  okText="移除"
-                  cancelText="取消"
-                  onConfirm={() =>
-                    saveDirectories(
-                      directories.filter((item) => item !== directory)
-                    )
-                  }
-                >
-                  <Button
-                    type="text"
-                    danger
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    aria-label={`移除技能目录 ${directory}`}
-                    disabled={saving}
-                  />
-                </Popconfirm>
+                <div className="skill-directory-actions">
+                  <Tooltip title="在文件夹中打开">
+                    <Button
+                      type="text"
+                      size="small"
+                      className="skill-directory-open"
+                      icon={<FolderOpenOutlined />}
+                      aria-label={`在文件夹中打开 ${directory}`}
+                      onClick={() => openDirectory(directory)}
+                    />
+                  </Tooltip>
+                  <Popconfirm
+                    title="移除这个技能目录？"
+                    description="只停止扫描，不会删除目录中的文件。"
+                    okText="移除"
+                    cancelText="取消"
+                    onConfirm={() =>
+                      saveDirectories(
+                        directories.filter((item) => item !== directory)
+                      )
+                    }
+                  >
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      aria-label={`移除技能目录 ${directory}`}
+                      disabled={saving}
+                    />
+                  </Popconfirm>
+                </div>
               </div>
             ))}
             {directories.length === 0 ? (

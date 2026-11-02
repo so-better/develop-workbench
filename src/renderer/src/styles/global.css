@@ -542,6 +542,15 @@ body {
   line-height: 1.65;
 }
 
+/* 模型与技能合并页签。 */
+.settings-ai-tabs .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.settings-ai-tabs .ant-tabs-tab {
+  padding: 10px 0;
+}
+
 .settings-autosave-status {
   margin: 6px 0 0;
   color: var(--app-muted);
@@ -2366,77 +2375,6 @@ body {
 
 .workbench-header-skeleton .ant-skeleton-paragraph > li {
   height: 12px;
-}
-
-.workbench-feishu-callout {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
-  align-items: center;
-  margin-top: 12px;
-  padding: 8px 10px;
-  color: #1e3a8a;
-  font-size: 12px;
-  line-height: 1.5;
-  background: linear-gradient(90deg, #eef6ff 0%, #e0e7ff 100%);
-  border: 1px solid #93c5fd;
-  border-radius: 8px;
-}
-
-.workbench-feishu-callout-icon {
-  color: #2563eb;
-  font-size: 14px;
-}
-
-.workbench-feishu-callout-text {
-  flex: 1;
-  min-width: 0;
-  color: #1e40af;
-}
-
-.workbench-feishu-callout-action {
-  flex-shrink: 0;
-  padding: 3px 10px;
-  margin-left: auto;
-  color: #ffffff;
-  font-weight: 600;
-  text-decoration: none;
-  background: #2563eb;
-  border-radius: 999px;
-  transition: background-color 0.15s ease;
-}
-
-.workbench-feishu-callout-action:hover {
-  color: #ffffff;
-  background: #1d4ed8;
-}
-
-:root[data-theme="dark"] .workbench-feishu-callout {
-  color: #dbeafe;
-  background: linear-gradient(
-    90deg,
-    rgba(37, 99, 235, 0.24) 0%,
-    rgba(79, 70, 229, 0.18) 100%
-  );
-  border-color: rgba(147, 197, 253, 0.45);
-}
-
-:root[data-theme="dark"] .workbench-feishu-callout-icon {
-  color: #93c5fd;
-}
-
-:root[data-theme="dark"] .workbench-feishu-callout-text {
-  color: #bfdbfe;
-}
-
-:root[data-theme="dark"] .workbench-feishu-callout-action {
-  color: #172554;
-  background: #60a5fa;
-}
-
-:root[data-theme="dark"] .workbench-feishu-callout-action:hover {
-  color: #172554;
-  background: #93c5fd;
 }
 
 .workbench-header-actions {
@@ -7139,12 +7077,6 @@ body {
   border-radius: 0;
 }
 
-.defect-content-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 12px;
-}
-
 .defect-transition-form {
   display: flex;
   flex-direction: column;
@@ -7293,6 +7225,22 @@ body {
   color: var(--app-text);
   font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
+}
+
+.skill-directory-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  align-items: center;
+}
+
+.skill-directory-open.ant-btn {
+  color: #1677ff !important;
+}
+
+.skill-directory-open.ant-btn:hover {
+  color: #4096ff !important;
+  background: rgba(22, 119, 255, 0.08) !important;
 }
 
 .skill-directory-empty {
@@ -8385,6 +8333,14 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 80px;
+}
+
+.quick-notes-empty.is-error strong {
+  color: #d92d20;
+}
+
+.quick-notes-empty.is-error .ant-btn {
+  margin-top: 2px;
 }
 
 .quick-notes-empty {

@@ -91,6 +91,10 @@ const electronAPI = {
   openExternalUrl: (url: string): Promise<void> =>
     ipcRenderer.invoke('system:open-external-url', url),
 
+  /** 在系统文件管理器中打开目录。 */
+  openDirectory: (path: string): Promise<void> =>
+    ipcRenderer.invoke('system:open-directory', path),
+
   /**
    * 获取应用版本及 Electron、Chromium、Node.js 运行时信息。
    */

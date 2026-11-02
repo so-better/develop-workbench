@@ -17,6 +17,7 @@ interface QuickNotesProps {
   loading: boolean
   error: string | null
   onOpen: () => void
+  onReload: () => void
   onClose: () => void
   onAdd: (text: string) => Promise<void>
   onSetDone: (id: string, done: boolean) => Promise<void>
@@ -34,6 +35,7 @@ export default function QuickNotes({
   loading,
   error,
   onOpen,
+  onReload,
   onClose,
   onAdd,
   onSetDone,
@@ -330,12 +332,23 @@ export default function QuickNotes({
         </div>
       </div>
 
-      {error ? <div className="quick-notes-error">{error}</div> : null}
+      {error && notes.length > 0 ? <div className="quick-notes-error">{error}</div> : null}
 
       <div className="quick-notes-body">
         {loading ? (
           <div className="quick-notes-loading">
             <Spin size="small" />
+          </div>
+        ) : error && notes.length === 0 ? (
+          <div className="quick-notes-empty is-error">
+            <span className="quick-notes-empty-icon">
+              <CheckSquareOutlined />
+            </span>
+            <strong>待办加载失败</strong>
+            <span>{error}</span>
+            <Button type="link" size="small" onClick={onReload}>
+              重试
+            </Button>
           </div>
         ) : pendingNotes.length === 0 && completedNotes.length === 0 ? (
           <div className="quick-notes-empty">

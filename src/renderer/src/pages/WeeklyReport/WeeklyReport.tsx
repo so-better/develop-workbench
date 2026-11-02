@@ -475,9 +475,11 @@ export default function WeeklyReport(): JSX.Element {
         {error ? (
           <Alert
             className="weekly-report-error"
-            type="error"
+            type={state ? 'warning' : 'error'}
             showIcon
-            message="无法读取飞书周报"
+            message={
+              state ? '刷新周报失败，当前展示上次同步结果' : '无法读取飞书周报'
+            }
             description={error}
             action={
               <Button
@@ -492,7 +494,9 @@ export default function WeeklyReport(): JSX.Element {
               </Button>
             }
           />
-        ) : loading && !state ? (
+        ) : null}
+
+        {loading && !state ? (
           <div className="weekly-report-loading">
             <Skeleton active paragraph={{ rows: 8 }} />
           </div>

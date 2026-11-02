@@ -16,7 +16,6 @@ import {
   ProjectOutlined,
   SearchOutlined,
   SettingOutlined,
-  ThunderboltOutlined
 } from '@ant-design/icons'
 import { Button, Modal } from 'antd'
 import RobotMark from '../RobotMark/RobotMark'
@@ -72,7 +71,8 @@ const CAPABILITIES: GuideCapability[] = [
       '按角色、状态和迭代筛选我参与的缺陷',
       '支持“显示已结束”筛选，查看已解决、已关闭等缺陷',
       '查看详细字段和评论，编辑 BUG 处理人与责任人',
-      '执行缺陷状态流转，并填写流转所需字段'
+      '执行缺陷状态流转，并填写流转所需字段',
+      '使用 AI 分析缺陷原因、影响范围、修复建议和验证点'
     ]
   },
   {
@@ -196,16 +196,10 @@ const SETTINGS_GROUPS: GuideSettingGroup[] = [
     title: 'AI 与维护',
     items: [
       {
-        title: '模型配置',
+        title: '模型与技能',
         icon: <ApiOutlined />,
         description:
-          '编辑 OpenAI Chat Completions 兼容的模型 JSON，格式正确时自动保存；可复制示例后替换 API Key。'
-      },
-      {
-        title: '技能',
-        icon: <ThunderboltOutlined />,
-        description:
-          '使用内置编码、图表、文件生成、需求分析、SQL、翻译和写作技能；也可添加多个绝对路径目录，扫描 SKILL.md、参考文件和脚本。'
+          '在同一栏目切换模型配置和技能目录；模型支持 OpenAI Chat Completions 兼容 JSON 自动保存，技能支持扫描多个绝对路径目录。'
       },
       {
         title: '存储清理',
@@ -245,6 +239,11 @@ export default function ProductGuide({
       key: 'quick-notes',
       keys: isMac ? ['⌘', '⇧', 'K'] : ['Ctrl', 'Shift', 'K'],
       label: '打开待办简记'
+    },
+    {
+      key: 'theme',
+      keys: isMac ? ['⌘', '⇧', 'L'] : ['Ctrl', 'Shift', 'L'],
+      label: '切换主题模式'
     },
     {
       key: 'navigate',

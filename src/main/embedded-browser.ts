@@ -889,6 +889,19 @@ export const initializeEmbeddedBrowser = (): void => {
     }
   })
 
+  // 刷新内嵌浏览器当前页面。
+  ipcMain.handle('embedded-browser:reload', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+
+    if (!window) return
+
+    const entry = entries.get(window.id)
+
+    if (entry && !entry.closing) {
+      entry.view.webContents.reload()
+    }
+  })
+
   ipcMain.handle('embedded-browser:toggle-devtools', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
 

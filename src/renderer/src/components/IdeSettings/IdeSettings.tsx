@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, App, Button, Input, Select, Spin } from 'antd'
+import { Alert, App, Input, Select, Spin } from 'antd'
 import { IDE_PRESETS } from '../../../../types/ide'
 import type { IdeConfigState, IdePresetId } from '../../../../types/ide'
+import ExecutablePathField from '../ExecutablePathField/ExecutablePathField'
 
 /**
  * 内置 IDE 启动配置。
@@ -189,34 +190,19 @@ export default function IdeSettings(): JSX.Element {
             />
           </div>
 
-          <div className="settings-field">
-            <label htmlFor="ide-command">可执行文件</label>
-            <div className="ide-command-controls">
-              <Input
-                id="ide-command"
-                value={command}
-                placeholder={preset ? '自动检测或手动选择可执行文件' : '请先选择 IDE'}
-                spellCheck={false}
-                disabled={!preset}
-                onChange={(event) => setCommand(event.target.value)}
-                onBlur={() => saveConfig()}
-                onPressEnter={() => saveConfig()}
-              />
-              <Button
-                variant="filled"
-                disabled={!preset}
-                onClick={() => handleChooseCommand()}
-              >
-                选择应用/文件
-              </Button>
-              <Button variant="filled" disabled={!preset} onClick={() => handleDetect()}>
-                自动检测
-              </Button>
-            </div>
-            <p className="settings-help">
-              macOS 可以直接选择 .app 应用，也可以选择可执行文件。
-            </p>
-          </div>
+          <ExecutablePathField
+            id="ide-command"
+            label="可执行文件"
+            value={command}
+            placeholder={preset ? '自动检测或手动选择可执行文件' : '请先选择 IDE'}
+            help="macOS 可以直接选择 .app 应用，也可以选择可执行文件。"
+            disabled={!preset}
+            chooseLabel="选择应用/文件"
+            onChange={setCommand}
+            onSave={() => saveConfig()}
+            onChoose={() => handleChooseCommand()}
+            onDetect={() => handleDetect()}
+          />
 
           <div className="settings-field">
             <label htmlFor="ide-args">启动参数</label>

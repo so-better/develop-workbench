@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { QuickNote } from '../../../types/quick-note'
 import { getErrorMessage } from '../../../utils'
 
@@ -7,6 +7,7 @@ interface QuickNotesController {
   openCount: number
   loading: boolean
   error: string | null
+  reload: () => Promise<void>
   add: (text: string) => Promise<void>
   setDone: (id: string, done: boolean) => Promise<void>
   remove: (id: string) => Promise<void>
@@ -21,28 +22,34 @@ export const useQuickNotes = (): QuickNotesController => {
   const [notes, setNotes] = useState<QuickNote[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const reloadRequestRef = useRef(0)
 
-  useEffect(() => {
-    let mounted = true
+  /** 重新读取待办列表，用于失败后重试。 */
+  const reload = useCallback(async (): Promise<void> => {
+    const requestId = ++reloadRequestRef.current
 
-    window.electron
-      .getQuickNoteState()
-      .then((state) => {
-        if (mounted) setNotes(state.notes)
-      })
-      .catch((loadError) => {
-        if (mounted) {
-          setError(getErrorMessage(loadError, '读取待办简记失败'))
-        }
-      })
-      .finally(() => {
-        if (mounted) setLoading(false)
-      })
+    setLoading(true)
+    setError(null)
 
-    return () => {
-      mounted = false
+    try {
+      const state = await window.electron.getQuickNoteState()
+
+      if (requestId !== reloadRequestRef.current) return
+      setNotes(state.notes)
+    } catch (loadError) {
+      if (requestId === reloadRequestRef.current) {
+        setError(getErrorMessage(loadError, '读取待办简记失败'))
+      }
+    } finally {
+      if (requestId === reloadRequestRef.current) {
+        setLoading(false)
+      }
     }
   }, [])
+
+  useEffect(() => {
+    void reload()
+  }, [reload])
 
   const add = useCallback(async (text: string): Promise<void> => {
     const state = await window.electron.addQuickNote(text)
@@ -82,6 +89,7 @@ export const useQuickNotes = (): QuickNotesController => {
     openCount,
     loading,
     error,
+    reload,
     add,
     setDone,
     remove,
