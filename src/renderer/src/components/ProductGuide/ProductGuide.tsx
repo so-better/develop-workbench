@@ -11,6 +11,7 @@ import {
   CompassOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
+  HistoryOutlined,
   InfoCircleOutlined,
   ProjectOutlined,
   SearchOutlined,
@@ -59,7 +60,9 @@ const CAPABILITIES: GuideCapability[] = [
     items: [
       '我负责的需求按迭代分组，可切换 Meegle 空间并筛选',
       '集中查看详情、评论、流程节点、排期、估分和负责人',
-      '关联需求文档、完整飞书详情，并直接发起 AI 分析'
+      '关联需求文档、完整飞书详情，并直接发起 AI 分析',
+      '支持创建本地临时需求，可归入现有迭代并维护产品、状态和优先级',
+      '临时需求可绑定仓库、打开 IDE 和 AI 分析，只保存在本机'
     ]
   },
   {
@@ -67,6 +70,7 @@ const CAPABILITIES: GuideCapability[] = [
     icon: <BugOutlined />,
     items: [
       '按角色、状态和迭代筛选我参与的缺陷',
+      '支持“显示已结束”筛选，查看已解决、已关闭等缺陷',
       '查看详细字段和评论，编辑 BUG 处理人与责任人',
       '执行缺陷状态流转，并填写流转所需字段'
     ]
@@ -86,7 +90,7 @@ const CAPABILITIES: GuideCapability[] = [
     items: [
       '保存日常系统、文档和工具，按环境与标签管理',
       '常用站点优先展示，支持拖拽排序和一键打开',
-      '使用 AI 分析站点分类、重复项和标签整理建议'
+      '使用 AI 结合飞书、Meegle、业务、CI/CD 和监控等场景推荐站点与优化建议'
     ]
   },
   {
@@ -134,6 +138,15 @@ const CAPABILITIES: GuideCapability[] = [
       '检测并登录本机 Lark CLI 和 Meegle CLI',
       '配置 Git、仓库根目录、IDE、AI 模型和技能目录',
       '管理深浅主题、下载记录、缓存和临时数据'
+    ]
+  },
+  {
+    title: '更新与窗口',
+    icon: <HistoryOutlined />,
+    items: [
+      '底部“更新日志”可查看历史版本更新内容',
+      'macOS 和 Windows 点击关闭按钮默认最小化，应用保持运行',
+      'Windows 可通过托盘菜单重新打开主窗口或退出应用'
     ]
   }
 ]
@@ -399,7 +412,7 @@ export default function ProductGuide({
               </div>
 
               <footer className="product-guide-tip">
-                底部工具栏还提供待办简记、下载管理、搜索、使用手册、飞书云文档、AI
+                底部工具栏还提供更新日志、待办简记、下载管理、搜索、使用手册、飞书云文档、AI
                 助手、设置和主题切换。关闭后仍可从“使用手册”再次查看。
               </footer>
             </section>
