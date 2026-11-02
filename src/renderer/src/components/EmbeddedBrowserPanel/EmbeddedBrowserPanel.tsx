@@ -339,26 +339,22 @@ export default function EmbeddedBrowserPanel({
 
       <div className="embedded-browser-toolbar">
         <div className="embedded-browser-nav">
-          {state.showNavigation ? (
-            <>
-              <Button
-                type="text"
-                size="small"
-                icon={<ArrowLeftOutlined />}
-                disabled={!state.canGoBack}
-                aria-label="后退"
-                onClick={() => window.electron.goBackEmbeddedBrowser()}
-              />
-              <Button
-                type="text"
-                size="small"
-                icon={<ArrowRightOutlined />}
-                disabled={!state.canGoForward}
-                aria-label="前进"
-                onClick={() => window.electron.goForwardEmbeddedBrowser()}
-              />
-            </>
-          ) : null}
+          <Button
+            type="text"
+            size="small"
+            icon={<ArrowLeftOutlined />}
+            disabled={!state.canGoBack}
+            aria-label="后退"
+            onClick={() => window.electron.goBackEmbeddedBrowser()}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<ArrowRightOutlined />}
+            disabled={!state.canGoForward}
+            aria-label="前进"
+            onClick={() => window.electron.goForwardEmbeddedBrowser()}
+          />
           <Button
             type="text"
             size="small"

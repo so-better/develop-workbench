@@ -433,8 +433,7 @@ export default function App(): JSX.Element {
         }
         onOpenCloudDocs={() =>
           window.electron.openEmbeddedBrowser(
-            'https://www.feishu.cn/drive/home/',
-            { navigation: true }
+            'https://www.feishu.cn/drive/home/'
           )
         }
       />

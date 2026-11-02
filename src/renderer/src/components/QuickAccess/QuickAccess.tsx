@@ -612,9 +612,7 @@ export default function QuickAccess(): JSX.Element {
         }
       }
 
-      const opened = await window.electron.openEmbeddedBrowser(item.url, {
-        navigation: true
-      })
+      const opened = await window.electron.openEmbeddedBrowser(item.url)
 
       if (!opened) return
 

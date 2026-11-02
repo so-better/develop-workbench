@@ -26,7 +26,6 @@ interface BrowserEntry {
   animateInOnNextBounds: boolean
   animationTimer: NodeJS.Timeout | null
   closing: boolean
-  showNavigation: boolean
 }
 
 interface DownloadEntry {
@@ -50,7 +49,6 @@ const getEmptyState = (): EmbeddedBrowserState => ({
   title: null,
   loading: false,
   error: null,
-  showNavigation: false,
   canGoBack: false,
   canGoForward: false
 })
@@ -328,7 +326,6 @@ const toState = (entry: BrowserEntry): EmbeddedBrowserState => {
     title: webContents.getTitle() || null,
     loading: webContents.isLoading(),
     error: entry.error,
-    showNavigation: entry.showNavigation,
     canGoBack: webContents.navigationHistory.canGoBack(),
     canGoForward: webContents.navigationHistory.canGoForward()
   }
@@ -347,11 +344,7 @@ const applyVisibility = (entry: BrowserEntry): void => {
   entry.view.setVisible(entry.visible && !entry.suppressed && hasUsableBounds)
 }
 
-const loadUrl = (
-  entry: BrowserEntry,
-  rawUrl: string,
-  showNavigation = false
-): boolean => {
+const loadUrl = (entry: BrowserEntry, rawUrl: string): boolean => {
   const url = tryNormalizeHttpUrl(rawUrl)
 
   if (!url) return false
@@ -372,7 +365,6 @@ const loadUrl = (
   }
 
   entry.visible = true
-  entry.showNavigation = showNavigation
   applyVisibility(entry)
   broadcastState(entry)
   entry.view.webContents.loadURL(url).catch(() => undefined)
@@ -592,8 +584,7 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
     requestedUrl: null,
     animateInOnNextBounds: false,
     animationTimer: null,
-    closing: false,
-    showNavigation: false
+    closing: false
   }
 
   view.setBackgroundColor('#ffffff')
@@ -607,7 +598,7 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
   webContents.setUserAgent(userAgent)
 
   webContents.setWindowOpenHandler(({ url }) => {
-    loadUrl(entry, url, entry.showNavigation)
+    loadUrl(entry, url)
     return { action: 'deny' }
   })
 
@@ -694,12 +685,11 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
 
 export const openEmbeddedBrowser = (
   window: BrowserWindow,
-  rawUrl: string,
-  options: { navigation?: boolean } = {}
+  rawUrl: string
 ): boolean => {
   const entry = getEntry(window)
 
-  return loadUrl(entry, rawUrl, options.navigation === true)
+  return loadUrl(entry, rawUrl)
 }
 
 interface GeneratedDownloadHandle {
@@ -824,23 +814,15 @@ export const initializeEmbeddedBrowser = (): void => {
   loadPersistedDownloads()
   app.on('before-quit', persistDownloadsSync)
 
-  ipcMain.handle(
-    'embedded-browser:open',
-    (event, rawUrl: unknown, rawOptions: unknown) => {
-      if (typeof rawUrl !== 'string') throw new Error('链接格式不合法')
+  ipcMain.handle('embedded-browser:open', (event, rawUrl: unknown) => {
+    if (typeof rawUrl !== 'string') throw new Error('链接格式不合法')
 
-      const window = BrowserWindow.fromWebContents(event.sender)
+    const window = BrowserWindow.fromWebContents(event.sender)
 
-      if (!window) return false
+    if (!window) return false
 
-      const navigation =
-        Boolean(rawOptions) &&
-        typeof rawOptions === 'object' &&
-        (rawOptions as { navigation?: unknown }).navigation === true
-
-      return openEmbeddedBrowser(window, rawUrl, { navigation })
-    }
-  )
+    return openEmbeddedBrowser(window, rawUrl)
+  })
 
   ipcMain.handle('embedded-browser:open-external', async (event) => {
     const window = BrowserWindow.fromWebContents(event.sender)
