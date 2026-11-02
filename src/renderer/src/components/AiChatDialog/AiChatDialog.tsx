@@ -8,7 +8,7 @@ import {
   FileTextOutlined,
   DownloadOutlined,
   DeleteOutlined,
-  DownOutlined,
+  RightOutlined,
   ImportOutlined,
   LoadingOutlined,
   PaperClipOutlined,
@@ -209,7 +209,7 @@ function ToolCards({ tools }: { tools: AiToolCall[] }): JSX.Element {
               </span>
               <span className="ai-tool-name">{tool.label || tool.name}</span>
               {tool.output ? (
-                <DownOutlined
+                <RightOutlined
                   className={`ai-tool-caret${open ? ' is-open' : ''}`}
                 />
               ) : null}
@@ -583,6 +583,7 @@ export default function AiChatDialog({
       centered
       footer={null}
       className="ai-chat-dialog-modal"
+      maskClosable={false}
       styles={{ body: { padding: 0 } }}
       onCancel={handleClose}
     >

@@ -6759,7 +6759,7 @@ body {
 }
 
 .ai-tool-caret.is-open {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
 }
 
 .ai-tool-state {
