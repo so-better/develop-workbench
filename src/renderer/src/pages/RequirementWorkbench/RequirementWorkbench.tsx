@@ -184,6 +184,8 @@ const SELECTED_REQUIREMENT_KEY = 'develop-workbench:selected-requirement'
 const OPEN_CLOSED_REQUIREMENT_KEY = 'develop-workbench:open-closed-requirement'
 /** 记住是否预置 IDE 会话的 localStorage key。 */
 const IDE_SESSION_PROMPT_KEY = 'develop-workbench:ide-session-prompt'
+/** IDE 会话里最多带入的本地需求描述长度。 */
+const IDE_SESSION_DESCRIPTION_LIMIT = 2_000
 
 /**
  * 将 Git 远程地址转换为不包含 .git 的仓库根地址。
@@ -1814,6 +1816,31 @@ export default function RequirementWorkbench({
     }
   }
 
+  /** 生成 IDE 预置会话内容；本地需求没有飞书链接，直接带入需求信息。 */
+  const getIdeSessionPrompt = (): string | undefined => {
+    if (!selectedRequirement) return undefined
+
+    if (!selectedRequirementIsLocal) {
+      return requirementUrl ? `${requirementUrl}\n帮我分析一下这个需求` : undefined
+    }
+
+    const description = selectedRequirement.description?.trim()
+    const promptDescription =
+      description && description.length > IDE_SESSION_DESCRIPTION_LIMIT
+        ? `${description.slice(0, IDE_SESSION_DESCRIPTION_LIMIT)}…`
+        : description
+
+    return [
+      '请结合当前仓库代码分析并处理下面这个本地临时需求。',
+      '',
+      `需求名称：${selectedRequirement.name}`,
+      `所属版本：${selectedRequirement.iterationName ?? '未规划迭代'}`,
+      `状态：${selectedRequirement.status ?? '未知'}`,
+      `优先级：${selectedRequirement.priority ?? '未设置'}`,
+      `需求描述：${promptDescription || '暂无描述'}`
+    ].join('\n')
+  }
+
   /**
    * 在 IDE 中打开仓库。
    */
@@ -1882,10 +1909,7 @@ export default function RequirementWorkbench({
 
       // 留出时间让用户看到分支检查和拉取结果。
       await new Promise((resolve) => setTimeout(resolve, 1000))
-      const chatPrompt =
-        prefillSession && requirementUrl
-          ? `${requirementUrl}\n帮我分析一下这个需求`
-          : undefined
+      const chatPrompt = prefillSession ? getIdeSessionPrompt() : undefined
       await window.electron.launchRepositoryInIde(binding.repositoryId, chatPrompt)
     } catch (openError) {
       message.error(getErrorMessage(openError))
