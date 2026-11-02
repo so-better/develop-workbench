@@ -1,7 +1,7 @@
 /**
  * 本地临时需求状态。
  */
-export type LocalRequirementStatus = '待处理' | '进行中' | '已完成' | '已取消'
+export type LocalRequirementStatus = '待处理' | '进行中' | '待测试' | '已完成' | '已取消'
 
 /**
  * 本地临时需求优先级。

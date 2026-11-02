@@ -22,7 +22,13 @@ const MAX_NAME_LENGTH = 160
 const MAX_DESCRIPTION_LENGTH = 8_000
 const LOCAL_ID_PREFIX = 'local:'
 
-const STATUS_VALUES: LocalRequirementStatus[] = ['待处理', '进行中', '已完成', '已取消']
+const STATUS_VALUES: LocalRequirementStatus[] = [
+  '待处理',
+  '进行中',
+  '待测试',
+  '已完成',
+  '已取消'
+]
 const PRIORITY_VALUES: LocalRequirementPriority[] = ['P0', 'P1', 'P2']
 
 interface LocalRequirementStore {

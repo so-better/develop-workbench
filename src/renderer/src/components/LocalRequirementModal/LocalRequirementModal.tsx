@@ -77,6 +77,7 @@ const toLocalPerson = (
 const STATUS_OPTIONS: Array<{ value: LocalRequirementStatus; label: string }> = [
   { value: '待处理', label: '待处理' },
   { value: '进行中', label: '进行中' },
+  { value: '待测试', label: '待测试' },
   { value: '已完成', label: '已完成' },
   { value: '已取消', label: '已取消' }
 ]
@@ -147,6 +148,7 @@ export default function LocalRequirementModal({
       versionKey: getInitialVersionKey(versions, initialRequirement),
       status:
         initialRequirement?.status === '进行中' ||
+        initialRequirement?.status === '待测试' ||
         initialRequirement?.status === '已完成' ||
         initialRequirement?.status === '已取消'
           ? initialRequirement.status
