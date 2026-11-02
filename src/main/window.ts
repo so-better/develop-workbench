@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen } from 'electron'
+import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron'
 import { join } from 'node:path'
 import { openEmbeddedBrowser } from './embedded-browser'
 import {
@@ -8,6 +8,15 @@ import {
 } from './theme'
 
 let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
+let isQuitting = false
+
+// 用户通过菜单、托盘或 Cmd+Q 退出时，允许窗口真正关闭。
+app.on('before-quit', () => {
+  isQuitting = true
+  tray?.destroy()
+  tray = null
+})
 
 /**
  * 获取主窗口引用。
@@ -36,6 +45,40 @@ export const focusMainWindow = (): void => {
   if (mainWindow.isMinimized()) mainWindow.restore()
   mainWindow.show()
   mainWindow.focus()
+}
+
+/** Windows 托盘图标路径。 */
+const getTrayIconPath = (): string =>
+  app.isPackaged
+    ? join(process.resourcesPath, 'icon.png')
+    : join(__dirname, '../../build/icon.png')
+
+/**
+ * 创建 Windows 托盘菜单。
+ * 关闭按钮只最小化，托盘菜单提供明确的退出入口。
+ */
+const createWindowsTray = (): void => {
+  if (process.platform !== 'win32' || tray) return
+
+  const image = nativeImage.createFromPath(getTrayIconPath())
+
+  tray = new Tray(image.isEmpty() ? nativeImage.createEmpty() : image)
+  tray.setToolTip('AI 研发工作台')
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        label: '打开主窗口',
+        click: focusMainWindow
+      },
+      { type: 'separator' },
+      {
+        label: '退出',
+        click: () => app.quit()
+      }
+    ])
+  )
+  tray.on('click', focusMainWindow)
+  tray.on('double-click', focusMainWindow)
 }
 
 /**
@@ -79,6 +122,7 @@ export const createMainWindow = (): void => {
 
   if (process.platform === 'win32') {
     registerTitleBarOverlayWindow(window)
+    createWindowsTray()
   }
 
   // 首次打开时最大化到屏幕工作区，随后再显示窗口。
@@ -90,6 +134,14 @@ export const createMainWindow = (): void => {
   // 每次窗口重新显示时通知渲染进程刷新 lark 登录状态。
   window.on('show', () => {
     window.webContents.send('window:shown')
+  })
+
+  // 点击关闭按钮时最小化而不是销毁窗口；通过菜单、托盘或 Cmd+Q 退出。
+  window.on('close', (event) => {
+    if (isQuitting) return
+
+    event.preventDefault()
+    window.minimize()
   })
 
   // 窗口销毁后释放引用，避免访问已销毁的 BrowserWindow。

@@ -6,6 +6,7 @@ import QuickAccess from './components/QuickAccess/QuickAccess'
 import AppNavigation from './components/AppNavigation/AppNavigation'
 import LinkContextMenu from './components/LinkContextMenu/LinkContextMenu'
 import ProductGuide from './components/ProductGuide/ProductGuide'
+import ChangelogModal from './components/ChangelogModal/ChangelogModal'
 import QuickNotes from './components/QuickNotes/QuickNotes'
 import UpdatePrompt from './components/UpdatePrompt/UpdatePrompt'
 import { APP_PAGES } from './navigation'
@@ -22,6 +23,7 @@ import type { AppInfo } from '../../types/app'
 import type { AuthExpiredEvent } from '../../types/auth'
 import type { LarkCliInfo, LarkUser } from '../../types/lark'
 import type { MeegleState } from '../../types/meegle'
+import changelogContent from '../../../CHANGELOG.md?raw'
 import type { UpdateCheckResult } from '../../types/updates'
 
 
@@ -62,6 +64,7 @@ export default function App(): JSX.Element {
   const [downloadsModalOpen, setDownloadsModalOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
   const [guideWelcome, setGuideWelcome] = useState(false)
+  const [changelogOpen, setChangelogOpen] = useState(false)
   const [quickNotesOpen, setQuickNotesOpen] = useState(false)
   const quickNotes = useQuickNotes()
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null)
@@ -388,6 +391,12 @@ export default function App(): JSX.Element {
         onClose={closeGuide}
       />
 
+      <ChangelogModal
+        open={changelogOpen}
+        content={changelogContent}
+        onClose={() => setChangelogOpen(false)}
+      />
+
       <UpdatePrompt
         update={updateInfo}
         open={updateOpen}
@@ -411,6 +420,7 @@ export default function App(): JSX.Element {
           setGuideWelcome(false)
           setGuideOpen(true)
         }}
+        onOpenChangelog={() => setChangelogOpen(true)}
         onOpenQuickAccess={() => window.dispatchEvent(new Event('quick-access:open'))}
         onOpenAi={() =>
           openAiDialog({

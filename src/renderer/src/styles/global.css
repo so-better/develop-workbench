@@ -8743,3 +8743,21 @@ body {
 .workbench-show-closed .ant-checkbox + span {
   font-size: 12px;
 }
+
+/* 更新日志弹窗。 */
+.changelog-modal-content {
+  max-height: 60vh;
+  padding: 4px 2px 2px;
+  overflow-y: auto;
+}
+
+.changelog-modal-content .markdown-content h1 {
+  margin-top: 0;
+}
+
+.changelog-empty {
+  padding: 32px 0;
+  color: var(--workbench-secondary);
+  font-size: 13px;
+  text-align: center;
+}

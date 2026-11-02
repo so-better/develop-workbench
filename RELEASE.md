@@ -17,9 +17,8 @@
 
 ## 发布前确认
 
-- 当前分支为 `main`
-- 工作区已提交，`git status` 没有未提交改动
 - 本地已安装依赖：`npm ci`
+- 已更新根目录 `CHANGELOG.md`，添加当前版本的更新内容
 - 同时准备 macOS 和 Windows 安装包
 - 更新目录中的文件名必须保持不变：
   - `develop-workbench-<版本>-mac.dmg`
@@ -28,6 +27,8 @@
   - `develop-workbench-<版本>-win.zip`
 
 ## 1. 版本号推荐与确认
+
+版本变更是每次发布的强制步骤，不可跳过。
 
 ### 1.1 读取当前版本
 
@@ -74,7 +75,7 @@ echo "当前版本：${CURRENT_VERSION}"
 
 ```bash
 RECOMMENDED_VERSION="0.3.0" # 替换为用户确认后的版本号
-npm version "${RECOMMENDED_VERSION}" --no-git-tag-version
+node scripts/set-version.cjs "${RECOMMENDED_VERSION}"
 ```
 
 确认 `package.json` 和 `package-lock.json` 中的版本一致：
@@ -82,6 +83,43 @@ npm version "${RECOMMENDED_VERSION}" --no-git-tag-version
 ```bash
 node -p "require('./package.json').version"
 ```
+
+### 1.5 维护 CHANGELOG
+
+应用底部的“更新日志”入口会展示根目录 `CHANGELOG.md` 的内容。
+
+每次发布前，必须由 AI 根据本次实际变更更新 `CHANGELOG.md`：
+
+```md
+## 0.3.0
+
+### 新增
+
+- 新增 XXX 功能
+
+### 优化
+
+- 优化 XXX 流程
+
+### 修复
+
+- 修复 XXX 问题
+
+## 0.2.0
+
+...
+```
+
+要求：
+
+- 发布时由 AI 根据本次实际变更创建或更新 `CHANGELOG.md`
+- 不要添加 `# 更新日志` 这类一级标题，弹窗已经显示标题
+- 新版本必须新增到文件顶部
+- 保留历史版本，不要清空已有更新日志
+- 版本号必须与本次确认后的 `package.json` 版本一致
+- 内容必须来自本次实际变更，不能编造
+- 更新内容按“新增 / 优化 / 修复”分类
+- 没有更新 `CHANGELOG.md` 时，更新日志入口看不到本次版本内容
 
 ## 2. 类型检查
 
@@ -116,7 +154,7 @@ npm run dist:win
 
 - `dist:*` 会自动执行 `clean:release`、类型检查和 `electron-vite build`
 - 构建完成后产物在 `release/`
-- `release/` 已被 `.gitignore` 忽略，不要提交安装包
+- `release/` 是构建产物，不要上传到源码仓库
 - 每个版本必须同时提供 macOS 和 Windows 包，否则另一平台的更新检查可能无法拿到安装包
 
 ## 4. 检查产物
@@ -263,19 +301,7 @@ lark-cli drive files list \
 - 文件名可被更新规则识别：
   `^develop-workbench-<版本>-(mac|win)\.(dmg|zip|exe)$`
 
-## 7. 提交版本变更
-
-```bash
-VERSION=$(node -p "require('./package.json').version")
-
-git add package.json package-lock.json
-git commit -m "chore: release v${VERSION}"
-git push
-```
-
-如果本次发布还包含代码改动，先把代码改动单独提交，再提交版本号变更。
-
-## 8. 更新服端到端验证
+## 7. 更新端到端验证
 
 在旧版本应用中验证：
 
@@ -330,8 +356,9 @@ CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo "当前版本：${CURRENT_VERSION}"
 # 必须等待用户确认推荐版本后再执行：
 # RECOMMENDED_VERSION="<用户确认后的版本号>"
-# npm version "${RECOMMENDED_VERSION}" --no-git-tag-version
+# node scripts/set-version.cjs "${RECOMMENDED_VERSION}"
 # VERSION=$(node -p "require('./package.json').version")
+# 同时在根目录 CHANGELOG.md 顶部添加该版本的更新内容
 
 # 2. 检查并构建
 # macOS 机器执行
@@ -352,8 +379,3 @@ ls -lh release/develop-workbench-${VERSION}-*
 # develop-workbench-<版本>-mac.zip
 # develop-workbench-<版本>-win.exe
 # develop-workbench-<版本>-win.zip
-
-# 5. 提交版本变更
-git add package.json package-lock.json
-git commit -m "chore: release v${VERSION}"
-git push

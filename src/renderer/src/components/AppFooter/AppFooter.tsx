@@ -2,6 +2,7 @@ import {
   CheckSquareOutlined,
   CloudOutlined,
   DownloadOutlined,
+  HistoryOutlined,
   ReadOutlined,
   SearchOutlined,
   SettingOutlined
@@ -19,6 +20,7 @@ interface AppFooterProps {
   onOpenDownloads: () => void
   onOpenQuickNotes: () => void
   onOpenGuide: () => void
+  onOpenChangelog: () => void
   onOpenAi: () => void
   onOpenCloudDocs: () => void
   onOpenQuickAccess: () => void
@@ -36,6 +38,7 @@ export default function AppFooter({
   onOpenDownloads,
   onOpenQuickNotes,
   onOpenGuide,
+  onOpenChangelog,
   onOpenAi,
   onOpenCloudDocs,
   onOpenQuickAccess
@@ -51,6 +54,14 @@ export default function AppFooter({
             <Tag bordered={false}>v{appInfo.appVersion}</Tag>
           </span>
         ) : null}
+        <Button
+          type="text"
+          size="small"
+          icon={<HistoryOutlined />}
+          onClick={onOpenChangelog}
+        >
+          更新日志
+        </Button>
         <Badge count={quickNoteCount} size="small">
           <Button
             type="text"
