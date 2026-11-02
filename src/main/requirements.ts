@@ -1874,6 +1874,8 @@ export const getMyRequirements = async (
 
 /** 周报工具返回的单条本周工作。 */
 export interface WeeklyWorkItem {
+  /** 需求来源：Meegle 或本地临时需求。 */
+  source: 'meegle' | 'local'
   id: string
   name: string
   status: string | null
@@ -1941,38 +1943,55 @@ const getCurrentWeekRange = (): { start: string; end: string } => {
  */
 export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
   const project = await getProject()
-  const roleNames = await fetchStoryRoleNames(project)
+  const [roleNames, localRequirements] = await Promise.all([
+    fetchStoryRoleNames(project).catch(() => [] as string[]),
+    listLocalRequirements(project.projectKey, true)
+  ])
   const roleCondition = buildCurrentUserRoleCondition(roleNames)
   const week = getCurrentWeekRange()
+  /** 本地时间的日期字符串是否落在本周范围内。 */
+  const inCurrentWeek = (value: string | null): boolean => {
+    if (!value) return false
 
-  if (!roleCondition) {
-    return {
-      project: project.name,
-      weekStart: week.start,
-      weekEnd: week.end,
-      total: 0,
-      hasMore: false,
-      items: [],
-      note: '没有读取到当前用户的需求角色配置'
-    }
+    const date = value.slice(0, 10)
+
+    return date >= week.start && date <= week.end
   }
-
-  const rows = await fetchMqlRows(
-    project,
-    [
-      'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `完成日期`, `技术方案`, `标签`, `risk_label()`',
-      `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
-      `WHERE (${roleCondition}) AND (RELATIVE_DATETIME_EQ(\`更新时间\`, 'current_week') OR RELATIVE_DATETIME_EQ(\`完成日期\`, 'current_week'))`,
-      'ORDER BY `更新时间` DESC'
-    ].join(' ')
+  const remoteRequirements = roleCondition
+    ? (
+        await fetchMqlRows(
+          project,
+          [
+            'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `完成日期`, `技术方案`, `标签`, `risk_label()`',
+            `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
+            `WHERE (${roleCondition}) AND (RELATIVE_DATETIME_EQ(\`更新时间\`, 'current_week') OR RELATIVE_DATETIME_EQ(\`完成日期\`, 'current_week'))`,
+            'ORDER BY `更新时间` DESC'
+          ].join(' ')
+        )
+      )
+        .map(parseRequirement)
+        .filter((requirement): requirement is MeegleRequirement => requirement !== null)
+    : []
+  // 本地需求没有 Meegle 的 current_week 查询，按更新时间或完成时间筛选。
+  const localWeeklyRequirements = localRequirements
+    .filter(
+      (requirement) =>
+        inCurrentWeek(requirement.updatedAt) ||
+        inCurrentWeek(requirement.completedAt)
+    )
+    .map(toMeegleRequirement)
+  const requirements = [...remoteRequirements, ...localWeeklyRequirements].sort(
+    (left, right) => (right.updatedAt ?? '').localeCompare(left.updatedAt ?? '')
   )
-  const requirements = rows
-    .map(parseRequirement)
-    .filter((requirement): requirement is MeegleRequirement => requirement !== null)
   const items: WeeklyWorkItem[] = []
 
   for (const requirement of requirements.slice(0, WEEKLY_WORK_ITEM_LIMIT)) {
+    const owners =
+      requirement.owners.length > 0
+        ? requirement.owners.map((owner) => owner.name)
+        : requirement.productManagers.map((owner) => owner.name)
     const item: WeeklyWorkItem = {
+      source: requirement.source,
       id: requirement.id,
       name: requirement.name,
       status: requirement.status,
@@ -1983,7 +2002,7 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
       requirementType: requirement.requirementType,
       tags: requirement.tags,
       riskLabels: requirement.riskLabels,
-      owners: requirement.owners.map((owner) => owner.name),
+      owners,
       description: compactText(requirement.description, WEEKLY_DESCRIPTION_LIMIT),
       technicalSolution: compactText(
         requirement.technicalSolution,
@@ -2004,8 +2023,8 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
     total: requirements.length,
     hasMore: requirements.length > items.length,
     items,
-    note: items.length
-      ? '仅包含本周有更新或完成的需求；需要更多详情时再按需补充'
+    note: requirements.length
+      ? '包含本周有更新或完成的 Meegle 需求和本地临时需求；需要更多详情时再按需补充'
       : '本周没有查询到更新或完成的需求'
   }
 }

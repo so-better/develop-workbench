@@ -102,7 +102,7 @@ const CAPABILITIES: GuideCapability[] = [
     title: 'AI 周报',
     icon: <FileTextOutlined />,
     items: [
-      '读取本周更新和完成的需求作为周报依据',
+      '结合本周 Meegle/本地需求、已解决缺陷和代码提交生成周报',
       'AI 生成周报内容并回填到当前编辑字段',
       '编辑完成后直接提交到飞书汇报'
     ]

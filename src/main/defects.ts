@@ -179,6 +179,8 @@ const DEFECT_DONE_STATUSES = [
   '转需求',
   'Not a Bug'
 ]
+/** 计入周报的已解决缺陷状态。 */
+const DEFECT_FIXED_STATUSES = ['已解决', '测试通过', '已关闭']
 
 let currentUserCache: { expiresAt: number; userKey: string } | null = null
 const roleNameCache = new Map<string, { expiresAt: number; names: Map<string, string> }>()
@@ -546,6 +548,41 @@ export const getMyDefects = async (
   return {
     project,
     role,
+    defects,
+    total: defects.length,
+    fetchedAt: new Date().toISOString()
+  }
+}
+
+/** 读取当前用户本周解决或关闭的缺陷。 */
+export const getWeeklyResolvedDefects = async (): Promise<MeegleMyDefects> => {
+  const project = await getProject()
+  const roleFields = DEFECT_ROLES.map((item) => `\`__${item}\``).join(', ')
+  const rows = await fetchMqlRows(
+    project,
+    [
+      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
+      `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
+      `WHERE \`状态\` in (${DEFECT_FIXED_STATUSES.map(
+        (status) => `'${status.replace(/'/g, "''")}'`
+      ).join(', ')}) AND RELATIVE_DATETIME_EQ(\`完成日期\`, 'current_week') AND \`BUG解决人\` = current_login_user()`,
+      'ORDER BY `完成日期` DESC',
+      'LIMIT 50'
+    ].join(' ')
+  )
+  const defects = rows
+    .map(parseDefect)
+    .filter((defect): defect is MeegleDefect => defect !== null)
+
+  try {
+    await enrichDefectAvatars(project, defects)
+  } catch {
+    // 头像不是周报核心数据，补齐失败时继续。
+  }
+
+  return {
+    project,
+    role: null,
     defects,
     total: defects.length,
     fetchedAt: new Date().toISOString()

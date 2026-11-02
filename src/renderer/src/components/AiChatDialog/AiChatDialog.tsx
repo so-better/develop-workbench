@@ -676,8 +676,9 @@ export default function AiChatDialog({
               const renderStreaming = isGenerating || Boolean(message.interrupted)
               const isEditing = editingId === message.id
               const hasContent = Boolean(message.content.trim())
+              // 流式阶段也立即格式化，避免隐藏 JSON 在生成过程中闪现。
               const displayContent =
-                message.role === 'assistant' && formatContent && !isGenerating
+                message.role === 'assistant' && formatContent
                   ? formatContent(message.content)
                   : message.content
               const hasVisibleContent = Boolean(displayContent.trim())

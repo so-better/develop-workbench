@@ -491,6 +491,583 @@ export const getRepositoryState = async (): Promise<RepositoryState> => {
   }
 }
 
+/** 周报使用的代码提交摘要。 */
+export interface RepositoryCommitSummary {
+  repositoryId: string
+  repositoryName: string
+  hash: string
+  shortHash: string
+  subject: string
+  author: string
+  authorEmail: string
+  date: string
+}
+
+/** 本周代码提交读取结果。 */
+export interface WeeklyRepositoryCommitsResult {
+  /** 匹配到当前 Git 用户的提交。 */
+  commits: RepositoryCommitSummary[]
+
+  /** 读取失败或跳过仓库的原因。 */
+  warnings: string[]
+}
+
+/**
+ * 读取本周各仓库中当前 Git 用户自己的提交。
+ * 仓库未配置 user.name / user.email 时跳过该仓库，避免混入其他作者提交。
+ */
+export const getWeeklyRepositoryCommits = async (
+  since: string,
+  until: string
+): Promise<WeeklyRepositoryCommitsResult> => {
+  const state = await getRepositoryState()
+  const commits: RepositoryCommitSummary[] = []
+  const warnings: string[] = []
+
+  for (const repository of state.repositories) {
+    if (!repository.available) continue
+
+    const cwd = repository.localPath
+    const [configuredName, configuredEmail] = await Promise.all([
+      runGit(['config', '--get', 'user.name'], { cwd })
+        .then((value) => value.trim())
+        .catch(() => ''),
+      runGit(['config', '--get', 'user.email'], { cwd })
+        .then((value) => value.trim().toLowerCase())
+        .catch(() => '')
+    ])
+
+    if (!configuredName && !configuredEmail) {
+      warnings.push(
+        `仓库 ${repository.name} 未配置 Git user.name/user.email，已跳过本周提交`
+      )
+      continue
+    }
+
+    let output: string
+
+    try {
+      output = await runGit(
+        [
+          'log',
+          '--all',
+          '--no-merges',
+          `--since=${since}`,
+          `--until=${until}`,
+          '--max-count=200',
+          '--format=%H%x00%h%x00%an%x00%ae%x00%cI%x00%s'
+        ],
+        { cwd, timeout: GIT_NETWORK_TIMEOUT_MS }
+      )
+    } catch (error) {
+      warnings.push(
+        `仓库 ${repository.name} 读取提交失败：${getGitErrorMessage(error)}`
+      )
+      continue
+    }
+
+    for (const line of output.split(/\r?\n/)) {
+      if (!line.trim()) continue
+
+      const [hash, shortHash, author, authorEmail, date, subject] =
+        line.split('\0')
+
+      if (!hash || !shortHash || !date) continue
+
+      const nameMatches = Boolean(configuredName) && author === configuredName
+      const emailMatches =
+        Boolean(configuredEmail) &&
+        (authorEmail ?? '').toLowerCase() === configuredEmail
+
+      if (!nameMatches && !emailMatches) continue
+
+      commits.push({
+        repositoryId: repository.id,
+        repositoryName: repository.name,
+        hash,
+        shortHash,
+        subject: subject || '无提交说明',
+        author: author || '未知作者',
+        authorEmail: authorEmail || '',
+        date
+      })
+    }
+  }
+
+  return {
+    commits: commits.sort((left, right) => right.date.localeCompare(left.date)),
+    warnings
+  }
+}
+
+/** 需求分析使用的仓库上下文。 */
+export interface RepositoryContextFile {
+  /** 文件绝对路径。 */
+  path: string
+
+  /** 相对仓库根目录的路径。 */
+  relativePath: string
+}
+
+/** 代码内容命中的文件位置和所在行。 */
+export interface RepositoryContextContentMatch extends RepositoryContextFile {
+  /** 命中行号，从 1 开始。 */
+  line: number
+
+  /** 命中行文本，已压缩并限制长度。 */
+  text: string
+}
+
+/** 仓库近期提交摘要。 */
+export interface RepositoryContextCommit {
+  /** 提交短哈希。 */
+  shortHash: string
+
+  /** 提交标题。 */
+  subject: string
+
+  /** 提交作者。 */
+  author: string
+
+  /** 提交时间，ISO 字符串。 */
+  date: string
+}
+
+/** 单个仓库的需求分析上下文。 */
+export interface RepositoryContext {
+  /** 仓库 ID。 */
+  repositoryId: string
+
+  /** 仓库名称。 */
+  repositoryName: string
+
+  /** 仓库绝对路径。 */
+  repositoryPath: string
+
+  /** 当前分支。 */
+  branch: string | null
+
+  /** 仓库顶层目录和文件。 */
+  topLevel: string[]
+
+  /** package.json 内容；不存在时为 null。 */
+  manifest: { path: string; content: string } | null
+
+  /** 文件名命中关键词的文件列表。 */
+  files: RepositoryContextFile[]
+
+  /** 文件内容命中关键词的位置。 */
+  contentMatches: RepositoryContextContentMatch[]
+
+  /** 最近提交。 */
+  recentCommits: RepositoryContextCommit[]
+}
+
+/** 批量读取的文件内容。 */
+export interface RepositoryFileContent {
+  /** 文件绝对路径。 */
+  path: string
+
+  /** 相对仓库根目录的路径。 */
+  relativePath: string
+
+  /** 本次读取到的 UTF-8 文本。 */
+  content: string
+
+  /** 本次读取起始字节。 */
+  offset: number
+
+  /** 下一次续读的起始字节。 */
+  nextOffset: number
+
+  /** 文件总字节数。 */
+  size: number
+
+  /** 是否还有未读取内容。 */
+  truncated: boolean
+}
+
+/** 批量读取文件的请求。 */
+export interface RepositoryFileReadRequest {
+  /** 文件绝对路径。 */
+  path: string
+
+  /** 从第几个字节开始读取；默认 0。 */
+  offset?: number
+}
+
+/** 未读取的文件及原因。 */
+export interface RepositoryFileReadSkip {
+  /** 请求的文件路径。 */
+  path: string
+
+  /** 未读取原因。 */
+  reason: string
+}
+
+/** 批量读取结果。 */
+export interface RepositoryFileReadResult {
+  /** 成功读取的文件。 */
+  files: RepositoryFileContent[]
+
+  /** 被跳过的文件。 */
+  skipped: RepositoryFileReadSkip[]
+}
+
+// 限制仓库上下文的输出规模，避免一次工具结果过大。
+const CONTEXT_MAX_KEYWORDS = 8
+const CONTEXT_MAX_FILES = 40
+const CONTEXT_MAX_MATCHES = 60
+const CONTEXT_MAX_COMMITS = 8
+const CONTEXT_MANIFEST_BYTES = 5_000
+const CONTEXT_FILE_BYTES = 64_000
+const CONTEXT_MAX_READ_FILES = 8
+
+/** 去重、裁剪并限制需求分析关键词数量。 */
+const normalizeContextKeywords = (values: string[]): string[] => {
+  const seen = new Set<string>()
+
+  for (const value of values) {
+    const keyword = value.trim().slice(0, 80)
+
+    if (keyword) seen.add(keyword)
+    if (seen.size >= CONTEXT_MAX_KEYWORDS) break
+  }
+
+  return Array.from(seen)
+}
+
+/** 避免按字节截断时把 UTF-8 多字节字符切成半个。 */
+const trimIncompleteUtf8Tail = (buffer: Buffer, length: number): number => {
+  if (length <= 0) return 0
+
+  let index = length - 1
+
+  while (
+    index >= 0 &&
+    length - index <= 4 &&
+    (buffer[index] & 0xc0) === 0x80
+  ) {
+    index -= 1
+  }
+
+  if (index < 0) return length
+
+  const first = buffer[index]
+  const expected =
+    (first & 0x80) === 0
+      ? 1
+      : (first & 0xe0) === 0xc0
+        ? 2
+        : (first & 0xf0) === 0xe0
+          ? 3
+          : (first & 0xf8) === 0xf0
+            ? 4
+            : 1
+
+  return index + expected > length ? index : length
+}
+
+/** 从指定字节偏移读取文件片段，并返回下一次续读位置。 */
+const readFilePrefix = async (
+  filePath: string,
+  maxBytes: number,
+  offset = 0
+): Promise<{
+  content: string
+  offset: number
+  nextOffset: number
+  size: number
+  truncated: boolean
+}> => {
+  const info = await stat(filePath)
+  const start = Math.max(0, Math.min(offset, info.size))
+  const length = Math.max(0, Math.min(maxBytes, info.size - start))
+  const handle = await open(filePath, 'r')
+  const buffer = Buffer.alloc(length)
+
+  try {
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, start)
+    const completeBytes =
+      start + bytesRead < info.size
+        ? trimIncompleteUtf8Tail(buffer, bytesRead)
+        : bytesRead
+
+    return {
+      content: buffer.subarray(0, completeBytes).toString('utf8'),
+      offset: start,
+      nextOffset: start + completeBytes,
+      size: info.size,
+      truncated: start + completeBytes < info.size
+    }
+  } finally {
+    await handle.close()
+  }
+}
+
+/** 已解析真实路径的文件位置。 */
+interface RepositoryFileLocation {
+  repository: Repository
+  resolvedPath: string
+  root: string
+}
+
+/**
+ * 查找文件所属的已配置仓库。
+ * 使用 realpath 校验，避免仓库内符号链接指向仓库外文件。
+ */
+const findRepositoryFile = async (
+  repositories: RepositoryState['repositories'],
+  filePath: string
+): Promise<RepositoryFileLocation | null> => {
+  let resolvedPath: string
+
+  try {
+    resolvedPath = await realpath(filePath)
+  } catch {
+    return null
+  }
+
+  for (const repository of repositories) {
+    if (!repository.available) continue
+
+    let root: string
+
+    try {
+      root = await realpath(repository.localPath)
+    } catch {
+      root = resolve(repository.localPath)
+    }
+
+    const relativePath = relative(root, resolvedPath)
+
+    if (
+      relativePath &&
+      !relativePath.startsWith('..') &&
+      !isAbsolute(relativePath)
+    ) {
+      return { repository, resolvedPath, root }
+    }
+  }
+
+  return null
+}
+
+/** 解析 git log 的 NUL 分隔输出。 */
+const parseContextLog = (output: string): RepositoryContextCommit[] =>
+  output
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .flatMap((line) => {
+      const [shortHash, subject, author, date] = line.split('\0')
+
+      return shortHash && date
+        ? [
+            {
+              shortHash,
+              subject: subject || '无提交说明',
+              author: author || '未知作者',
+              date
+            }
+          ]
+        : []
+    })
+
+/**
+ * 一次读取仓库结构、关键词命中文件、代码匹配和近期提交。
+ * 用于减少需求分析时逐文件调用 executeShell。
+ */
+export const getRepositoryContext = async (
+  pathValues: string[],
+  keywordValues: string[]
+): Promise<RepositoryContext[]> => {
+  const state = await getRepositoryState()
+  const availableRepositories = state.repositories.filter(
+    (repository) => repository.available
+  )
+  const repositoryByPath = new Map(
+    availableRepositories.map((repository) => [
+      resolve(repository.localPath),
+      repository
+    ])
+  )
+  const keywords = normalizeContextKeywords(keywordValues)
+  const results: RepositoryContext[] = []
+
+  for (const pathValue of new Set(pathValues)) {
+    const repository = repositoryByPath.get(resolve(pathValue))
+
+    if (!repository) continue
+
+    const cwd = repository.localPath
+    const [branch, logOutput, fileOutput, topLevelEntries] = await Promise.all([
+      runGit(['branch', '--show-current'], { cwd })
+        .then((value) => value.trim() || null)
+        .catch(() => null),
+      runGit(
+        [
+          'log',
+          '--no-merges',
+          `--max-count=${CONTEXT_MAX_COMMITS}`,
+          '--format=%h%x00%s%x00%an%x00%cI'
+        ],
+        { cwd }
+      ).catch(() => ''),
+      runGit(['ls-files'], { cwd }).catch(() => ''),
+      readdir(cwd, { withFileTypes: true }).catch(() => [])
+    ])
+    const files = fileOutput
+      .split(/\r?\n/)
+      .filter(Boolean)
+      .filter((file) => {
+        if (!keywords.length) return false
+
+        const normalized = file.toLocaleLowerCase()
+
+        return keywords.some((keyword) =>
+          normalized.includes(keyword.toLocaleLowerCase())
+        )
+      })
+      .slice(0, CONTEXT_MAX_FILES)
+      .map((relativePath) => ({
+        path: join(cwd, relativePath),
+        relativePath
+      }))
+    let contentMatches: RepositoryContextContentMatch[] = []
+
+    if (keywords.length) {
+      const args = [
+        'grep',
+        '-n',
+        '-I',
+        '--no-color',
+        '-m',
+        '2',
+        '-F',
+        ...keywords.flatMap((keyword) => ['-e', keyword])
+      ]
+      const output = await runGit(args, { cwd }).catch(() => '')
+
+      contentMatches = output
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .slice(0, CONTEXT_MAX_MATCHES)
+        .flatMap((line) => {
+          const match = /^(.+?):(\d+):(.*)$/.exec(line)
+
+          if (!match) return []
+
+          const relativePath = match[1]
+          const lineNumber = Number.parseInt(match[2], 10)
+
+          if (!Number.isFinite(lineNumber)) return []
+
+          return [
+            {
+              path: join(cwd, relativePath),
+              relativePath,
+              line: lineNumber,
+              text: match[3].trim().slice(0, 240)
+            }
+          ]
+        })
+    }
+
+    const manifestPath = join(cwd, 'package.json')
+    const manifest = await readFilePrefix(
+      manifestPath,
+      CONTEXT_MANIFEST_BYTES
+    ).catch(() => null)
+
+    results.push({
+      repositoryId: repository.id,
+      repositoryName: repository.name,
+      repositoryPath: cwd,
+      branch,
+      topLevel: topLevelEntries
+        .filter(
+          (entry) =>
+            !SKIP_DIRECTORIES.has(entry.name) &&
+            !entry.name.startsWith('.git')
+        )
+        .map((entry) => `${entry.name}${entry.isDirectory() ? '/' : ''}`)
+        .sort((left, right) => left.localeCompare(right, 'zh-CN'))
+        .slice(0, 80),
+      manifest: manifest
+        ? { path: manifestPath, content: manifest.content }
+        : null,
+      files,
+      contentMatches,
+      recentCommits: parseContextLog(logOutput)
+    })
+  }
+
+  return results
+}
+
+/**
+ * 批量读取仓库文件，单文件默认返回 64KB。
+ * 截断时可通过 nextOffset 继续读取；只允许读取已配置仓库目录。
+ */
+export const readRepositoryFiles = async (
+  requests: RepositoryFileReadRequest[]
+): Promise<RepositoryFileReadResult> => {
+  const state = await getRepositoryState()
+  const files: RepositoryFileContent[] = []
+  const skipped: RepositoryFileReadSkip[] = []
+
+  for (const [index, request] of requests.entries()) {
+    const pathValue = request.path
+
+    if (index >= CONTEXT_MAX_READ_FILES) {
+      skipped.push({
+        path: pathValue,
+        reason: `单次最多读取 ${CONTEXT_MAX_READ_FILES} 个文件`
+      })
+      continue
+    }
+
+    if (!pathValue?.trim()) {
+      skipped.push({ path: pathValue, reason: '文件路径为空' })
+      continue
+    }
+
+    const location = await findRepositoryFile(state.repositories, pathValue)
+
+    if (!location) {
+      skipped.push({
+        path: pathValue,
+        reason: '文件不存在、无法访问或不在已配置的代码仓库内'
+      })
+      continue
+    }
+
+    const { resolvedPath, root } = location
+    const relativePath = relative(root, resolvedPath)
+    const content = await readFilePrefix(
+      resolvedPath,
+      CONTEXT_FILE_BYTES,
+      request.offset ?? 0
+    ).catch(() => null)
+
+    if (!content) {
+      skipped.push({
+        path: pathValue,
+        reason: '文件不存在、不是普通文件或无法读取'
+      })
+      continue
+    }
+
+    files.push({
+      path: resolvedPath,
+      relativePath,
+      ...content
+    })
+  }
+
+  return { files, skipped }
+}
+
 const getGitErrorMessage = (error: unknown): string => {
   const message =
     error instanceof Error ? error.message.split(/\r?\n/)[0].trim() : 'Git 操作失败'

@@ -92,6 +92,77 @@ const textToHtml = (text: string): string => {
   return blocks.join('')
 }
 
+// 隐藏 JSON 使用 HTML 注释包裹，聊天中由 formatGeneratedReport 剥离。
+const WEEKLY_REPORT_JSON_START = '<!--WEEKLY_REPORT_JSON_START'
+const WEEKLY_REPORT_JSON_END = 'WEEKLY_REPORT_JSON_END-->'
+
+/** 去掉 AI 回复中给人看的 JSON 标记。 */
+const stripWeeklyReportJson = (content: string): string => {
+  const start = content.indexOf(WEEKLY_REPORT_JSON_START)
+
+  if (start < 0) return content
+
+  const end = content.indexOf(WEEKLY_REPORT_JSON_END, start)
+
+  return end < 0
+    ? content.slice(0, start)
+    : content.slice(0, start) + content.slice(end + WEEKLY_REPORT_JSON_END.length)
+}
+
+/** 去掉模型可能添加的 Markdown 代码围栏。 */
+const normalizeJsonPayload = (value: string): string =>
+  value
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+
+/** 解析隐藏周报 JSON；没有隐藏标记时兼容旧的纯 JSON 返回。 */
+const parseWeeklyReportJson = (content: string): unknown => {
+  const markerStart = content.indexOf(WEEKLY_REPORT_JSON_START)
+
+  if (markerStart >= 0) {
+    const bodyStart = markerStart + WEEKLY_REPORT_JSON_START.length
+    const markerEnd = content.indexOf(WEEKLY_REPORT_JSON_END, bodyStart)
+
+    if (markerEnd < 0) {
+      throw new Error('隐藏 JSON 缺少结束标记')
+    }
+
+    const body = normalizeJsonPayload(content.slice(bodyStart, markerEnd))
+
+    if (!body) throw new Error('隐藏 JSON 内容为空')
+
+    try {
+      return JSON.parse(body)
+    } catch {
+      // 兼容模型在标记内额外包了一层对象或代码块的情况。
+      const braceStart = body.indexOf('{')
+      const braceEnd = body.lastIndexOf('}')
+
+      if (braceStart >= 0 && braceEnd > braceStart) {
+        try {
+          return JSON.parse(body.slice(braceStart, braceEnd + 1))
+        } catch {
+          // 继续使用统一错误提示。
+        }
+      }
+
+      throw new Error('隐藏 JSON 格式错误')
+    }
+  }
+
+  const trimmed = content.trim()
+
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return null
+
+  try {
+    return JSON.parse(trimmed)
+  } catch {
+    throw new Error('周报 JSON 格式错误')
+  }
+}
+
 /**
  * 飞书个人工作周报。
  * 使用内嵌浏览器登录态读取和提交 OA 汇报接口。
@@ -198,22 +269,24 @@ export default function WeeklyReport(): JSX.Element {
     })
   }
 
-  /** 把周报 JSON 转成聊天里的可读内容，回填仍使用原始 JSON。 */
+  /** 聊天里展示正常回答，隐藏 JSON 只用于回填。 */
   const formatGeneratedReport = (content: string): string => {
-    const start = content.indexOf('{')
-    const end = content.lastIndexOf('}')
+    const visible = stripWeeklyReportJson(content).trim()
 
-    if (start < 0 || end <= start) return content
+    if (visible && !visible.startsWith('{')) return visible
 
     let parsed: unknown
 
     try {
-      parsed = JSON.parse(content.slice(start, end + 1))
+      parsed = parseWeeklyReportJson(content)
     } catch {
-      return content
+      // 已出现隐藏标记时，即使 JSON 未完成也不能把原文显示出来。
+      return content.includes(WEEKLY_REPORT_JSON_START) ? visible : visible || content
     }
 
-    if (!isRecord(parsed)) return content
+    if (!isRecord(parsed)) {
+      return content.includes(WEEKLY_REPORT_JSON_START) ? visible : visible || content
+    }
 
     const source = isRecord(parsed.fields) ? parsed.fields : parsed
     const sections = textFields.flatMap((field) => {
@@ -228,9 +301,10 @@ export default function WeeklyReport(): JSX.Element {
       ]
     })
 
-    return sections.length ? sections.join('\n\n') : content
+    return visible || (sections.length ? sections.join('\n\n') : content)
   }
 
+  /** 从 AI 原始回复中提取隐藏 JSON，并回填到周报字段。 */
   const applyGeneratedReport = (
     content: string,
     tools: import('../../../../types/ai').AiToolCall[]
@@ -245,19 +319,19 @@ export default function WeeklyReport(): JSX.Element {
       throw new Error('AI 尚未读取工作数据，请先重新生成')
     }
 
-    const start = content.indexOf('{')
-    const end = content.lastIndexOf('}')
-
-    if (start < 0 || end <= start) {
-      throw new Error('AI 返回内容不是有效的 JSON，无法回填周报')
-    }
-
     let parsed: unknown
 
     try {
-      parsed = JSON.parse(content.slice(start, end + 1))
-    } catch {
-      throw new Error('AI 返回内容不是有效的 JSON，无法回填周报')
+      parsed = parseWeeklyReportJson(content)
+    } catch (error) {
+      const detail =
+        error instanceof Error ? error.message : '周报 JSON 格式错误'
+
+      throw new Error(`${detail}，无法回填周报`)
+    }
+
+    if (!parsed) {
+      throw new Error('AI 没有生成可回填的周报数据')
     }
 
     if (!isRecord(parsed)) {
@@ -310,9 +384,10 @@ export default function WeeklyReport(): JSX.Element {
       applyLabel: '应用到周报内容',
       formatContent: formatGeneratedReport,
       prompt: [
-        '请优先调用 getWeeklyWorkItems 获取我本周更新或完成的需求。',
-        '该工具返回的数据足够时，不要再用 executeShell 逐个查询需求。',
-        '只有缺少飞书数据或工具未覆盖的信息时，才使用 executeShell 调用本机 lark-cli / meegle 补充。',
+        '请优先调用 getWeeklyWorkItems 获取本周完整工作上下文。',
+        '该工具会返回 Meegle 需求、本地临时需求、已解决缺陷和代码提交。',
+        '该工具返回的数据足够时，不要再用 executeShell 逐个查询需求、缺陷或 Git 提交。',
+        '只有缺少飞书数据或工具未覆盖的信息时，才使用 executeShell 调用本机 lark-cli / meegle / git 补充。',
         '需要时先用 --help / inspect 探查命令，不要假设 CLI 参数；help/版本探查最多两次。',
         '',
         '然后根据工具实际返回的数据生成本周周报。',
@@ -326,12 +401,17 @@ export default function WeeklyReport(): JSX.Element {
         '- 需协调配合事项只写确实需要他人决策或配合的事项：找谁、需要什么、影响什么；没有就写“暂无”。',
         '- 每条尽量写成“事项或需求 + 动作 + 结果或状态”，避免流水账和大段概括。',
         '- 技术细节只保留影响进度或结论的部分。',
+        '- 已解决缺陷要写成具体问题、处理结果和影响，不要只列缺陷标题。',
+        '- 代码提交用于补充实际改动和技术细节，不要把同一件事拆成多条流水账。',
         '',
         '输出要求：',
-        '- 只输出一个 JSON 对象，不要代码块、解释或额外字段。',
-        '- JSON 的键必须使用下面提供的字段 id，值是纯文本。',
-        '- 所有字段都要生成；没有依据时写“暂无可提供的信息”，不要编造。',
-        '- 如果工具读取失败或数据不足，明确说明，不要用猜测补全。',
+        '先像正常对话一样，用 Markdown 输出一份给人阅读的周报正文；按字段分节，内容要具体、可读。',
+        '正文之后，再输出一段不可见的 HTML 注释 JSON，专门用于点击“应用到周报内容”时回填页面。',
+        '隐藏 JSON 必须严格使用下面的格式，放在回复最后，不要加代码块：',
+        `<!--WEEKLY_REPORT_JSON_START{"fields":{"字段id":"纯文本内容"}}WEEKLY_REPORT_JSON_END-->`,
+        '隐藏 JSON 的键必须使用下面提供的字段 id，值是纯文本；所有字段都要生成，没有依据时写“暂无可提供的信息”，不要编造。',
+        '正常回答中不要重复隐藏 JSON 的内容。',
+        '如果工具读取失败或数据不足，在正常回答中明确说明，不要用猜测补全。',
         '',
         '可回填字段：',
         fieldMeta
