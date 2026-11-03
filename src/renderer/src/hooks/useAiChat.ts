@@ -192,6 +192,7 @@ export const useAiChat = (options: UseAiChatOptions = {}): UseAiChatResult => {
       .getAiAssistantSession()
       .then((state) => {
         if (!active) return
+        // 恢复期间用户可能已开始新对话，历史数据不得覆盖当前会话。
         if (messagesRef.current.length === 0) {
           updateMessages(state.messages)
         }
@@ -207,6 +208,7 @@ export const useAiChat = (options: UseAiChatOptions = {}): UseAiChatResult => {
   }, [persistAssistantSession, updateMessages])
 
   useEffect(() => {
+    // 完成水合且不在流式生成时才保存，避免空初始值或半截输出覆盖完整历史。
     if (!persistAssistantSession || !hydrated || streaming) return
 
     const stored = toStoredMessages(messages)
@@ -503,6 +505,7 @@ export const useAiChat = (options: UseAiChatOptions = {}): UseAiChatResult => {
         if (requestVersion !== requestVersionRef.current) return
 
         pendingEventsRef.current = []
+        // 启动失败仅移除空助手消息，保留用户提示（包括隐藏提示）供首次分析重试。
         updateMessages(
           messagesRef.current.filter((message) => message.id !== assistant.id)
         )

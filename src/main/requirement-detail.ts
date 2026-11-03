@@ -210,6 +210,7 @@ export const getRequirementDetail = async (raw: string): Promise<RequirementDeta
   const projectKey = reference.projectKey ?? (await getProject()).key
   const fields: RequirementDetailResponse['work_item_fields'] = []
   const currentNodeNames = new Set<string>()
+  const seenPageTokens = new Set<string>()
   let attribute: RequirementDetailResponse['work_item_attribute']
   let pageToken: string | undefined
 
@@ -242,11 +243,24 @@ export const getRequirementDetail = async (raw: string): Promise<RequirementDeta
       if (node.name?.trim()) currentNodeNames.add(node.name.trim())
     }
 
-    pageToken = response.pagination?.has_more
-      ? response.pagination.next_page_token
-      : undefined
+    if (!response.pagination?.has_more) {
+      pageToken = undefined
+      break
+    }
 
-    if (!pageToken) break
+    // 声明有下一页却缺少有效 token，或 token 循环，均不能当作完整详情返回。
+    const nextPageToken = response.pagination.next_page_token
+
+    if (typeof nextPageToken !== 'string' || !nextPageToken.trim()) {
+      throw new Error('需求字段分页异常：缺少有效的下一页 token，无法完整读取')
+    }
+    if (seenPageTokens.has(nextPageToken)) {
+      throw new Error('需求字段分页异常：下一页 token 重复，无法完整读取')
+    }
+
+    seenPageTokens.add(nextPageToken)
+    // token 是服务端的不透明标识，校验后原样传回，不修改其内容。
+    pageToken = nextPageToken
   }
 
   if (pageToken) {

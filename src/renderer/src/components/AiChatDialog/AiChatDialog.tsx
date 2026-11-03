@@ -564,10 +564,13 @@ export default function AiChatDialog({
   }
 
   const visibleMessages = messages.filter((message) => !message.hidden)
+  // 隐藏的初始提示会在启动失败后保留供重试，不能仅凭“无可见消息”判断仍在等待。
   const preparing =
     open &&
     configStatus?.configured === true &&
     autoStart &&
+    !error &&
+    (streaming || !startedRef.current) &&
     visibleMessages.length === 0 &&
     Boolean(initialPrompt.trim())
   return (
@@ -657,6 +660,8 @@ export default function AiChatDialog({
                     ? '正在检查模型配置'
                     : preparing
                       ? '正在准备分析'
+                      : error
+                        ? '分析未能完成'
                       : '有什么可以帮你？'}
                 </h3>
                 <p>
@@ -664,6 +669,8 @@ export default function AiChatDialog({
                     ? '请稍候...'
                     : preparing
                       ? '正在发送当前页面内容...'
+                      : error
+                        ? '可点击上方“重试”重新发送原请求，或输入新的问题。'
                       : '输入问题，开始和 AI 对话。'}
                 </p>
               </div>

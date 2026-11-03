@@ -193,41 +193,56 @@ const runExecutable = (
         ? { windowsVerbatimArguments: true }
         : {})
     })
-    let stdout = ''
-    let stderr = ''
+    const stdoutChunks: Buffer[] = []
+    const stderrChunks: Buffer[] = []
+    let stdoutBytes = 0
+    let stderrBytes = 0
     let settled = false
-    const timeout = setTimeout(() => {
-      if (settled) return
-      settled = true
-      child.kill()
-      reject(new Error('Meegle CLI command timed out'))
-    }, timeoutMs)
-
-    child.stdout?.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8')
-
-      if (stdout.length > MEEGLE_MAX_BUFFER_BYTES) {
-        child.kill()
-      }
-    })
-    child.stderr?.on('data', (chunk: Buffer) => {
-      stderr += chunk.toString('utf8')
-    })
-    child.on('error', (error) => {
+    const fail = (error: Error): void => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
+      // 先结算并释放已收集内容，再终止进程；kill 后仍可能收到 data/error/close。
+      stdoutChunks.length = 0
+      stderrChunks.length = 0
+      child.kill()
       reject(error)
+    }
+    const timeout = setTimeout(() => {
+      fail(new Error('Meegle CLI command timed out'))
+    }, timeoutMs)
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      if (settled) return
+      if (stdoutBytes + chunk.byteLength > MEEGLE_MAX_BUFFER_BYTES) {
+        fail(new Error('Meegle CLI stdout exceeded the 2 MB output limit'))
+        return
+      }
+      stdoutBytes += chunk.byteLength
+      stdoutChunks.push(chunk)
     })
+    child.stderr?.on('data', (chunk: Buffer) => {
+      if (settled) return
+      if (stderrBytes + chunk.byteLength > MEEGLE_MAX_BUFFER_BYTES) {
+        fail(new Error('Meegle CLI stderr exceeded the 2 MB output limit'))
+        return
+      }
+      stderrBytes += chunk.byteLength
+      stderrChunks.push(chunk)
+    })
+    child.on('error', fail)
     child.on('close', (code) => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
       resolve({
         code: code ?? 1,
-        stdout,
-        stderr
+        // 最后统一解码，避免 UTF-8 字符被拆在两个 data 块中时出现乱码。
+        stdout: Buffer.concat(stdoutChunks, stdoutBytes).toString('utf8'),
+        stderr: Buffer.concat(stderrChunks, stderrBytes).toString('utf8')
       })
+      stdoutChunks.length = 0
+      stderrChunks.length = 0
     })
   })
 
@@ -467,6 +482,7 @@ const isLoginSuccess = (response: DeviceFlowResponse, code: number): boolean => 
     return true
   }
 
+  // 兼容旧 CLI 成功时只返回退出码、不返回 status 的响应。
   return code === 0 && !status
 }
 

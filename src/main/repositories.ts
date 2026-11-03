@@ -162,6 +162,18 @@ const writeStore = async (repositories: StoredRepository[]): Promise<void> => {
   }
 }
 
+// 原子替换文件只能避免写坏文件；整个读—改—写过程还必须串行，才能避免旧快照覆盖新配置。
+let repositoryMutationQueue: Promise<void> = Promise.resolve()
+let repositoryRootRevision = 0
+let repositoryRemovalRevision = 0
+const removedRepositoryPaths = new Map<string, number>()
+
+const mutateRepositories = <T>(operation: () => Promise<T>): Promise<T> => {
+  const result = repositoryMutationQueue.then(operation, operation)
+  repositoryMutationQueue = result.then(() => undefined, () => undefined)
+  return result
+}
+
 /**
  * 判断路径是否存在。
  */
@@ -224,7 +236,7 @@ const runGit = async (
 
 /**
  * 读取仓库基础信息。
- * 返回 null 表示目标路径不是 Git 工作区。
+ * 返回 null 表示不是 Git 工作区或读取失败，不能据此判断仓库已删除。
  */
 const inspectRepository = async (targetPath: string): Promise<InspectedRepository | null> => {
   try {
@@ -278,7 +290,10 @@ const inspectRepository = async (targetPath: string): Promise<InspectedRepositor
  * 在单个根目录下查找 Git 仓库。
  * 找到仓库后不再向该仓库内部递归。
  */
-const findRepositoriesUnderRoot = async (rootPath: string): Promise<string[]> => {
+const findRepositoriesUnderRoot = async (
+  rootPath: string,
+  errors: string[]
+): Promise<string[]> => {
   const repositories: string[] = []
   const resolvedRoot = resolve(rootPath)
 
@@ -287,7 +302,10 @@ const findRepositoriesUnderRoot = async (rootPath: string): Promise<string[]> =>
 
     try {
       entries = await readdir(directory, { withFileTypes: true })
-    } catch {
+    } catch (error) {
+      errors.push(
+        `无法扫描目录：${directory}（${error instanceof Error ? error.message : '读取失败'}）`
+      )
       return
     }
 
@@ -436,6 +454,7 @@ const startRepositoryWatcher = (root: string | null): void => {
  * 供任意页面或后台任务调用。
  */
 export const refreshRepository = async (repositoryId: string): Promise<RepositoryState> => {
+  const rootRevision = repositoryRootRevision
   const repositories = await readStore()
   const target = repositories.find((repository) => repository.id === repositoryId)
 
@@ -447,7 +466,10 @@ export const refreshRepository = async (repositoryId: string): Promise<Repositor
     const inspected = await inspectRepository(target.localPath)
 
     if (inspected) {
-      const next = repositories.map((repository) =>
+      await mutateRepositories(async () => {
+      if (rootRevision !== repositoryRootRevision) return
+      const latest = await readStore()
+      const next = latest.map((repository) =>
         repository.id === repositoryId
           ? {
               ...repository,
@@ -461,6 +483,7 @@ export const refreshRepository = async (repositoryId: string): Promise<Repositor
       )
 
       await writeStore(next)
+      })
     }
   }
 
@@ -1624,10 +1647,12 @@ export const createRepositoryBranch = async (
 /**
  * 扫描代码根目录。
  * 以当前根目录为唯一数据范围，新仓库自动加入，已有仓库更新 Git 信息，
- * 不在根目录或已不存在的历史仓库会从配置中移除。
+ * 只有确认移出根目录或路径不存在的历史仓库才移除；读取失败保留原记录和 ID。
  */
 export const refreshRootRepositories = async (): Promise<RepositoryScanResult> => {
   const root = getPreferences().repositoryRoot
+  const rootRevision = repositoryRootRevision
+  const removalRevision = repositoryRemovalRevision
   const errors: string[] = []
 
   if (!root) {
@@ -1655,7 +1680,7 @@ export const refreshRootRepositories = async (): Promise<RepositoryScanResult> =
   }
 
   const discoveredPaths = new Set<string>()
-  const repositories = await findRepositoriesUnderRoot(root)
+  const repositories = await findRepositoriesUnderRoot(root, errors)
 
   for (const repositoryPath of repositories) {
     discoveredPaths.add(repositoryPath)
@@ -1678,6 +1703,12 @@ export const refreshRootRepositories = async (): Promise<RepositoryScanResult> =
     (inspected): inspected is InspectedRepository => inspected !== null
   )
 
+  const counts = await mutateRepositories(async () => {
+  // 根目录切换/清空后，旧扫描的结果作废，不能写回新根目录的配置。
+  if (rootRevision !== repositoryRootRevision) {
+    errors.push('扫描期间代码根目录已变更，已忽略本次扫描结果')
+    return { added: 0, updated: 0, removed: 0 }
+  }
   const existing = await readStore()
   const existingByPath = new Map(existing.map((repository) => [getPathKey(repository.localPath), repository]))
   const now = new Date().toISOString()
@@ -1686,6 +1717,8 @@ export const refreshRootRepositories = async (): Promise<RepositoryScanResult> =
   let updated = 0
 
   for (const inspected of inspectedRepositories) {
+    // 删除发生在扫描开始之后时，当前扫描不得把该仓库作为“新仓库”重新加入。
+    if ((removedRepositoryPaths.get(getPathKey(inspected.localPath)) ?? 0) > removalRevision) continue
     const previous = existingByPath.get(getPathKey(inspected.localPath))
     const repository: StoredRepository = {
       id: previous?.id ?? randomUUID(),
@@ -1707,16 +1740,53 @@ export const refreshRootRepositories = async (): Promise<RepositoryScanResult> =
     nextById.set(repository.id, repository)
   }
 
+  const inspectedPathKeys = new Set(
+    inspectedRepositories.map((repository) => getPathKey(repository.localPath))
+  )
+
+  // 扫描遗漏不等于删除：权限、扫描深度和 Git 临时错误都可能让现有仓库未被返回。
+  // 对遗漏的记录只依据明确的文件系统结果移除，避免重新发现时更换 ID、断开需求绑定。
+  for (const repository of existing) {
+    if (nextById.has(repository.id)) continue
+    if (inspectedPathKeys.has(getPathKey(repository.localPath))) continue
+
+    const relativePath = relative(getPathKey(root), getPathKey(repository.localPath))
+    if (
+      relativePath === '..' ||
+      relativePath.startsWith('../') ||
+      relativePath.startsWith('..\\') ||
+      isAbsolute(relativePath)
+    ) {
+      continue
+    }
+
+    try {
+      if (!(await stat(repository.localPath)).isDirectory()) continue
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+
+      if (code === 'ENOENT' || code === 'ENOTDIR') continue
+
+      errors.push(
+        `无法确认仓库路径状态，已保留配置：${repository.localPath}（${
+          error instanceof Error ? error.message : '读取失败'
+        }）`
+      )
+    }
+
+    nextById.set(repository.id, repository)
+  }
+
   const removed = existing.filter((repository) => !nextById.has(repository.id)).length
   const merged = [...nextById.values()]
   await writeStore(merged)
+  return { added, updated, removed }
+  })
 
   const state = await getRepositoryState()
   const result: RepositoryScanResult = {
     ...state,
-    added,
-    updated,
-    removed,
+    ...counts,
     unavailable: state.repositories.filter((repository) => !repository.available).length,
     errors
   }
@@ -1736,6 +1806,7 @@ export const setRepositoryRoot = async (rootPath: string): Promise<RepositorySta
     throw new Error('选择的目录不存在')
   }
 
+  await mutateRepositories(async () => {
   const previousRoot = getPreferences().repositoryRoot
   const rootChanged = previousRoot ? getPathKey(previousRoot) !== getPathKey(normalized) : false
 
@@ -1747,7 +1818,9 @@ export const setRepositoryRoot = async (rootPath: string): Promise<RepositorySta
     await writeStore([])
   }
 
+  repositoryRootRevision += 1
   startRepositoryWatcher(normalized)
+  })
   await refreshRootRepositories()
 
   return getRepositoryState()
@@ -1758,11 +1831,14 @@ export const setRepositoryRoot = async (rootPath: string): Promise<RepositorySta
  * 只删除应用内元数据，不删除本地代码。
  */
 export const clearRepositoryRoot = async (): Promise<RepositoryState> => {
+  await mutateRepositories(async () => {
   updatePreferences({
     repositoryRoot: undefined
   })
   await writeStore([])
+  repositoryRootRevision += 1
   stopRepositoryWatcher()
+  })
 
   const state = await getRepositoryState()
   broadcastRepositoryChanged(state)
@@ -1773,13 +1849,24 @@ export const clearRepositoryRoot = async (): Promise<RepositoryState> => {
  * 将指定路径的 Git 仓库写入仓库数据。
  * 克隆完成后复用这段逻辑。
  */
-const saveRepositoryFromPath = async (targetPath: string): Promise<RepositoryState> => {
+const saveRepositoryFromPath = async (
+  targetPath: string,
+  rootRevision = repositoryRootRevision
+): Promise<RepositoryState> => {
+  const removalRevision = repositoryRemovalRevision
   const inspected = await inspectRepository(targetPath)
 
   if (!inspected) {
     throw new Error('选择的目录不是 Git 仓库')
   }
 
+  await mutateRepositories(async () => {
+  if (rootRevision !== repositoryRootRevision) {
+    throw new Error('代码根目录已变更，请重新扫描仓库')
+  }
+  if ((removedRepositoryPaths.get(getPathKey(inspected.localPath)) ?? 0) > removalRevision) {
+    throw new Error('仓库记录已被移除，请重新扫描仓库')
+  }
   const repositories = await readStore()
   const existing = repositories.find(
     (repository) => getPathKey(repository.localPath) === getPathKey(inspected.localPath)
@@ -1801,6 +1888,7 @@ const saveRepositoryFromPath = async (targetPath: string): Promise<RepositorySta
     : [...repositories, repository]
 
   await writeStore(next)
+  })
   return getRepositoryState()
 }
 
@@ -1924,6 +2012,7 @@ export const cancelRepositoryClone = (): void => {
  * 从 Git 克隆仓库到指定根目录。
  */
 export const cloneRepository = async (input: CloneRepositoryInput): Promise<RepositoryState> => {
+  const rootRevision = repositoryRootRevision
   const url = input.url.trim()
   const configuredRoot = getPreferences().repositoryRoot
 
@@ -1983,7 +2072,7 @@ export const cloneRepository = async (input: CloneRepositoryInput): Promise<Repo
 
   broadcastCloneProgress({ message: '正在读取仓库信息...', percent: 100 })
 
-  const state = await saveRepositoryFromPath(targetPath)
+  const state = await saveRepositoryFromPath(targetPath, rootRevision)
   broadcastRepositoryChanged(state)
 
   return state
@@ -1996,6 +2085,7 @@ export const updateRepository = async (
   repositoryId: string,
   patch: UpdateRepositoryInput
 ): Promise<RepositoryState> => {
+  await mutateRepositories(async () => {
   const repositories = await readStore()
   const target = repositories.find((repository) => repository.id === repositoryId)
 
@@ -2017,6 +2107,7 @@ export const updateRepository = async (
   )
 
   await writeStore(next)
+  })
 
   const state = await getRepositoryState()
   broadcastRepositoryChanged(state)
@@ -2028,8 +2119,14 @@ export const updateRepository = async (
  * 只删除应用内记录，不删除本地代码。
  */
 export const removeRepository = async (repositoryId: string): Promise<RepositoryState> => {
+  await mutateRepositories(async () => {
   const repositories = await readStore()
+  const target = repositories.find((repository) => repository.id === repositoryId)
   await writeStore(repositories.filter((repository) => repository.id !== repositoryId))
+  if (target) {
+    removedRepositoryPaths.set(getPathKey(target.localPath), ++repositoryRemovalRevision)
+  }
+  })
 
   const state = await getRepositoryState()
   broadcastRepositoryChanged(state)
@@ -2128,7 +2225,7 @@ export const initializeRepositories = (): void => {
     return setRepositoryRoot(rootPath)
   })
 
-  // 清除代码根目录，不删除仓库数据。
+  // 清除根目录及应用内仓库记录，不删除磁盘上的代码。
   ipcMain.handle('repositories:clear-root', () => clearRepositoryRoot())
 
   // 打开系统目录选择器。

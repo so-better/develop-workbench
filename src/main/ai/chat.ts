@@ -228,7 +228,9 @@ const stringifyToolOutput = (output: unknown): string => {
   let text: string
 
   try {
-    text = typeof output === 'string' ? output : JSON.stringify(output)
+    text = output instanceof Error
+      ? `${output.name}: ${output.message}`
+      : typeof output === 'string' ? output : (JSON.stringify(output) ?? String(output))
   } catch {
     text = String(output)
   }

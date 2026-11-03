@@ -10,7 +10,7 @@ import { clearAiArtifacts, getAiArtifactStats } from './ai/artifacts'
 import {
   BROWSER_PARTITION,
   clearEmbeddedBrowserDownloadHistory,
-  closeEmbeddedBrowserForWindow,
+  closeEmbeddedBrowserForCleanup,
   getEmbeddedBrowserDownloadHistoryStats
 } from './embedded-browser'
 import type {
@@ -145,10 +145,10 @@ const clearSessionCaches = async (target: Session): Promise<void> => {
   await target.clearHostResolverCache()
 }
 
-const closeOpenBrowsers = (): void => {
+const closeOpenBrowsers = async (): Promise<void> => {
   for (const window of BrowserWindow.getAllWindows()) {
     if (window.isDestroyed()) continue
-    closeEmbeddedBrowserForWindow(window)
+    await closeEmbeddedBrowserForCleanup(window)
   }
 }
 
@@ -185,7 +185,7 @@ export const clearStorageItem = async (
       await clearAiArtifacts()
       break
     case 'browser-cache':
-      closeOpenBrowsers()
+      await closeOpenBrowsers()
       await clearSessionCaches(session.fromPartition(BROWSER_PARTITION))
       break
     case 'app-cache':

@@ -10,6 +10,7 @@ const MAX_CACHE_BYTES = 64 * 1024 * 1024
 const CACHE_TTL_MS = 5 * 60 * 1000
 const MAX_CACHE_ENTRIES = 40
 const IMAGE_TIMEOUT_MS = 20_000
+const MAX_IMAGE_REDIRECTS = 5
 
 const ALLOWED_IMAGE_HOSTS = [
   'feishu.cn',
@@ -139,9 +140,14 @@ const loadImage = async (rawUrl: string): Promise<string | null> => {
 
   try {
     const browserSession = session.fromPartition(BROWSER_PARTITION)
-    const response = await browserSession.fetch(url.toString(), {
+    // 整条重定向链共用超时；每次请求前重新检查目标，禁止白名单站点跳转绕过校验。
+    const signal = AbortSignal.timeout(IMAGE_TIMEOUT_MS)
+    let response: Response
+    for (let redirects = 0; ; redirects += 1) {
+      if (!isAllowedImageUrl(url)) return null
+      response = await browserSession.fetch(url.toString(), {
       method: 'GET',
-      redirect: 'follow',
+      redirect: 'manual',
       credentials: 'include',
       headers: {
         accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif,*/*',
@@ -149,17 +155,52 @@ const loadImage = async (rawUrl: string): Promise<string | null> => {
         referer: `${url.origin}/`,
         'user-agent': USER_AGENT
       },
-      signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS)
+      signal
     })
 
-    if (!response.ok) return null
+      if (![301, 302, 303, 307, 308].includes(response.status)) break
+
+      const location = response.headers.get('location')
+      await response.body?.cancel()
+      if (!location || redirects >= MAX_IMAGE_REDIRECTS) return null
+      url = new URL(location, url)
+    }
+
+    if (!response.ok) {
+      await response.body?.cancel()
+      return null
+    }
 
     const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
     const contentLength = Number(response.headers.get('content-length') ?? 0)
 
-    if (contentLength > MAX_IMAGE_BYTES) return null
+    if (contentLength > MAX_IMAGE_BYTES) {
+      await response.body?.cancel()
+      return null
+    }
 
-    const buffer = Buffer.from(await response.arrayBuffer())
+    if (!response.body) return null
+    const reader = response.body.getReader()
+    const chunks: Buffer[] = []
+    let totalBytes = 0
+
+    // content-length 可能缺失或不准确，以实际读取的字节数为准，超限立即取消响应流。
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        totalBytes += value.byteLength
+        if (totalBytes > MAX_IMAGE_BYTES) {
+          await reader.cancel()
+          return null
+        }
+        chunks.push(Buffer.from(value))
+      }
+    } finally {
+      reader.releaseLock()
+    }
+
+    const buffer = Buffer.concat(chunks, totalBytes)
 
     if (buffer.byteLength === 0 || buffer.byteLength > MAX_IMAGE_BYTES) {
       return null

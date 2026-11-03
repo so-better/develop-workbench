@@ -76,6 +76,7 @@ interface DeviceFlowResponse {
  */
 interface PendingLogin {
   child: ChildProcess
+  timer: NodeJS.Timeout | null
 }
 
 const execFileAsync = promisify(execFile)
@@ -95,6 +96,32 @@ const LOGIN_SCOPE = 'auth:user.id:read contact:user.basic_profile:readonly profi
 
 // 当前正在等待授权的登录会话。
 let pendingLogin: PendingLogin | null = null
+// 二维码生成也属于登录会话；取消后不能让尚在 await 的旧请求重新启动轮询。
+let loginRequestVersion = 0
+
+/** Windows 轮询可能由 cmd 包装，终止时一起清理其 CLI 子进程。 */
+const stopLoginProcess = (child: ChildProcess): void => {
+  if (process.platform === 'win32' && child.pid) {
+    execFile('taskkill.exe', ['/pid', String(child.pid), '/T', '/F'], {
+      windowsHide: true,
+      timeout: 5_000
+    }, () => undefined)
+    return
+  }
+
+  child.kill('SIGTERM')
+}
+
+/** 仅当前会话可以结束并广播结果，迟到的 error/close 事件直接忽略。 */
+const finishLogin = (pending: PendingLogin, event?: LarkLoginEvent): boolean => {
+  if (pendingLogin !== pending) return false
+
+  if (pending.timer) clearTimeout(pending.timer)
+  pending.timer = null
+  pendingLogin = null
+  if (event) broadcastLoginEvent(event)
+  return true
+}
 
 /**
  * 向所有窗口广播扫码登录结果。
@@ -467,14 +494,17 @@ const createLoginQrDataUrl = async (
  * 授权完成后由主进程广播登录结果。
  */
 export const startLarkLogin = async (): Promise<LarkLoginSession> => {
+  cancelLarkLogin()
+  const requestVersion = loginRequestVersion
+  const ensureCurrentRequest = (): void => {
+    if (requestVersion !== loginRequestVersion) throw new Error('飞书登录已取消')
+  }
   const resolved = await resolveLarkCli(true)
+  ensureCurrentRequest()
 
   if (!resolved?.available) {
     throw new Error('Lark Cli 不可用')
   }
-
-  // 新登录会替换掉上一次尚未完成的会话。
-  cancelLarkLogin()
 
   const output = await runExecutable(resolved.path, [
     'auth',
@@ -485,6 +515,7 @@ export const startLarkLogin = async (): Promise<LarkLoginSession> => {
     '--scope',
     LOGIN_SCOPE
   ])
+  ensureCurrentRequest()
   const response = parseJson(output) as DeviceFlowResponse
 
   // lark-cli 的 no-wait 成功响应不一定包含 ok 字段，以关键字段为准。
@@ -492,47 +523,71 @@ export const startLarkLogin = async (): Promise<LarkLoginSession> => {
     throw new Error(response.error?.message ?? '无法发起飞书授权')
   }
 
+  // 授权有效期从拿到 device code 起计时，不能在生成二维码之后重新开始计时。
+  const expiresIn = typeof response.expires_in === 'number' &&
+    Number.isFinite(response.expires_in) && response.expires_in > 0
+    ? Math.min(response.expires_in, 24 * 60 * 60)
+    : 600
+  const expiresAt = Date.now() + expiresIn * 1000
   const qrCodeDataUrl = await createLoginQrDataUrl(
     resolved.path,
     response.verification_url
   )
+  ensureCurrentRequest()
+  if (Date.now() >= expiresAt) throw new Error('飞书授权已过期，请重新生成二维码')
 
   // 后台轮询授权状态，用户扫码完成后自动获取 token。
+  const invocation = getCliInvocation(resolved.path, [
+    'auth', 'login', '--device-code', response.device_code, '--json'
+  ])
   const child = spawn(
-    resolved.path,
-    ['auth', 'login', '--device-code', response.device_code, '--json'],
+    invocation.command,
+    invocation.args,
     {
-      env: process.env,
+      env: getCliEnvironment(resolved.path),
+      windowsHide: true,
+      windowsVerbatimArguments: invocation.windowsVerbatimArguments,
       stdio: ['ignore', 'pipe', 'pipe']
     }
   )
-  const pending: PendingLogin = { child }
+  const pending: PendingLogin = { child, timer: null }
   pendingLogin = pending
+  pending.timer = setTimeout(() => {
+    if (finishLogin(pending, { status: 'error', message: '飞书授权超时，请重新生成二维码' })) {
+      stopLoginProcess(child)
+    }
+  }, Math.max(1, expiresAt - Date.now()))
 
   let stdout = ''
+  let outputBytes = 0
 
   child.stdout?.on('data', (chunk: Buffer) => {
+    if (pendingLogin !== pending) return
+    outputBytes += chunk.length
+    if (outputBytes > MAX_BUFFER_BYTES) {
+      if (finishLogin(pending, { status: 'error', message: '飞书授权输出超出限制，请重试' })) {
+        stopLoginProcess(child)
+      }
+      return
+    }
     stdout += chunk.toString('utf8')
   })
+  // CLI 可能持续向 stderr 打印轮询日志，必须消费管道，避免写满后阻塞。
+  child.stderr?.resume()
 
   child.on('error', (error) => {
-    if (pendingLogin !== pending) return
-
-    pendingLogin = null
-    broadcastLoginEvent({
+    if (finishLogin(pending, {
       status: 'error',
       message: error.message
-    })
+    })) stopLoginProcess(child)
   })
 
   child.on('close', (code) => {
     if (pendingLogin !== pending) return
 
-    pendingLogin = null
-
     if (code === 0) {
       invalidateLarkCliResolution()
-      broadcastLoginEvent({ status: 'success' })
+      finishLogin(pending, { status: 'success' })
       return
     }
 
@@ -545,7 +600,7 @@ export const startLarkLogin = async (): Promise<LarkLoginSession> => {
       // 命令失败且没有 JSON 输出时使用默认提示。
     }
 
-    broadcastLoginEvent({
+    finishLogin(pending, {
       status: 'error',
       message
     })
@@ -553,7 +608,7 @@ export const startLarkLogin = async (): Promise<LarkLoginSession> => {
 
   return {
     qrCodeDataUrl,
-    expiresAt: Date.now() + (response.expires_in ?? 600) * 1000
+    expiresAt
   }
 }
 
@@ -562,12 +617,13 @@ export const startLarkLogin = async (): Promise<LarkLoginSession> => {
  * 关闭弹窗或重新生成二维码时调用。
  */
 export const cancelLarkLogin = (): void => {
+  loginRequestVersion += 1
   const current = pendingLogin
 
   if (!current) return
 
-  pendingLogin = null
-  current.child.kill()
+  finishLogin(current)
+  stopLoginProcess(current.child)
 }
 
 /**

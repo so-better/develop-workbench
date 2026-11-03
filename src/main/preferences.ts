@@ -1,5 +1,6 @@
 import { app } from 'electron'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { closeSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { backupCorruptStoreSync } from './store-backup'
 import type { ThemeMode } from '../types/theme'
@@ -149,7 +150,7 @@ export const getPreferences = (): AppPreferences => ({ ...readPreferences() })
 
 /**
  * 合并并保存应用偏好。
- * 写入磁盘失败时仍保留本次会话中的内存值。
+ * 同目录临时文件落盘后原子替换，成功后才更新缓存；失败由调用方处理。
  */
 export const updatePreferences = (patch: Partial<AppPreferences>): AppPreferences => {
   const next: AppPreferences = {
@@ -172,13 +173,31 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
     next.productGuideSeenVersion >= 0
       ? next.productGuideSeenVersion
       : undefined
-  cachedPreferences = next
-
+  const targetPath = getPreferencesPath()
+  const temporaryPath = `${targetPath}.${randomUUID()}.tmp`
+  let temporaryCreated = false
   try {
-    writeFileSync(getPreferencesPath(), JSON.stringify(next, null, 2), 'utf8')
-  } catch {
-    // 偏好持久化失败不阻断当前操作。
+    // 独占创建，避免覆盖其他文件；Windows 上也需先关闭句柄再执行重命名。
+    const descriptor = openSync(temporaryPath, 'wx', 0o600)
+    temporaryCreated = true
+    try {
+      writeFileSync(descriptor, JSON.stringify(next, null, 2), 'utf8')
+      fsyncSync(descriptor)
+    } finally {
+      closeSync(descriptor)
+    }
+    renameSync(temporaryPath, targetPath)
+  } catch (error) {
+    if (temporaryCreated) {
+      try {
+        rmSync(temporaryPath, { force: true })
+      } catch {
+        // 清理失败不掩盖原始保存错误，也不能删除原配置文件。
+      }
+    }
+    throw error
   }
 
+  cachedPreferences = next
   return { ...next }
 }

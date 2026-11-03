@@ -649,6 +649,46 @@ export const getWeeklyReport = async (
  * 提交本周周报。
  * 内部接口不是飞书开放平台 API，提交前会保留页面二次确认。
  */
+const isReportRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+
+/** IPC 类型声明不等于运行时校验；完整检查后才允许进入授权和网络提交流程。 */
+const validateWeeklyReportInput = (value: unknown): SubmitWeeklyReportInput => {
+  if (!isReportRecord(value)) throw new Error('周报参数不合法')
+  if (typeof value.ruleId !== 'string' || !value.ruleId.trim()) {
+    throw new Error('周报规则不合法')
+  }
+  if (!Array.isArray(value.fields)) throw new Error('周报内容不合法')
+
+  const ids = new Set<string>()
+  for (const [index, field] of value.fields.entries()) {
+    const label = `周报第 ${index + 1} 个字段`
+    if (!isReportRecord(field) || typeof field.id !== 'string' || !field.id.trim()) {
+      throw new Error(`${label} ID 不合法`)
+    }
+    if (ids.has(field.id)) throw new Error(`${label} ID 重复`)
+    ids.add(field.id)
+    if (typeof field.text !== 'string' || typeof field.html !== 'string') {
+      throw new Error(`${label}文本格式不合法`)
+    }
+    if (!isReportRecord(field.delta) || !Array.isArray(field.delta.ops)) {
+      throw new Error(`${label}富文本格式不合法`)
+    }
+    // 提交的是编辑器内容快照：支持文本或嵌入对象，不接受 retain/delete 增量操作。
+    for (const op of field.delta.ops) {
+      if (!isReportRecord(op) ||
+          (typeof op.insert !== 'string' && !isReportRecord(op.insert)) ||
+          'retain' in op || 'delete' in op ||
+          (op.attributes !== undefined && !isReportRecord(op.attributes))) {
+        throw new Error(`${label}富文本操作不合法`)
+      }
+    }
+  }
+
+  // 校验不改写或截断文本、HTML 和 Delta，交给现有转换逻辑处理。
+  return value as unknown as SubmitWeeklyReportInput
+}
+
 const submitWeeklyReportInternal = async (
   input: SubmitWeeklyReportInput
 ): Promise<WeeklyReportState> => {
@@ -769,9 +809,11 @@ const submitWeeklyReportInternal = async (
  */
 export const submitWeeklyReport = async (
   window: BrowserWindow,
-  input: SubmitWeeklyReportInput
-): Promise<WeeklyReportState> =>
-  withWeeklyReportAuth(window, () => submitWeeklyReportInternal(input))
+  value: unknown
+): Promise<WeeklyReportState> => {
+  const input = validateWeeklyReportInput(value)
+  return withWeeklyReportAuth(window, () => submitWeeklyReportInternal(input))
+}
 
 export const initializeWeeklyReport = (): void => {
   ipcMain.handle('weekly-report:get', (event) => {
@@ -786,6 +828,6 @@ export const initializeWeeklyReport = (): void => {
 
     if (!window) throw new Error('无法获取当前窗口')
 
-    return submitWeeklyReport(window, input as SubmitWeeklyReportInput)
+    return submitWeeklyReport(window, input)
   })
 }

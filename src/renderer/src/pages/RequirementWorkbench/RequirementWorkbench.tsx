@@ -496,6 +496,7 @@ export default function RequirementWorkbench({
   const [projects, setProjects] = useState<MeegleProject[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectSwitching, setProjectSwitching] = useState(false)
+  // 主动切换空间时忽略自身收到的广播，避免重复清空状态和重复加载。
   const projectSwitchRef = useRef(false)
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null)
   const [personalStatus, setPersonalStatus] = useState<RequirementPersonalStatus | null>(null)
@@ -1926,9 +1927,15 @@ export default function RequirementWorkbench({
   /**
    * 打开创建 MR 弹窗，并按当前绑定预选来源和目标分支。
    */
+  const mergeRequestVersionRef = useRef(0)
+  useEffect(() => {
+    if (!mergeRequestBinding) mergeRequestVersionRef.current += 1
+  }, [mergeRequestBinding])
+  useEffect(() => () => { mergeRequestVersionRef.current += 1 }, [])
   const handleOpenCreateMergeRequest = async (
     binding: RequirementRepoBinding
   ): Promise<void> => {
+    const requestVersion = ++mergeRequestVersionRef.current
     const repository = repositoryMap.get(binding.repositoryId)
     const source =
       binding.mode === 'qingzhou' ? binding.requirementBranch : binding.branchName
@@ -1946,12 +1953,13 @@ export default function RequirementWorkbench({
 
     try {
       const result = await window.electron.listRepositoryBranches(binding.repositoryId, true)
+      if (requestVersion !== mergeRequestVersionRef.current) return
       setMergeRequestBranches(result.branches)
       setMergeRequestWarning(result.fetchWarning)
     } catch (error) {
-      setMergeRequestWarning(getErrorMessage(error))
+      if (requestVersion === mergeRequestVersionRef.current) setMergeRequestWarning(getErrorMessage(error))
     } finally {
-      setMergeRequestBranchesLoading(false)
+      if (requestVersion === mergeRequestVersionRef.current) setMergeRequestBranchesLoading(false)
     }
   }
 
@@ -2246,8 +2254,8 @@ export default function RequirementWorkbench({
     const pointsChanged =
       selectedNode.supportsPoints && nodeEditPoints !== selectedNode.points
 
-    if (!nodeEditRange && pointsChanged) {
-      message.warning('修改估分前请先设置总排期')
+    if (pointsChanged && (nodeEditPoints === null || !Number.isFinite(nodeEditPoints) || nodeEditPoints < 0)) {
+      message.warning('请填写非负估分；如需归零请填写 0')
       return
     }
 
@@ -2278,25 +2286,27 @@ export default function RequirementWorkbench({
             ? originalEnd.valueOf()
             : nodeEditRange[1].endOf('day').valueOf()
           : undefined
-      const scheduleChanged =
+      // null 表示用户清空排期；估分独立比较，不依赖节点是否支持排期。
+      const clearSchedule =
         selectedNode.supportsSchedule &&
-        nodeEditRange !== null &&
-        (startAt !== undefined &&
-          (!selectedNode.scheduleStart ||
-            startAt !== dayjs(selectedNode.scheduleStart).valueOf()) ||
-          (endAt !== undefined &&
-            (!selectedNode.scheduleEnd ||
-              endAt !== dayjs(selectedNode.scheduleEnd).valueOf())) ||
-          (selectedNode.supportsPoints &&
-            (nodeEditPoints ?? null) !== selectedNode.points))
+        nodeEditRange === null &&
+        Boolean(selectedNode.scheduleStart || selectedNode.scheduleEnd)
+      const scheduleChanged =
+        clearSchedule ||
+        (selectedNode.supportsSchedule &&
+          nodeEditRange !== null &&
+          ((startAt !== undefined &&
+            startAt !== originalStart?.valueOf()) ||
+            (endAt !== undefined && endAt !== originalEnd?.valueOf())))
 
-      if (!scheduleChanged && !ownersChanged) {
+      if (!scheduleChanged && !pointsChanged && !ownersChanged) {
         setNodeEditing(false)
         return
       }
 
       await window.electron.updateRequirementNode(selectedRequirementId, selectedNode.key, {
-        ...(scheduleChanged ? { startAt, endAt, points: nodeEditPoints ?? undefined } : {}),
+        ...(scheduleChanged ? (clearSchedule ? { clearSchedule: true } : { startAt, endAt }) : {}),
+        ...(pointsChanged ? { points: nodeEditPoints as number } : {}),
         ...(ownersChanged ? { ownerUserKeys: nextOwnerKeys } : {})
       })
 
@@ -2309,14 +2319,14 @@ export default function RequirementWorkbench({
                   ? {
                       ...node,
                       scheduleStart:
-                        startAt === undefined
+                        clearSchedule ? null : startAt === undefined
                           ? node.scheduleStart
                           : new Date(startAt).toISOString(),
                       scheduleEnd:
-                        endAt === undefined
+                        clearSchedule ? null : endAt === undefined
                           ? node.scheduleEnd
                           : new Date(endAt).toISOString(),
-                      points: nodeEditRange ? nodeEditPoints : node.points
+                      points: pointsChanged ? nodeEditPoints : node.points
                     }
                   : node
               )

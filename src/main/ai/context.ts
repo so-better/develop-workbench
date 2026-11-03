@@ -115,6 +115,8 @@ export const trimChatMessages = (messages: AiChatMessage[]): AiChatMessage[] => 
     start += 1
   }
 
+  // 丢弃孤立的助手回复，确保裁剪后的上下文从用户提问开始。
+  while (start < messages.length && messages[start].role !== 'user') start += 1
   const trimmed = messages.slice(start)
   const last = trimmed[trimmed.length - 1]
 

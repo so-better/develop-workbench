@@ -304,23 +304,28 @@ export default function SitesPage(): JSX.Element {
     })
   )
 
+  const siteLoadVersion = useRef(0)
   const loadSites = useCallback(async (showLoading = true): Promise<void> => {
+    const version = ++siteLoadVersion.current
     if (showLoading) setLoading(true)
 
     setError(null)
 
     try {
       const state = await window.electron.getSiteState()
+      if (version !== siteLoadVersion.current) return
       setSites(state.sites)
     } catch (loadError) {
+      if (version !== siteLoadVersion.current) return
       setError(getErrorMessage(loadError, '站点加载失败'))
     } finally {
-      if (showLoading) setLoading(false)
+      if (version === siteLoadVersion.current) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     loadSites()
+    return () => { siteLoadVersion.current += 1 }
   }, [loadSites])
 
   useEffect(() => {

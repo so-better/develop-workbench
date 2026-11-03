@@ -1,10 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { basename, extname, join } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import { createGeneratedDownload } from '../embedded-browser'
 import type { AiArtifactStats, AiChatArtifact } from '../../types/ai'
 
@@ -254,7 +254,15 @@ export const downloadArtifact = async (
     source: `ai-artifact://${id}`
   })
 
+  let temporaryDirectory: string | undefined
+
   try {
+    // 在目标目录内暂存，保证重命名不跨文件系统；失败时不截断或删除用户的原文件。
+    // 独占的临时目录确保清理范围只包含本次保存创建的文件。
+    temporaryDirectory = await mkdtemp(
+      join(dirname(result.filePath), '.workbench-artifact-')
+    )
+    const temporaryPath = join(temporaryDirectory, 'artifact')
     let receivedBytes = 0
     const tracker = new Transform({
       transform(chunk: Buffer, _encoding, callback) {
@@ -267,13 +275,17 @@ export const downloadArtifact = async (
     await pipeline(
       createReadStream(record.path),
       tracker,
-      createWriteStream(result.filePath)
+      createWriteStream(temporaryPath, { flags: 'wx' })
     )
+    await rename(temporaryPath, result.filePath)
     download.complete(result.filePath)
   } catch (error) {
     download.fail()
-    await rm(result.filePath, { force: true }).catch(() => undefined)
     throw error
+  } finally {
+    if (temporaryDirectory) {
+      await rm(temporaryDirectory, { recursive: true, force: true }).catch(() => undefined)
+    }
   }
 
   return {

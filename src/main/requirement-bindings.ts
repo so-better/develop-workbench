@@ -3,7 +3,7 @@
  * 负责普通分支绑定、轻舟工作项绑定和轻舟分支快照，不修改 Git 工作区。
  */
 import { app, BrowserWindow, ipcMain } from 'electron'
-import { open, readFile, rename, rm } from 'node:fs/promises'
+import { open, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { isLocalRequirementId } from './local-requirements'
@@ -126,12 +126,10 @@ const normalizeStoredWorkspace = (value: unknown): StoredWorkspace | null => {
 
   const bindings = workspace.bindings.map(normalizeStoredBinding)
 
-  if (bindings.some((binding) => binding === null)) return null
-
   return {
     projectKey: workspace.projectKey,
     requirementId: workspace.requirementId,
-    bindings: bindings as RequirementRepoBinding[],
+    bindings: bindings.filter((binding): binding is RequirementRepoBinding => binding !== null),
     updatedAt: workspace.updatedAt
   }
 }
@@ -139,6 +137,7 @@ const normalizeStoredWorkspace = (value: unknown): StoredWorkspace | null => {
 /**
  * 读取绑定数据。
  */
+let lastBackedUpContent: string | null = null
 const readStore = async (): Promise<BindingStore> => {
   let raw: string
 
@@ -166,11 +165,18 @@ const readStore = async (): Promise<BindingStore> => {
     return { workspaces: [] }
   }
 
-  return {
-    workspaces: parsed.workspaces
+  const workspaces = parsed.workspaces
       .map(normalizeStoredWorkspace)
       .filter((workspace): workspace is StoredWorkspace => workspace !== null)
+  const bindingCount = workspaces.reduce((count, workspace) => count + workspace.bindings.length, 0)
+  const rawBindingCount = parsed.workspaces.reduce((count, workspace) =>
+    count + (Array.isArray(workspace?.bindings) ? workspace.bindings.length : 0), 0)
+  if ((workspaces.length !== parsed.workspaces.length || bindingCount !== rawBindingCount) && raw !== lastBackedUpContent) {
+    // 部分损坏时复制原始内容而不移走主文件；后续写入仍可保留其余合法绑定。
+    await writeFile(`${getStorePath()}.corrupt-${Date.now()}-${randomUUID()}`, raw, { encoding: 'utf8', flag: 'wx' })
+    lastBackedUpContent = raw
   }
+  return { workspaces }
 }
 
 /**

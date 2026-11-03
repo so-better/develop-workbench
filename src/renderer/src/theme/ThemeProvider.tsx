@@ -5,6 +5,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState
 } from 'react'
 import type { ReactNode } from 'react'
@@ -54,6 +55,7 @@ applyDocumentTheme(getSystemIsDark())
  * 同步主进程主题状态，并为 Ant Design 提供对应的亮色或暗色算法。
  */
 export default function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
+  const themeVersion = useRef(0)
   // 首屏先根据系统偏好渲染，随后再从主进程读取用户上次保存的选择。
   const [themeState, setThemeState] = useState<ThemeState>(() => ({
     mode: 'system',
@@ -62,6 +64,7 @@ export default function ThemeProvider({ children }: ThemeProviderProps): JSX.Ele
 
   useEffect(() => {
     let active = true
+    const initialVersion = themeVersion.current
 
     /**
      * 接收主进程返回的主题状态。
@@ -74,15 +77,23 @@ export default function ThemeProvider({ children }: ThemeProviderProps): JSX.Ele
     // 初始化时读取持久化主题，并订阅后续由系统或用户触发的主题变化。
     window.electron
       .getTheme()
-      .then(applyThemeState)
+      .then((next) => {
+        if (themeVersion.current === initialVersion) applyThemeState(next)
+      })
       .catch(() => {
-        applyThemeState({ mode: 'system', isDark: getSystemIsDark() })
+        if (themeVersion.current === initialVersion) {
+          applyThemeState({ mode: 'system', isDark: getSystemIsDark() })
+        }
       })
 
-    const unsubscribe = window.electron.onThemeChange(applyThemeState)
+    const unsubscribe = window.electron.onThemeChange((next) => {
+      themeVersion.current += 1
+      applyThemeState(next)
+    })
 
     return () => {
       active = false
+      themeVersion.current += 1
       unsubscribe()
     }
   }, [])
@@ -97,9 +108,12 @@ export default function ThemeProvider({ children }: ThemeProviderProps): JSX.Ele
    * 以主进程返回结果为准，保证系统主题、原生窗口和页面状态一致。
    */
   const setMode = useCallback((mode: ThemeMode): void => {
+    const version = ++themeVersion.current
     window.electron
       .setTheme(mode)
-      .then(setThemeState)
+      .then((next) => {
+        if (themeVersion.current === version) setThemeState(next)
+      })
       .catch(() => undefined)
   }, [])
 

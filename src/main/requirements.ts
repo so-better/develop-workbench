@@ -218,7 +218,7 @@ const PROJECT_CACHE_TTL_MS = 5 * 60 * 1000
 /** 空间团队列表缓存时长。 */
 const TEAM_CACHE_TTL_MS = 10 * 60 * 1000
 
-/** MQL 单页固定 50 条，最多读取 20 页，避免异常分页导致死循环。 */
+/** MQL 单页固定 50 条，最多读取 200 页，避免异常分页导致死循环。 */
 const MQL_PAGE_SIZE = 50
 const MAX_MQL_PAGES = 200
 
@@ -1643,6 +1643,7 @@ export const updateRequirementNode = async (
   nodeId: string,
   input: UpdateNodeInfoInput
 ): Promise<void> => {
+  if (!input || typeof input !== 'object') throw new Error('节点更新参数不合法')
   if (!/^\d+$/.test(workItemId)) throw new Error('需求 ID 不合法')
   if (!nodeId.trim()) throw new Error('节点 ID 不合法')
 
@@ -1665,6 +1666,18 @@ export const updateRequirementNode = async (
       )
     : []
   const hasSchedule = input.startAt !== undefined || input.endAt !== undefined
+  const hasPoints = input.points !== undefined
+  const clearSchedule = input.clearSchedule === true
+
+  if (input.clearSchedule !== undefined && typeof input.clearSchedule !== 'boolean') {
+    throw new Error('清空排期参数不合法')
+  }
+  if (clearSchedule && hasSchedule) {
+    throw new Error('清空排期时不能同时设置起止时间')
+  }
+  if (hasPoints && (typeof input.points !== 'number' || !Number.isFinite(input.points) || input.points < 0)) {
+    throw new Error('估分必须为非负有限数值')
+  }
 
   if (hasSchedule) {
     if (!Number.isFinite(input.startAt) || !Number.isFinite(input.endAt)) {
@@ -1673,20 +1686,22 @@ export const updateRequirementNode = async (
     if ((input.endAt as number) < (input.startAt as number)) {
       throw new Error('结束时间不能早于开始时间')
     }
-  } else if (typeof input.points === 'number') {
-    throw new Error('填写估分前请先设置总排期')
   }
 
-  if (!hasSchedule && !hasOwners) {
+  if (!hasSchedule && !clearSchedule && !hasPoints && !hasOwners) {
     throw new Error('没有需要更新的节点信息')
   }
 
   const project = await getProject()
 
-  if (hasSchedule) {
-    const nodeSchedule: Record<string, number> = {
-      estimate_start_date: input.startAt as number,
-      estimate_end_date: input.endAt as number
+  // 估分与总排期共享 node-schedule，但只发送本次修改的字段。
+  if (hasSchedule || clearSchedule || hasPoints) {
+    const nodeSchedule: Record<string, number | boolean> = {}
+
+    if (clearSchedule) nodeSchedule.clear_schedule = true
+    if (hasSchedule) {
+      nodeSchedule.estimate_start_date = input.startAt as number
+      nodeSchedule.estimate_end_date = input.endAt as number
     }
 
     if (typeof input.points === 'number' && Number.isFinite(input.points)) {
@@ -1711,7 +1726,7 @@ export const updateRequirementNode = async (
       MEEGLE_QUERY_TIMEOUT_MS
     )
 
-    ensureWriteSuccess(scheduleResult, '更新节点排期')
+    ensureWriteSuccess(scheduleResult, '更新节点排期和估分')
   }
 
   if (hasOwners) {
@@ -1828,7 +1843,9 @@ export const getMyRequirements = async (
   const project = await getProject()
   const [roleNames, statusNames, localRequirements] = await Promise.all([
     fetchStoryRoleNames(project),
-    fetchStoryStatusNames(project).catch(() => [] as string[]),
+    // 隐藏终态依赖真实状态配置，读取失败必须报错，不能降级成不带过滤的全量查询。
+    // 显示全部状态时无需读取该配置。
+    includeClosed ? Promise.resolve<string[]>([]) : fetchStoryStatusNames(project),
     listLocalRequirements(project.projectKey, includeClosed)
   ])
   const roleCondition = buildCurrentUserRoleCondition(roleNames)
@@ -1944,7 +1961,8 @@ const getCurrentWeekRange = (): { start: string; end: string } => {
 export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
   const project = await getProject()
   const [roleNames, localRequirements] = await Promise.all([
-    fetchStoryRoleNames(project).catch(() => [] as string[]),
+    // 角色读取失败须交给周报汇总层生成 warnings，不能用空角色伪装成远程需求为零。
+    fetchStoryRoleNames(project),
     listLocalRequirements(project.projectKey, true)
   ])
   const roleCondition = buildCurrentUserRoleCondition(roleNames)
@@ -1953,7 +1971,10 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
   const inCurrentWeek = (value: string | null): boolean => {
     if (!value) return false
 
-    const date = value.slice(0, 10)
+    const timestamp = new Date(value)
+    if (!Number.isFinite(timestamp.getTime())) return false
+    // 本地需求存储 UTC ISO 时间，必须转换到与周起止日期一致的本地日历日期。
+    const date = `${timestamp.getFullYear()}-${String(timestamp.getMonth() + 1).padStart(2, '0')}-${String(timestamp.getDate()).padStart(2, '0')}`
 
     return date >= week.start && date <= week.end
   }

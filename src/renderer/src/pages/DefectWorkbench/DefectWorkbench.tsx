@@ -426,6 +426,7 @@ export default function DefectWorkbench({
     return () => {
       active = false
     }
+    // fetchedAt 让同一缺陷在手动刷新后也重新读取评论。
   }, [activeTab, commentsVersion, data?.fetchedAt, selectedDefect?.id])
 
   /** 使用 AI 分析当前缺陷、评论和关联需求。 */
@@ -713,8 +714,19 @@ export default function DefectWorkbench({
     }
   }
 
+  const transitionRequestRef = useRef(0)
+  const transitionDefectRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!transitionOpen) transitionRequestRef.current += 1
+  }, [transitionOpen])
+  useEffect(() => {
+    return () => { transitionRequestRef.current += 1 }
+  }, [selectedDefect?.id])
+
   const handleOpenTransition = (): void => {
     if (!selectedDefect) return
+    const requestId = ++transitionRequestRef.current
+    transitionDefectRef.current = selectedDefect.id
 
     setTransitionOpen(true)
     setTransitionLoading(true)
@@ -724,11 +736,15 @@ export default function DefectWorkbench({
     setTransitionValues({})
     window.electron
       .getDefectTransitions(selectedDefect.id)
-      .then((result) => setTransitions(result))
-      .catch((loadError) =>
-        setTransitionError(getErrorMessage(loadError, '读取流转状态失败'))
-      )
-      .finally(() => setTransitionLoading(false))
+      .then((result) => {
+        if (requestId === transitionRequestRef.current) setTransitions(result)
+      })
+      .catch((loadError) => {
+        if (requestId === transitionRequestRef.current) setTransitionError(getErrorMessage(loadError, '读取流转状态失败'))
+      })
+      .finally(() => {
+        if (requestId === transitionRequestRef.current) setTransitionLoading(false)
+      })
   }
 
   const handleSelectTransition = (transitionId?: string): void => {
@@ -746,6 +762,7 @@ export default function DefectWorkbench({
 
   const handleSubmitTransition = async (): Promise<void> => {
     if (!selectedDefect || !selectedTransition || transitionSubmitting) return
+    if (transitionLoading || transitionDefectRef.current !== selectedDefect.id) return
 
     if (missingTransitionRoles.length > 0) {
       message.warning(

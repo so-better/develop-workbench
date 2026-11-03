@@ -69,7 +69,7 @@ export default function App(): JSX.Element {
   const quickNotes = useQuickNotes()
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null)
   const [updateOpen, setUpdateOpen] = useState(false)
-  const updateCheckRef = useRef(false)
+  const updateCheckRef = useRef<'idle' | 'checking' | 'completed'>('idle')
 
   /**
    * 重新读取本地 CLI 安装和授权状态。
@@ -284,26 +284,36 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     if (environmentLoading || !environmentReady || guideOpen) return
-    if (updateCheckRef.current) return
+    if (updateCheckRef.current !== 'idle') return
 
     let cancelled = false
     const timer = window.setTimeout(() => {
-      updateCheckRef.current = true
+      updateCheckRef.current = 'checking'
 
       window.electron
         .checkForUpdates()
         .then((result) => {
-          if (cancelled || !result.hasUpdate) return
+          // 只有仍有效的请求才能标记完成，未发现更新也属于一次成功检查。
+          if (cancelled) return
+          updateCheckRef.current = 'completed'
+          if (!result.hasUpdate) return
 
           setUpdateInfo(result)
           setUpdateOpen(true)
         })
-        .catch(() => undefined)
+        .catch(() => {
+          if (!cancelled) updateCheckRef.current = 'idle'
+        })
     }, 3000)
 
     return () => {
       cancelled = true
       window.clearTimeout(timer)
+      // IPC 请求无法在此中止，但可以丢弃结果并允许手册关闭后重新检查。
+      // 迟到的旧请求会被 cancelled 拦截，不会覆盖后续请求的状态。
+      if (updateCheckRef.current === 'checking') {
+        updateCheckRef.current = 'idle'
+      }
     }
   }, [environmentLoading, environmentReady, guideOpen])
 

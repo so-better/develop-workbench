@@ -55,18 +55,35 @@ const getEmptyState = (): EmbeddedBrowserState => ({
 
 const getDownloadsPath = (): string => join(app.getPath('userData'), DOWNLOADS_FILE)
 
+/** 活动任务不占历史配额；中断任务只有仍持有可续传的 DownloadItem 时才需要保留操作能力。 */
+const isActiveDownload = (entry: DownloadEntry): boolean =>
+  entry.state.status === 'progressing' ||
+  entry.state.paused ||
+  (entry.state.status === 'interrupted' && entry.item !== null && entry.state.canResume)
+
+/** 从 Map 中真正淘汰旧历史，而不是只截断展示列表。不会删除磁盘上的下载文件。 */
+const pruneDownloadHistory = (): void => {
+  const history = Array.from(downloads.values())
+    .filter((entry) => !isActiveDownload(entry))
+    .sort((left, right) => right.state.startedAt - left.state.startedAt)
+
+  for (const entry of history.slice(MAX_DOWNLOADS)) {
+    downloads.delete(entry.state.id)
+  }
+}
+
 const getDownloadStates = (): EmbeddedBrowserDownload[] =>
   Array.from(downloads.values())
     .map((entry) => entry.state)
     .sort((left, right) => right.startedAt - left.startedAt)
-    .slice(0, MAX_DOWNLOADS)
 
 /** 统计可清理的下载历史记录，正在下载的任务不计入。 */
 export const getEmbeddedBrowserDownloadHistoryStats = (): {
   count: number
   bytes: number
 } => ({
-  count: getDownloadStates().filter((item) => item.status !== 'progressing').length,
+  count: Array.from(downloads.values()).filter((entry) => !isActiveDownload(entry)).length,
+  // 历史清理只删除元数据，不删除已下载文件，因此不将文件体积计作可释放空间。
   bytes: 0
 })
 
@@ -198,11 +215,13 @@ const loadPersistedDownloads = (): void => {
     return
   }
 
-  for (const value of parsed.downloads.slice(0, MAX_DOWNLOADS)) {
+  for (const value of parsed.downloads) {
     const state = parseDownloadRecord(value)
 
     if (state) downloads.set(state.id, { item: null, state })
   }
+  // 重启后运行中的任务已转为中断历史，再按同一规则收敛到历史上限。
+  pruneDownloadHistory()
 }
 
 const closeRetryWindow = (webContentsId: number): void => {
@@ -220,6 +239,7 @@ const closeRetryWindow = (webContentsId: number): void => {
  * 向所有窗口广播下载列表，面板关闭后重新打开也能恢复记录。
  */
 const broadcastDownloads = (): void => {
+  pruneDownloadHistory()
   const state = getDownloadStates()
 
   for (const window of BrowserWindow.getAllWindows()) {
@@ -235,7 +255,7 @@ export const clearEmbeddedBrowserDownloadHistory = (): number => {
   let removed = 0
 
   for (const [id, entry] of downloads) {
-    if (entry.state.status === 'progressing') continue
+    if (isActiveDownload(entry)) continue
 
     downloads.delete(id)
     removed += 1
@@ -308,6 +328,11 @@ const configureBrowserSession = (): void => {
       syncDownloadState(item, state)
       state.status = result
       state.savePath = item.getSavePath() || state.savePath
+      // done 后 DownloadItem 已结束；中断只能重新下载，不再占用活动任务保留名额。
+      const entry = downloads.get(state.id)
+      if (entry) entry.item = null
+      state.paused = false
+      state.canResume = false
       broadcastDownloads()
       persistDownloadsNow()
       closeRetryWindow(webContents.id)
@@ -383,7 +408,7 @@ const cancelViewAnimation = (entry: BrowserEntry): void => {
  * 关闭动画结束后销毁原生视图。
  * 不复用旧页面，避免下一次打开时先闪出上一页内容。
  */
-const disposeEntry = (entry: BrowserEntry): void => {
+const disposeEntry = (entry: BrowserEntry, onDisposed?: () => void): void => {
   cancelViewAnimation(entry)
 
   if (entries.get(entry.window.id) === entry) {
@@ -402,8 +427,12 @@ const disposeEntry = (entry: BrowserEntry): void => {
   const webContents = entry.view.webContents
 
   if (webContents && !webContents.isDestroyed()) {
+    // 移除页面生命周期监听，避免销毁时回写旧视图状态；清理等待器需在此之后注册。
     webContents.removeAllListeners()
+    if (onDisposed) webContents.once('destroyed', onDisposed)
     webContents.close()
+  } else {
+    onDisposed?.()
   }
 }
 
@@ -521,6 +550,25 @@ export const closeEmbeddedBrowserForWindow = (window: BrowserWindow): void => {
   const entry = entries.get(window.id)
 
   if (entry) closeBrowserEntry(entry)
+}
+
+/** 缓存清理专用：跳过/取消动画，等待原生页面销毁后才能开始清理 Session。 */
+export const closeEmbeddedBrowserForCleanup = (window: BrowserWindow): Promise<void> => {
+  const entry = entries.get(window.id)
+
+  if (!entry) return Promise.resolve()
+
+  return new Promise<void>((resolve) => {
+    cancelViewAnimation(entry)
+    entry.closing = false
+    entry.visible = false
+    const webContents = entry.view.webContents
+    if (webContents && !webContents.isDestroyed()) {
+      applyVisibility(entry)
+      broadcastState(entry)
+    }
+    disposeEntry(entry, resolve)
+  })
 }
 
 /**

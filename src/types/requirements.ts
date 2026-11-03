@@ -287,6 +287,9 @@ export interface UpdateNodeInfoInput {
   /** 结束时间，Unix 毫秒时间戳。只更新工时可省略。 */
   endAt?: number
 
+  /** 显式清空总排期，与 startAt/endAt 互斥。 */
+  clearSchedule?: boolean
+
   /** 总估分。 */
   points?: number
 

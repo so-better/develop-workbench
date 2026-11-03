@@ -23,6 +23,14 @@ export const useQuickNotes = (): QuickNotesController => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const reloadRequestRef = useRef(0)
+  const queueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const mountedRef = useRef(true)
+  // 读与写共享队列，完整快照必须按操作顺序应用，不能被较早的加载覆盖。
+  const enqueue = useCallback(<T,>(operation: () => Promise<T>): Promise<T> => {
+    const result = queueRef.current.then(operation, operation)
+    queueRef.current = result.catch(() => undefined)
+    return result
+  }, [])
 
   /** 重新读取待办列表，用于失败后重试。 */
   const reload = useCallback(async (): Promise<void> => {
@@ -32,9 +40,9 @@ export const useQuickNotes = (): QuickNotesController => {
     setError(null)
 
     try {
-      const state = await window.electron.getQuickNoteState()
+      const state = await enqueue(() => window.electron.getQuickNoteState())
 
-      if (requestId !== reloadRequestRef.current) return
+      if (!mountedRef.current || requestId !== reloadRequestRef.current) return
       setNotes(state.notes)
     } catch (loadError) {
       if (requestId === reloadRequestRef.current) {
@@ -45,39 +53,37 @@ export const useQuickNotes = (): QuickNotesController => {
         setLoading(false)
       }
     }
-  }, [])
+  }, [enqueue])
 
   useEffect(() => {
+    mountedRef.current = true
     void reload()
+    return () => { mountedRef.current = false; reloadRequestRef.current += 1 }
   }, [reload])
 
-  const add = useCallback(async (text: string): Promise<void> => {
-    const state = await window.electron.addQuickNote(text)
+  const mutate = useCallback((operation: () => Promise<{ notes: QuickNote[] }>): Promise<void> =>
+    enqueue(async () => {
+      const state = await operation()
+      if (!mountedRef.current) return
+      setNotes(state.notes)
+      setError(null)
+    }), [enqueue])
 
-    setNotes(state.notes)
-    setError(null)
-  }, [])
+  const add = useCallback(async (text: string): Promise<void> => {
+    await mutate(() => window.electron.addQuickNote(text))
+  }, [mutate])
 
   const setDone = useCallback(async (id: string, done: boolean): Promise<void> => {
-    const state = await window.electron.setQuickNoteDone(id, done)
-
-    setNotes(state.notes)
-    setError(null)
-  }, [])
+    await mutate(() => window.electron.setQuickNoteDone(id, done))
+  }, [mutate])
 
   const remove = useCallback(async (id: string): Promise<void> => {
-    const state = await window.electron.removeQuickNote(id)
-
-    setNotes(state.notes)
-    setError(null)
-  }, [])
+    await mutate(() => window.electron.removeQuickNote(id))
+  }, [mutate])
 
   const clearCompleted = useCallback(async (): Promise<void> => {
-    const state = await window.electron.clearCompletedQuickNotes()
-
-    setNotes(state.notes)
-    setError(null)
-  }, [])
+    await mutate(() => window.electron.clearCompletedQuickNotes())
+  }, [mutate])
 
   const openCount = useMemo(
     () => notes.filter((note) => !note.done).length,

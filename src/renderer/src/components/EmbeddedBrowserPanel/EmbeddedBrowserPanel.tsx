@@ -191,7 +191,7 @@ export default function EmbeddedBrowserPanel({
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [state?.visible])
 
-  // 点击面板外关闭；弹窗打开时不处理，避免登录或确认流程被中断。
+  // 点击面板外关闭；有可见弹窗时暂停处理，避免点击弹窗或遮罩中断浏览器流程。
   useEffect(() => {
     if (!state?.visible) return
 
@@ -200,6 +200,19 @@ export default function EmbeddedBrowserPanel({
 
       if (target instanceof Node && panelRef.current?.contains(target)) return
       if (target instanceof Element && target.closest('.ant-popover')) return
+
+      // 普通 Modal 和确认弹窗共用 wrap；用布局与可见性判断，排除未销毁的隐藏弹窗。
+      const hasVisibleModal = Array.from(
+        document.querySelectorAll<HTMLElement>('.ant-modal-wrap')
+      ).some((element) => {
+        if (element.getClientRects().length === 0) return false
+
+        const visibility = window.getComputedStyle(element).visibility
+
+        return visibility !== 'hidden' && visibility !== 'collapse'
+      })
+
+      if (hasVisibleModal) return
 
       requestClose()
     }
@@ -228,7 +241,13 @@ export default function EmbeddedBrowserPanel({
   /**
    * 拖拽左边缘调整宽度，原生视图通过 ResizeObserver 跟随。
    */
+  const resizeCleanupRef = useRef<(() => void) | null>(null)
+  useEffect(() => {
+    if (!state?.visible) resizeCleanupRef.current?.()
+    return () => resizeCleanupRef.current?.()
+  }, [state?.visible])
   const startResize = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    resizeCleanupRef.current?.()
     event.preventDefault()
 
     const startX = event.clientX
@@ -244,6 +263,8 @@ export default function EmbeddedBrowserPanel({
     const handleUp = (): void => {
       window.removeEventListener('pointermove', handleMove)
       window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
+      resizeCleanupRef.current = null
       document.body.style.cursor = ''
       document.body.style.userSelect = ''
 
@@ -256,6 +277,8 @@ export default function EmbeddedBrowserPanel({
     document.body.style.userSelect = 'none'
     window.addEventListener('pointermove', handleMove)
     window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
+    resizeCleanupRef.current = handleUp
   }
 
   // 将占位区域的屏幕位置同步给主进程，原生 WebContentsView 不能使用 CSS 定位。

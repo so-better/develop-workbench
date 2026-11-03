@@ -4,7 +4,7 @@
  */
 import { app, ipcMain, shell } from 'electron'
 import { mkdir, readdir, rm, stat } from 'node:fs/promises'
-import { basename, extname, isAbsolute, join, relative } from 'node:path'
+import { extname, isAbsolute, join, relative } from 'node:path'
 import {
   createGeneratedDownload,
   getCompletedUpdateDownloadPath
@@ -22,6 +22,26 @@ const UPDATE_FOLDER_URL =
 const UPDATE_FILE_PATTERN =
   /^develop-workbench-(\d+\.\d+\.\d+)-(mac|win)\.(dmg|zip|exe)$/i
 const DOWNLOAD_TIMEOUT_MS = 30 * 60 * 1000
+
+/** 下载和目录解析共用命名校验；不剥离路径，避免非法输入被悄悄转换成合法包名。 */
+const parsePackageName = (name: unknown): {
+  version: string
+  platform: UpdatePackage['platform']
+  extension: UpdatePackage['extension']
+} | null => {
+  if (typeof name !== 'string') return null
+  const match = name.match(UPDATE_FILE_PATTERN)
+
+  // JS 的 $ 可以匹配末尾换行前的位置，必须额外确认整个文件名都被匹配。
+  if (!match || match[0] !== name) return null
+
+  const platform = match[2].toLowerCase() as UpdatePackage['platform']
+  const extension = match[3].toLowerCase() as UpdatePackage['extension']
+  if ((platform === 'mac' && extension === 'exe') ||
+      (platform === 'win' && extension === 'dmg')) return null
+
+  return { version: match[1], platform, extension }
+}
 
 interface DriveFile {
   name?: string
@@ -58,19 +78,19 @@ const parsePackages = (files: DriveFile[]): Array<{
   files.flatMap((file) => {
     if (file.type !== 'file' || !file.name || !file.token) return []
 
-    const match = file.name.match(UPDATE_FILE_PATTERN)
+    const parsedName = parsePackageName(file.name)
 
-    if (!match) return []
+    if (!parsedName) return []
 
     return [
       {
-        version: match[1],
+        version: parsedName.version,
         package: {
           name: file.name,
           fileToken: file.token,
           url: file.url ?? '',
-          platform: match[2].toLowerCase() === 'mac' ? 'mac' : 'win',
-          extension: match[3].toLowerCase() as UpdatePackage['extension']
+          platform: parsedName.platform,
+          extension: parsedName.extension
         }
       }
     ]
@@ -154,11 +174,13 @@ export const downloadUpdatePackage = async (
   }
 
   const item = value as Partial<UpdatePackage>
-  const fileName = typeof item.name === 'string' ? basename(item.name) : ''
+  const fileName = typeof item.name === 'string' ? item.name : ''
+  const parsedName = parsePackageName(fileName)
 
   if (
-    !fileName ||
-    !/^[a-zA-Z0-9._-]+$/.test(fileName) ||
+    !parsedName ||
+    item.platform !== parsedName.platform ||
+    item.extension !== parsedName.extension ||
     typeof item.fileToken !== 'string' ||
     !/^[a-zA-Z0-9_-]+$/.test(item.fileToken)
   ) {
@@ -167,6 +189,12 @@ export const downloadUpdatePackage = async (
 
   const downloadsPath = app.getPath('downloads')
   const targetPath = join(downloadsPath, fileName)
+
+  // 更新包只能落在下载目录的直接子路径，不能指向目录本身、父目录或其他盘符。
+  const targetRelativePath = relative(downloadsPath, targetPath)
+  if (isAbsolute(targetRelativePath) || targetRelativePath !== fileName) {
+    throw new Error('更新包路径不合法')
+  }
 
   await mkdir(downloadsPath, { recursive: true })
 
