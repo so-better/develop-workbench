@@ -25,6 +25,7 @@ interface BrowserEntry {
   suppressed: boolean
   bounds: Rectangle | null
   error: string | null
+  /** 创建标签的稳定入口，页面重定向或前端路由变化不改写，重复打开时用于复用。 */
   requestedUrl: string | null
   animateInOnNextBounds: boolean
   animationTimer: NodeJS.Timeout | null
@@ -691,7 +692,7 @@ const createEntry = (window: BrowserWindow): BrowserEntry => {
   webContents.on('will-navigate', (event, url) => {
     if (!tryNormalizeHttpUrl(url)) event.preventDefault()
     else {
-      // 用户主动跳转建立新的地址链，旧页面入口不再匹配当前标签。
+      // 页面导航建立新的当前地址链；创建标签的稳定入口另由 requestedUrl 保留。
       entry.aliases.clear()
       entry.aliases.add(url)
     }
@@ -762,8 +763,11 @@ export const openEmbeddedBrowser = (
 ): boolean => {
   const url = tryNormalizeHttpUrl(rawUrl)
   if (!url) return false
-  const existing = (pages.get(window.id) ?? []).find((page) =>
-    page.view.webContents.getURL() === url || page.aliases.has(url))
+  const retained = pages.get(window.id) ?? []
+  // 优先匹配正在显示的准确地址，再匹配稳定入口和重定向别名。
+  // SPA 的 replaceState/pushState 会重置 aliases，不能仅靠别名避免重复标签。
+  const existing = retained.find((page) => page.view.webContents.getURL() === url)
+    ?? retained.find((page) => page.requestedUrl === url || page.aliases.has(url))
   const entry = existing ?? createEntry(window)
   if (!existing) {
     entry.requestedUrl = url
