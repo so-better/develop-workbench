@@ -1,13 +1,14 @@
 /**
  * 内嵌浏览器授权流程。
- * 统一处理“打开登录页 → 轮询授权 → 关闭面板 → 重试操作”。
+ * 统一处理“打开登录标签 → 轮询授权 → 重试操作 → 关闭登录标签”。
  */
 import type { BrowserWindow } from 'electron'
 import { delay } from '../utils'
 import {
-  isEmbeddedBrowserVisible,
+  getActiveEmbeddedBrowserTabId,
+  hasEmbeddedBrowserTab,
+  closeEmbeddedBrowserTab,
   openEmbeddedBrowser,
-  requestEmbeddedBrowserClose
 } from './embedded-browser'
 
 const DEFAULT_POLL_INTERVAL_MS = 1_500
@@ -63,6 +64,8 @@ export const withBrowserAuth = async <T>(
   const opened = openEmbeddedBrowser(window, loginUrl)
 
   if (!opened) throw new Error(`无法打开${authName}登录页面`)
+  const loginTabId = getActiveEmbeddedBrowserTabId(window)
+  if (!loginTabId) throw new Error(`无法定位${authName}登录页面`)
 
   const deadline = Date.now() + timeoutMs
 
@@ -70,7 +73,7 @@ export const withBrowserAuth = async <T>(
     while (Date.now() < deadline) {
       await delay(pollIntervalMs)
 
-      if (!isEmbeddedBrowserVisible(window)) {
+      if (!hasEmbeddedBrowserTab(window, loginTabId)) {
         throw new Error(`${authName}登录已取消`)
       }
 
@@ -78,7 +81,7 @@ export const withBrowserAuth = async <T>(
         if (probe) await probe()
 
         const result = await operation()
-        requestEmbeddedBrowserClose(window)
+        if (!hasEmbeddedBrowserTab(window, loginTabId)) throw new Error(`${authName}登录已取消`)
         return result
       } catch (error) {
         if (isAuthError(error)) continue
@@ -88,6 +91,7 @@ export const withBrowserAuth = async <T>(
 
     throw new Error(`${authName}登录超时，请重新尝试`)
   } finally {
-    requestEmbeddedBrowserClose(window)
+    // 仅释放本次登录页，保留用户正在查看的其他标签和面板状态。
+    closeEmbeddedBrowserTab(window, loginTabId)
   }
 }

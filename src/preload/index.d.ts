@@ -81,6 +81,12 @@ import type {
 } from '../types/weekly-report'
 
 export interface ElectronAPI {
+  /** 展开上次收起的浏览器，保留页面状态。 */
+  showEmbeddedBrowser: () => Promise<void>
+  /** 切换到已保留页面，不重新加载。 */
+  selectEmbeddedBrowserTab: (id: string) => Promise<void>
+  /** 关闭单个页面并释放原生视图。 */
+  closeEmbeddedBrowserTab: (id: string) => Promise<void>
   /** 补充自动发现的需求链接，返回持久化后的完整列表。 */
   scanRequirementLinks: (scope: RequirementLinkScope, links: RequirementLinkInput[], restoreDeleted?: boolean) => Promise<RequirementLink[]>
   /** 手动新增需求链接。 */

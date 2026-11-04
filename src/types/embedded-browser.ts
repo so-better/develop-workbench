@@ -12,6 +12,11 @@ export interface EmbeddedBrowserBounds {
  * 内嵌浏览器状态。
  */
 export interface EmbeddedBrowserState {
+  /** 本次运行保留的页面，不持久化到磁盘。 */
+  tabs: Array<{ id: string; url: string | null; title: string; loading: boolean }>
+  activeTabId: string | null
+  /** 每次主动激活递增，用于中止同一标签的收起动画。 */
+  activationVersion: number
   /** 面板是否打开。 */
   visible: boolean
 

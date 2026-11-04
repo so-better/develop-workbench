@@ -64,6 +64,7 @@ export default function EmbeddedBrowserPanel({
     return Number.isFinite(stored) && stored > 0 ? clampPanelWidth(stored) : null
   })
   const panelRef = useRef<HTMLElement>(null)
+  const tabsRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const previousVisibleRef = useRef<boolean | null>(null)
   const openingBoundsRef = useRef<EmbeddedBrowserBounds | null>(null)
@@ -94,6 +95,23 @@ export default function EmbeddedBrowserPanel({
       unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    // 收起动画期间重新激活任意页面（包括同一页），取消旧面板的退出样式。
+    closingRef.current = false
+    setClosing(false)
+  }, [state?.activeTabId, state?.activationVersion])
+
+  useEffect(() => {
+    // 只滚动标签栏，避免 scrollIntoView 连带移动整个浏览器面板。
+    const strip = tabsRef.current
+    const active = strip?.querySelector<HTMLElement>('.embedded-browser-tab.is-active')
+    if (!strip || !active) return
+    const parentBounds = strip.getBoundingClientRect()
+    const bounds = active.getBoundingClientRect()
+    if (bounds.left < parentBounds.left) strip.scrollLeft -= parentBounds.left - bounds.left + 12
+    else if (bounds.right > parentBounds.right) strip.scrollLeft += bounds.right - parentBounds.right + 12
+  }, [state?.activeTabId, state?.visible, state?.tabs.length, expanded, panelWidth])
 
   useEffect(() => {
     if (!state?.visible) {
@@ -324,7 +342,11 @@ export default function EmbeddedBrowserPanel({
     }
   }, [expanded, opening, state?.visible])
 
-  if (!state?.visible) return null
+  if (!state?.visible) return state?.tabs.length ? (
+    <Button className="embedded-browser-resume" icon={<GlobalOutlined />} onClick={() => window.electron.showEmbeddedBrowser()}>
+      浏览器 · {state.tabs.length} 个页面
+    </Button>
+  ) : null
 
   let host = ''
 
@@ -433,10 +455,23 @@ export default function EmbeddedBrowserPanel({
             type="text"
             size="small"
             icon={<CloseOutlined />}
-            aria-label="关闭"
+            aria-label="收起浏览器并保留页面"
+            title="收起浏览器并保留页面"
             onClick={requestClose}
           />
         </div>
+      </div>
+
+      <div ref={tabsRef} className="embedded-browser-tabs" role="tablist" aria-label="已打开页面">
+        {state.tabs.map((tab) => (
+          <div className={`embedded-browser-tab${tab.id === state.activeTabId ? ' is-active' : ''}`} key={tab.id}>
+            <button type="button" role="tab" aria-selected={tab.id === state.activeTabId} title={tab.url ?? tab.title} onClick={() => window.electron.selectEmbeddedBrowserTab(tab.id)}>
+              {tab.loading ? <ReloadOutlined spin /> : <GlobalOutlined />}
+              <span>{tab.title}</span>
+            </button>
+            <Button type="text" size="small" icon={<CloseOutlined />} aria-label={`关闭页面 ${tab.title}`} onClick={() => window.electron.closeEmbeddedBrowserTab(tab.id)} />
+          </div>
+        ))}
       </div>
 
       {state.error ? (

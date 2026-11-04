@@ -40,6 +40,119 @@
     0 12px 32px -26px rgba(15, 23, 42, 0.42);
 }
 
+/* 页面标签独立于原生视图，切换时只改变可见页，不重建页面。 */
+.embedded-browser-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--workbench-divider);
+  background: var(--workbench-soft);
+  /* 保留横向滚动能力，隐藏滚动条，避免标签栏高度随溢出变化。 */
+  scrollbar-width: none;
+}
+
+.embedded-browser-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.embedded-browser-tab {
+  display: flex;
+  align-items: center;
+  position: relative;
+  flex: 0 1 200px;
+  min-width: 140px;
+  max-width: 220px;
+  height: 30px;
+  padding-right: 4px;
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+  background: var(--workbench-panel);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.embedded-browser-tab:hover {
+  background: var(--workbench-hover);
+}
+
+.embedded-browser-tab.is-active {
+  background: var(--workbench-selected-bg);
+  border-color: rgba(22, 119, 255, 0.45);
+}
+
+.embedded-browser-tab > button[role="tab"] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--workbench-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.embedded-browser-tab.is-active > button[role="tab"] {
+  color: var(--app-text);
+  font-weight: 500;
+}
+
+.embedded-browser-tab > button[role="tab"] > .anticon {
+  flex-shrink: 0;
+  color: var(--workbench-secondary);
+}
+
+.embedded-browser-tab.is-active > button[role="tab"] > .anticon {
+  color: #1677ff;
+}
+
+/* 操作槽位始终保留，悬停时不挤压标题或改变标签宽度。 */
+.embedded-browser-tab > .ant-btn {
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--workbench-secondary);
+  border-radius: 50%;
+}
+
+.embedded-browser-tab:hover > .ant-btn,
+.embedded-browser-tab:focus-within > .ant-btn,
+.embedded-browser-tab.is-active > .ant-btn {
+  opacity: 1;
+}
+
+.embedded-browser-tab > button:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: -3px;
+  border-radius: 8px;
+}
+
+@media (hover: none) {
+  .embedded-browser-tab > .ant-btn { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .embedded-browser-tab { transition: none; }
+}
+
+.embedded-browser-tab > button[role="tab"] > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embedded-browser-resume {
+  position: fixed;
+  right: 16px;
+  bottom: 48px;
+  z-index: 900;
+  box-shadow: var(--control-shadow);
+}
+
 :root[data-theme="dark"] {
   color-scheme: dark;
   color: #e6e7e9;

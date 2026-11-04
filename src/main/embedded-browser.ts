@@ -16,6 +16,9 @@ export const BROWSER_PARTITION = 'persist:workbench-browser'
 const BATCH_LOAD_ABORTED = -3
 
 interface BrowserEntry {
+  id: string
+  aliases: Set<string>
+  activationVersion: number
   window: BrowserWindow
   view: WebContentsView
   visible: boolean
@@ -36,6 +39,9 @@ interface DownloadEntry {
 const DOWNLOADS_FILE = 'downloads.json'
 const MAX_DOWNLOADS = 200
 const entries = new Map<number, BrowserEntry>()
+/** entries 指向活动页，pages 持有全部页面；非活动页只隐藏，不重新加载。 */
+const pages = new Map<number, BrowserEntry[]>()
+const trackedWindows = new WeakSet<BrowserWindow>()
 const downloads = new Map<string, DownloadEntry>()
 const retryWindows = new Map<
   number,
@@ -44,6 +50,9 @@ const retryWindows = new Map<
 let browserSessionConfigured = false
 
 const getEmptyState = (): EmbeddedBrowserState => ({
+  tabs: [],
+  activeTabId: null,
+  activationVersion: 0,
   visible: false,
   url: null,
   title: null,
@@ -346,6 +355,14 @@ const toState = (entry: BrowserEntry): EmbeddedBrowserState => {
   const currentUrl = webContents.getURL() || entry.requestedUrl
 
   return {
+    activeTabId: entry.id,
+    activationVersion: entry.activationVersion,
+    tabs: (pages.get(entry.window.id) ?? []).map((page) => ({
+      id: page.id,
+      url: page.view.webContents.getURL() || page.requestedUrl,
+      title: page.view.webContents.getTitle() || page.requestedUrl || '网页',
+      loading: page.view.webContents.isLoading()
+    })),
     visible: entry.visible,
     url: currentUrl || null,
     title: webContents.getTitle() || null,
@@ -359,14 +376,15 @@ const toState = (entry: BrowserEntry): EmbeddedBrowserState => {
 const broadcastState = (entry: BrowserEntry): void => {
   if (entry.window.isDestroyed()) return
 
-  entry.window.webContents.send('embedded-browser:state', toState(entry))
+  const active = entries.get(entry.window.id)
+  entry.window.webContents.send('embedded-browser:state', active ? toState(active) : getEmptyState())
 }
 
 const applyVisibility = (entry: BrowserEntry): void => {
   const hasUsableBounds =
     entry.bounds !== null && entry.bounds.width > 0 && entry.bounds.height > 0
 
-  entry.view.setVisible(entry.visible && !entry.suppressed && hasUsableBounds)
+  entry.view.setVisible(entries.get(entry.window.id) === entry && entry.visible && !entry.suppressed && hasUsableBounds)
 }
 
 const loadUrl = (entry: BrowserEntry, rawUrl: string): boolean => {
@@ -405,11 +423,13 @@ const cancelViewAnimation = (entry: BrowserEntry): void => {
 }
 
 /**
- * 关闭动画结束后销毁原生视图。
- * 不复用旧页面，避免下一次打开时先闪出上一页内容。
+ * 仅关闭标签、清理缓存或退出窗口时销毁原生视图。
  */
 const disposeEntry = (entry: BrowserEntry, onDisposed?: () => void): void => {
   cancelViewAnimation(entry)
+  const remaining = (pages.get(entry.window.id) ?? []).filter((page) => page !== entry)
+  if (remaining.length) pages.set(entry.window.id, remaining)
+  else pages.delete(entry.window.id)
 
   if (entries.get(entry.window.id) === entry) {
     entries.delete(entry.window.id)
@@ -473,7 +493,7 @@ const animateViewIn = (entry: BrowserEntry, target: Rectangle): void => {
 }
 
 /**
- * 关闭时把原生视图移出窗口，动画完成后再隐藏并销毁。
+ * 收起时把原生视图移出窗口，动画完成后隐藏，保留页面状态。
  */
 const animateViewOut = (entry: BrowserEntry): void => {
   const target = entry.bounds
@@ -482,7 +502,6 @@ const animateViewOut = (entry: BrowserEntry): void => {
     entry.visible = false
     applyVisibility(entry)
     broadcastState(entry)
-    disposeEntry(entry)
     return
   }
 
@@ -501,7 +520,6 @@ const animateViewOut = (entry: BrowserEntry): void => {
     entry.visible = false
     applyVisibility(entry)
     broadcastState(entry)
-    disposeEntry(entry)
   }
 
   const tick = (): void => {
@@ -539,7 +557,6 @@ const closeBrowserEntry = (entry: BrowserEntry): void => {
     entry.visible = false
     applyVisibility(entry)
     broadcastState(entry)
-    disposeEntry(entry)
     return
   }
 
@@ -554,21 +571,13 @@ export const closeEmbeddedBrowserForWindow = (window: BrowserWindow): void => {
 
 /** 缓存清理专用：跳过/取消动画，等待原生页面销毁后才能开始清理 Session。 */
 export const closeEmbeddedBrowserForCleanup = (window: BrowserWindow): Promise<void> => {
-  const entry = entries.get(window.id)
-
-  if (!entry) return Promise.resolve()
-
-  return new Promise<void>((resolve) => {
-    cancelViewAnimation(entry)
-    entry.closing = false
+  const retained = [...(pages.get(window.id) ?? [])]
+  entries.delete(window.id)
+  if (!window.isDestroyed()) window.webContents.send('embedded-browser:state', getEmptyState())
+  return Promise.all(retained.map((entry) => new Promise<void>((resolve) => {
     entry.visible = false
-    const webContents = entry.view.webContents
-    if (webContents && !webContents.isDestroyed()) {
-      applyVisibility(entry)
-      broadcastState(entry)
-    }
     disposeEntry(entry, resolve)
-  })
+  }))).then(() => undefined)
 }
 
 /**
@@ -580,10 +589,12 @@ export const requestEmbeddedBrowserClose = (window: BrowserWindow): void => {
 
   if (!entry?.visible) return
 
+  const activationVersion = entry.activationVersion
   window.webContents.send('embedded-browser:request-close')
 
   setTimeout(() => {
-    if (entries.get(window.id) === entry) closeBrowserEntry(entry)
+    // 收起后再次激活同一标签，也不应被旧请求的兜底定时器重新收起。
+    if (entries.get(window.id) === entry && entry.activationVersion === activationVersion) closeBrowserEntry(entry)
   }, 400)
 }
 
@@ -604,11 +615,7 @@ const toggleEntryDevTools = (entry: BrowserEntry): void => {
   webContents.openDevTools({ mode: 'detach', activate: true })
 }
 
-const getEntry = (window: BrowserWindow): BrowserEntry => {
-  const existing = entries.get(window.id)
-
-  if (existing) return existing
-
+const createEntry = (window: BrowserWindow): BrowserEntry => {
   configureBrowserSession()
 
   const view = new WebContentsView({
@@ -623,6 +630,9 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
     }
   })
   const entry: BrowserEntry = {
+    id: randomUUID(),
+    aliases: new Set(),
+    activationVersion: 0,
     window,
     view,
     visible: false,
@@ -646,7 +656,7 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
   webContents.setUserAgent(userAgent)
 
   webContents.setWindowOpenHandler(({ url }) => {
-    loadUrl(entry, url)
+    openEmbeddedBrowser(window, url)
     return { action: 'deny' }
   })
 
@@ -680,10 +690,16 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
 
   webContents.on('will-navigate', (event, url) => {
     if (!tryNormalizeHttpUrl(url)) event.preventDefault()
+    else {
+      // 用户主动跳转建立新的地址链，旧页面入口不再匹配当前标签。
+      entry.aliases.clear()
+      entry.aliases.add(url)
+    }
   })
 
-  webContents.on('will-redirect', (event, url) => {
+  webContents.on('will-redirect', (event, url, _isInPlace, isMainFrame) => {
     if (!tryNormalizeHttpUrl(url)) event.preventDefault()
+    else if (isMainFrame) entry.aliases.add(url)
   })
 
   webContents.on('did-start-loading', () => {
@@ -695,11 +711,18 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
     broadcastState(entry)
   })
 
-  webContents.on('did-navigate', () => {
+  webContents.on('did-navigate', (_event, url) => {
+    // 后退、前进等程序导航不一定触发 will-navigate；离开已知重定向链即清除旧入口。
+    if (!entry.aliases.has(url)) entry.aliases.clear()
+    entry.aliases.add(url)
     broadcastState(entry)
   })
 
-  webContents.on('did-navigate-in-page', () => {
+  webContents.on('did-navigate-in-page', (_event, url, isMainFrame) => {
+    if (isMainFrame) {
+      entry.aliases.clear()
+      entry.aliases.add(url)
+    }
     broadcastState(entry)
   })
 
@@ -722,11 +745,13 @@ const getEntry = (window: BrowserWindow): BrowserEntry => {
     broadcastState(entry)
   })
 
-  window.once('closed', () => {
-    disposeEntry(entry)
-  })
-
-  entries.set(window.id, entry)
+  if (!trackedWindows.has(window)) {
+    trackedWindows.add(window)
+    window.once('closed', () => {
+      for (const page of [...(pages.get(window.id) ?? [])]) disposeEntry(page)
+    })
+  }
+  pages.set(window.id, [...(pages.get(window.id) ?? []), entry])
 
   return entry
 }
@@ -735,9 +760,67 @@ export const openEmbeddedBrowser = (
   window: BrowserWindow,
   rawUrl: string
 ): boolean => {
-  const entry = getEntry(window)
+  const url = tryNormalizeHttpUrl(rawUrl)
+  if (!url) return false
+  const existing = (pages.get(window.id) ?? []).find((page) =>
+    page.view.webContents.getURL() === url || page.aliases.has(url))
+  const entry = existing ?? createEntry(window)
+  if (!existing) {
+    entry.requestedUrl = url
+    entry.aliases.add(url)
+  }
+  activatePage(entry)
+  return existing ? true : loadUrl(entry, url)
+}
 
-  return loadUrl(entry, rawUrl)
+/** 先隐藏旧页，再显示目标页；沿用当前面板尺寸，切换不触发 loadURL。 */
+const activatePage = (entry: BrowserEntry): void => {
+  const previous = entries.get(entry.window.id)
+  const bounds = previous?.visible ? previous.bounds : null
+  if (previous) {
+    cancelViewAnimation(previous)
+    previous.closing = false
+    previous.visible = false
+    previous.view.setVisible(false)
+  }
+  entries.set(entry.window.id, entry)
+  entry.closing = false
+  entry.visible = true
+  entry.activationVersion++
+  entry.suppressed = false
+  entry.bounds = bounds
+  entry.animateInOnNextBounds = !bounds
+  if (bounds) entry.view.setBounds(bounds)
+  applyVisibility(entry)
+  broadcastState(entry)
+}
+
+/** 授权流程持有具体标签，不因用户切换到其他页面而改变目标。 */
+export const getActiveEmbeddedBrowserTabId = (window: BrowserWindow): string | null =>
+  entries.get(window.id)?.id ?? null
+
+export const hasEmbeddedBrowserTab = (window: BrowserWindow, id: string): boolean =>
+  !window.isDestroyed() && Boolean(pages.get(window.id)?.some((page) => page.id === id))
+
+export const closeEmbeddedBrowserTab = (window: BrowserWindow, id: string): void => {
+  const retained = pages.get(window.id) ?? []
+  const index = retained.findIndex((page) => page.id === id)
+  if (index < 0) return
+  const entry = retained[index]
+  if (entries.get(window.id) === entry) {
+    const next = retained[index + 1] ?? retained[index - 1]
+    if (next) {
+      const wasVisible = entry.visible
+      activatePage(next)
+      if (!wasVisible) {
+        next.visible = false
+        applyVisibility(next)
+      }
+    }
+  }
+  disposeEntry(entry)
+  const active = entries.get(window.id)
+  if (!window.isDestroyed()) window.webContents.send('embedded-browser:state', active ? toState(active) : getEmptyState())
 }
 
 interface GeneratedDownloadHandle {
@@ -861,6 +944,23 @@ const retryDownload = (downloadId: string): void => {
 export const initializeEmbeddedBrowser = (): void => {
   loadPersistedDownloads()
   app.on('before-quit', persistDownloadsSync)
+
+  ipcMain.handle('embedded-browser:show', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const entry = window && entries.get(window.id)
+    if (entry) activatePage(entry)
+  })
+  ipcMain.handle('embedded-browser:select-tab', (event, id: unknown) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window || typeof id !== 'string') return
+    const entry = pages.get(window.id)?.find((page) => page.id === id)
+    if (entry) activatePage(entry)
+  })
+  ipcMain.handle('embedded-browser:close-tab', (event, id: unknown) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window || typeof id !== 'string') return
+    closeEmbeddedBrowserTab(window, id)
+  })
 
   ipcMain.handle('embedded-browser:open', (event, rawUrl: unknown) => {
     if (typeof rawUrl !== 'string') throw new Error('链接格式不合法')
@@ -1036,7 +1136,6 @@ export const initializeEmbeddedBrowser = (): void => {
         entry.visible = false
         applyVisibility(entry)
         broadcastState(entry)
-        disposeEntry(entry)
         return
       }
     }
