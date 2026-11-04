@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { App, Alert, Button, Form, Input, Modal, Popconfirm, Spin, Tooltip, theme } from 'antd'
-import { DeleteOutlined, EditOutlined, LinkOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DeleteOutlined, EditOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import type { RequirementLink, RequirementLinkInput, RequirementLinkScope } from '../../../../types/requirement-links'
 import { normalizeRequirementLinkUrl } from '../../../../types/requirement-links'
 import { getErrorMessage } from '../../../../utils'
-import { extractRequirementLinks } from './extract-links'
+import { extractRequirementLinks, isCurrentRequirementUrl } from './extract-links'
+import RequirementLinkTarget from './RequirementLinkTarget'
 import './requirement-links.css'
 
 interface Props extends RequirementLinkScope {
   description: string | null
   documentUrl: string | null
+  requirementUrl: string | null
 }
 
 /**
  * 自动发现和手动添加共用一个列表，主进程负责合并与持久化。
  * 父组件以空间和需求作为 key，切换需求时重新挂载，隔离列表和编辑表单状态。
  */
-export default function RequirementLinks({ projectKey, requirementId, description, documentUrl }: Props): JSX.Element {
+export default function RequirementLinks({ projectKey, requirementId, description, documentUrl, requirementUrl }: Props): JSX.Element {
   const { message } = App.useApp()
   const { token } = theme.useToken()
   const [links, setLinks] = useState<RequirementLink[]>([])
@@ -35,7 +37,9 @@ export default function RequirementLinks({ projectKey, requirementId, descriptio
   const restoreOnScan = useRef(false)
   const scope = useMemo(() => ({ projectKey, requirementId }), [projectKey, requirementId])
   // 手动扫描与失败重试也重新解析当前内容，不请求远端需求或链接目标。
-  const discovered = useMemo(() => extractRequirementLinks(description, documentUrl), [description, documentUrl, retry])
+  const discovered = useMemo(() => extractRequirementLinks(description, documentUrl, requirementUrl), [description, documentUrl, requirementUrl, retry])
+  // 兼容此前已入库的自身地址，避免重新进入详情后又出现在列表中。
+  const visibleLinks = links.filter((link) => !isCurrentRequirementUrl(link.url, requirementUrl))
 
   useEffect(() => {
     alive.current = true
@@ -101,7 +105,7 @@ export default function RequirementLinks({ projectKey, requirementId, descriptio
   return (
     <section className="requirement-repo-section requirement-links-section">
       <div className="requirement-repo-heading">
-        <div className="requirement-repo-heading-title"><h2>相关链接</h2><span className="requirement-repo-count">{links.length} 个链接</span></div>
+        <div className="requirement-repo-heading-title"><h2>相关链接</h2><span className="requirement-repo-count">{visibleLinks.length} 个链接</span></div>
         <div className="requirement-repo-heading-actions">
           {/* 保持文字按钮形态，仅设置语义色；禁用时沿用组件默认颜色。 */}
             <Tooltip title="重新扫描当前需求内容，恢复其中已删除的链接">
@@ -112,18 +116,11 @@ export default function RequirementLinks({ projectKey, requirementId, descriptio
       </div>
       {error ? <Alert type="error" showIcon message="相关链接读取失败" description={error} action={<Button size="small" onClick={() => setRetry((value) => value + 1)}>重试</Button>} /> : null}
       {loading ? <Spin size="small" /> : null}
-      {!loading && !error && !links.length ? <p className="requirement-links-empty">暂无相关链接</p> : null}
+      {!loading && !error && !visibleLinks.length ? <p className="requirement-links-empty">暂无相关链接</p> : null}
       <ul className="requirement-links-list">
-        {links.map((link) => (
+        {visibleLinks.map((link) => (
           <li key={link.id} className="requirement-links-row">
-            <a className="requirement-links-target" href={link.url} title={link.url} onClick={(event) => { event.preventDefault(); openLink(link.url) }}>
-              <span className="requirement-links-icon" aria-hidden="true"><LinkOutlined /></span>
-              <span className="requirement-links-text">
-                <span className="requirement-links-name">{link.name}</span>
-                {/* 仅精简显示，打开和悬停提示仍使用完整地址。 */}
-                <span className="requirement-links-url">{link.url.replace(/^https?:\/\//i, '')}</span>
-              </span>
-            </a>
+            <RequirementLinkTarget link={link} onOpen={openLink} />
             <div className="requirement-links-actions">
               <Tooltip title="编辑链接">
                 <Button type="text" size="small" aria-label={`编辑 ${link.name}`} icon={<EditOutlined />} disabled={loading || saving || !!error} onClick={() => openEditor(link)} />

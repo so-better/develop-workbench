@@ -22,13 +22,27 @@ const parseHtml = (value: string): DocumentFragment => {
   return template.content
 }
 
+/** 当前 Story 的不同页签、查询参数和锚点仍视为同一需求页面。 */
+export const isCurrentRequirementUrl = (url: string, requirementUrl: string | null): boolean => {
+  if (!requirementUrl) return false
+  try {
+    const candidate = new URL(url)
+    const current = new URL(requirementUrl)
+    return candidate.host === current.host &&
+      decodeURIComponent(candidate.pathname).replace(/\/+$/, '') === decodeURIComponent(current.pathname).replace(/\/+$/, '')
+  } catch {
+    return false
+  }
+}
+
 /** 解析 Markdown 语法树及原始富文本，不请求链接目标，也不执行 HTML。 */
-export const extractRequirementLinks = (description: string | null, documentUrl: string | null): RequirementLinkInput[] => {
+export const extractRequirementLinks = (description: string | null, documentUrl: string | null, requirementUrl: string | null = null): RequirementLinkInput[] => {
   // 按规范化后的完整 URL 去重并保留首次名称，查询参数和锚点不同仍是不同入口。
   const links = new Map<string, RequirementLinkInput>()
   const add = (raw: string, title = ''): void => {
     try {
       const url = normalizeRequirementLinkUrl(raw)
+      if (isCurrentRequirementUrl(url, requirementUrl)) return
       const parsed = new URL(url)
       const name = title.replace(/\s+/g, ' ').trim().slice(0, 200) || `${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}`.slice(0, 200)
       if (!links.has(url)) links.set(url, { name, url })

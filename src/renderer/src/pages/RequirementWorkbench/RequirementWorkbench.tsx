@@ -3786,6 +3786,7 @@ export default function RequirementWorkbench({
                   requirementId={selectedRequirement.id}
                   description={selectedRequirement.description}
                   documentUrl={selectedRequirement.documentUrl}
+                  requirementUrl={requirementUrl}
                 />
               ) : null}
 
