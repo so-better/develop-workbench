@@ -1,0 +1,114 @@
+.requirement-links-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.requirement-links-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border-radius: 8px;
+  transition: background-color 150ms ease;
+}
+
+.requirement-links-row:hover,
+.requirement-links-row:focus-within {
+  background: var(--workbench-hover);
+}
+
+/* 图标与文字共用链接区域；维护按钮独立，避免编辑时触发页面打开。 */
+.requirement-links-target {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  color: var(--app-text);
+  border-radius: 6px;
+}
+
+.requirement-links-target:hover {
+  color: var(--app-text);
+}
+
+.requirement-links-target:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.requirement-links-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--workbench-soft);
+  color: var(--workbench-secondary);
+  font-size: 16px;
+}
+
+.requirement-links-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.requirement-links-name,
+.requirement-links-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-links-name {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.requirement-links-url,
+.requirement-links-empty {
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.requirement-links-empty {
+  margin: 0;
+  padding: 12px;
+}
+
+/* 始终保留操作入口，窄窗口中让文本截断而非把按钮挤到第二行。 */
+.requirement-links-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.requirement-links-actions .ant-btn:not(.ant-btn-dangerous):not(:disabled) {
+  color: var(--workbench-secondary);
+}
+
+@media (max-width: 1000px) {
+  .requirement-links-row {
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  .requirement-links-target {
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .requirement-links-row {
+    transition: none;
+  }
+}

@@ -13,6 +13,7 @@ import type {
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
 import type { QuickNoteState } from '../types/quick-note'
+import type { RequirementLink, RequirementLinkInput, RequirementLinkScope } from '../types/requirement-links'
 import type {
   UpdateCheckResult,
   UpdateDownloadResult,
@@ -80,6 +81,14 @@ import type {
 } from '../types/weekly-report'
 
 export interface ElectronAPI {
+  /** 补充自动发现的需求链接，返回持久化后的完整列表。 */
+  scanRequirementLinks: (scope: RequirementLinkScope, links: RequirementLinkInput[], restoreDeleted?: boolean) => Promise<RequirementLink[]>
+  /** 手动新增需求链接。 */
+  addRequirementLink: (scope: RequirementLinkScope, link: RequirementLinkInput) => Promise<RequirementLink[]>
+  /** 按 ID 编辑需求链接。 */
+  updateRequirementLink: (scope: RequirementLinkScope, id: string, link: RequirementLinkInput) => Promise<RequirementLink[]>
+  /** 删除需求链接，并防止自动扫描重新添加。 */
+  removeRequirementLink: (scope: RequirementLinkScope, id: string) => Promise<RequirementLink[]>
   platform: string
   /** 获取应用与运行时版本信息。 */
   getAppInfo: () => Promise<AppInfo>

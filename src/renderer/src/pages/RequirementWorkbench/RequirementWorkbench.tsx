@@ -74,6 +74,7 @@ import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import MarkdownContent from '../../components/MarkdownContent/MarkdownContent'
 import MarkdownEditor from '../../components/MarkdownEditor/MarkdownEditor'
 import RequirementFlowchart from '../../components/RequirementFlowchart/RequirementFlowchart'
+import RequirementLinks from '../../components/RequirementLinks/RequirementLinks'
 
 interface RequirementWorkbenchProps {
   /** 打开设置弹窗，并定位到指定分类。 */
@@ -3777,6 +3778,16 @@ export default function RequirementWorkbench({
                   </>
                 )}
               </section>
+
+              {data?.project.projectKey ? (
+                <RequirementLinks
+                  key={JSON.stringify([data.project.projectKey, selectedRequirement.id])}
+                  projectKey={data.project.projectKey}
+                  requirementId={selectedRequirement.id}
+                  description={selectedRequirement.description}
+                  documentUrl={selectedRequirement.documentUrl}
+                />
+              ) : null}
 
               {localRequirementDetail}
 

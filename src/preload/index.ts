@@ -15,6 +15,7 @@ import type {
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
 import type { QuickNoteState } from '../types/quick-note'
+import type { RequirementLink, RequirementLinkInput, RequirementLinkScope } from '../types/requirement-links'
 import type {
   UpdateCheckResult,
   UpdateDownloadResult,
@@ -82,6 +83,18 @@ import type {
 } from '../types/weekly-report'
 
 const electronAPI = {
+  /** 补充自动发现的需求链接，返回持久化后的完整列表。 */
+  scanRequirementLinks: (scope: RequirementLinkScope, links: RequirementLinkInput[], restoreDeleted = false): Promise<RequirementLink[]> =>
+    ipcRenderer.invoke('requirement-links:scan', scope, links, restoreDeleted),
+  /** 手动新增需求链接。 */
+  addRequirementLink: (scope: RequirementLinkScope, link: RequirementLinkInput): Promise<RequirementLink[]> =>
+    ipcRenderer.invoke('requirement-links:add', scope, link),
+  /** 按 ID 编辑需求链接。 */
+  updateRequirementLink: (scope: RequirementLinkScope, id: string, link: RequirementLinkInput): Promise<RequirementLink[]> =>
+    ipcRenderer.invoke('requirement-links:update', scope, id, link),
+  /** 删除需求链接，并防止自动扫描重新添加。 */
+  removeRequirementLink: (scope: RequirementLinkScope, id: string): Promise<RequirementLink[]> =>
+    ipcRenderer.invoke('requirement-links:remove', scope, id),
   // 当前运行平台，渲染进程可在首次渲染时同步读取。
   platform: process.platform,
 
