@@ -766,19 +766,25 @@ export const openEmbeddedBrowser = (
   const retained = pages.get(window.id) ?? []
   // 优先匹配正在显示的准确地址，再匹配稳定入口和重定向别名。
   // SPA 的 replaceState/pushState 会重置 aliases，不能仅靠别名避免重复标签。
-  const existing = retained.find((page) => page.view.webContents.getURL() === url)
-    ?? retained.find((page) => page.requestedUrl === url || page.aliases.has(url))
+  const matched = retained.find((page) => page.view.webContents.getURL() === url)
+    ?? retained.find((page) => page.aliases.has(url))
+  const existing = matched ?? retained.find((page) => page.requestedUrl === url)
   const entry = existing ?? createEntry(window)
   if (!existing) {
     entry.requestedUrl = url
     entry.aliases.add(url)
   }
   activatePage(entry)
-  return existing ? true : loadUrl(entry, url)
+  if (matched) return true
+  // 原始入口仍复用原标签，但页面已离开对应地址链时必须导航回请求内容。
+  // 前端路由无法通用地判断是否同一文档，此时宁可重新加载，也不展示错误内容。
+  entry.aliases.clear()
+  entry.aliases.add(url)
+  return loadUrl(entry, url)
 }
 
 /** 先隐藏旧页，再显示目标页；沿用当前面板尺寸，切换不触发 loadURL。 */
-const activatePage = (entry: BrowserEntry): void => {
+const activatePage = (entry: BrowserEntry, visible = true, notify = true): void => {
   const previous = entries.get(entry.window.id)
   const bounds = previous?.visible ? previous.bounds : null
   if (previous) {
@@ -789,19 +795,41 @@ const activatePage = (entry: BrowserEntry): void => {
   }
   entries.set(entry.window.id, entry)
   entry.closing = false
-  entry.visible = true
+  entry.visible = visible
   entry.activationVersion++
   entry.suppressed = false
   entry.bounds = bounds
-  entry.animateInOnNextBounds = !bounds
+  entry.animateInOnNextBounds = visible && !bounds
   if (bounds) entry.view.setBounds(bounds)
   applyVisibility(entry)
-  broadcastState(entry)
+  if (notify) broadcastState(entry)
 }
 
 /** 授权流程持有具体标签，不因用户切换到其他页面而改变目标。 */
 export const getActiveEmbeddedBrowserTabId = (window: BrowserWindow): string | null =>
   entries.get(window.id)?.id ?? null
+
+/** 同步记录授权入口的页面归属，复用用户页面时不得在授权结束后自动关闭。 */
+export const openEmbeddedBrowserForAuth = (
+  window: BrowserWindow,
+  url: string
+): { tabId: string; created: boolean } | null => {
+  const normalizedUrl = tryNormalizeHttpUrl(url)
+  if (!normalizedUrl || window.isDestroyed()) return null
+  // 授权不使用历史入口或重定向别名匹配用户标签，避免导航已有页面丢失输入。
+  const existing = (pages.get(window.id) ?? []).find((page) =>
+    page.view.webContents.getURL() === normalizedUrl)
+  if (existing) {
+    activatePage(existing)
+    return { tabId: existing.id, created: false }
+  }
+  const entry = createEntry(window)
+  entry.requestedUrl = normalizedUrl
+  entry.aliases.add(normalizedUrl)
+  activatePage(entry)
+  loadUrl(entry, normalizedUrl)
+  return { tabId: entry.id, created: true }
+}
 
 export const hasEmbeddedBrowserTab = (window: BrowserWindow, id: string): boolean =>
   !window.isDestroyed() && Boolean(pages.get(window.id)?.some((page) => page.id === id))
@@ -814,12 +842,8 @@ export const closeEmbeddedBrowserTab = (window: BrowserWindow, id: string): void
   if (entries.get(window.id) === entry) {
     const next = retained[index + 1] ?? retained[index - 1]
     if (next) {
-      const wasVisible = entry.visible
-      activatePage(next)
-      if (!wasVisible) {
-        next.visible = false
-        applyVisibility(next)
-      }
+      // 先设置最终可见状态，移除旧页后统一广播，避免隐藏面板短暂展开。
+      activatePage(next, entry.visible && !entry.closing, false)
     }
   }
   disposeEntry(entry)
