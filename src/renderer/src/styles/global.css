@@ -41,13 +41,29 @@
 }
 
 /* 页面标签独立于原生视图，切换时只改变可见页，不重建页面。 */
+.embedded-browser-tabbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+  border-bottom: 1px solid var(--workbench-divider);
+  background: var(--workbench-soft);
+}
+
+.embedded-browser-close-all {
+  flex-shrink: 0;
+  margin-right: 10px;
+  font-size: 12px;
+  color: var(--workbench-secondary);
+}
+
 .embedded-browser-tabs {
   display: flex;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
   gap: 6px;
   overflow-x: auto;
   padding: 7px 10px;
-  border-bottom: 1px solid var(--workbench-divider);
   background: var(--workbench-soft);
   /* 保留横向滚动能力，隐藏滚动条，避免标签栏高度随溢出变化。 */
   scrollbar-width: none;
@@ -113,10 +129,31 @@
 
 /* 操作槽位始终保留，悬停时不挤压标题或改变标签宽度。 */
 .embedded-browser-tab > .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  line-height: 1;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0;
   flex-shrink: 0;
   opacity: 0;
   color: var(--workbench-secondary);
   border-radius: 50%;
+}
+
+.embedded-browser-tab > .ant-btn .ant-btn-icon,
+.embedded-browser-tab > .ant-btn .anticon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.embedded-browser-tab > .ant-btn .anticon {
+  font-size: 10px;
 }
 
 .embedded-browser-tab:hover > .ant-btn,

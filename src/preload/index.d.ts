@@ -87,6 +87,8 @@ export interface ElectronAPI {
   selectEmbeddedBrowserTab: (id: string) => Promise<void>
   /** 关闭单个页面并释放原生视图。 */
   closeEmbeddedBrowserTab: (id: string) => Promise<void>
+  /** 关闭全部标签并释放页面，不是收起面板。 */
+  closeAllEmbeddedBrowserTabs: () => Promise<void>
   /** 补充自动发现的需求链接，返回持久化后的完整列表。 */
   scanRequirementLinks: (scope: RequirementLinkScope, links: RequirementLinkInput[], restoreDeleted?: boolean) => Promise<RequirementLink[]>
   /** 手动新增需求链接。 */

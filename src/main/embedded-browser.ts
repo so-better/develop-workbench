@@ -1,5 +1,5 @@
 import { app, BrowserWindow, ipcMain, session, shell, WebContentsView } from 'electron'
-import type { DownloadItem, Rectangle } from 'electron'
+import type { DownloadItem, Rectangle, LoadURLOptions } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { open, rename, rm } from 'node:fs/promises'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -388,7 +388,7 @@ const applyVisibility = (entry: BrowserEntry): void => {
   entry.view.setVisible(entries.get(entry.window.id) === entry && entry.visible && !entry.suppressed && hasUsableBounds)
 }
 
-const loadUrl = (entry: BrowserEntry, rawUrl: string): boolean => {
+const loadUrl = (entry: BrowserEntry, rawUrl: string, options?: LoadURLOptions): boolean => {
   const url = tryNormalizeHttpUrl(rawUrl)
 
   if (!url) return false
@@ -411,7 +411,7 @@ const loadUrl = (entry: BrowserEntry, rawUrl: string): boolean => {
   entry.visible = true
   applyVisibility(entry)
   broadcastState(entry)
-  entry.view.webContents.loadURL(url).catch(() => undefined)
+  entry.view.webContents.loadURL(url, options).catch(() => undefined)
 
   return true
 }
@@ -656,8 +656,18 @@ const createEntry = (window: BrowserWindow): BrowserEntry => {
 
   webContents.setUserAgent(userAgent)
 
-  webContents.setWindowOpenHandler(({ url }) => {
-    openEmbeddedBrowser(window, url)
+  webContents.setWindowOpenHandler(({ url, referrer, postBody }) => {
+    const options: LoadURLOptions = {}
+    if (referrer?.url) options.httpReferrer = referrer
+    if (postBody) {
+      // 保留原始编码和 multipart 分隔符，否则服务端无法还原表单及上传文件。
+      options.postData = postBody.data
+      const contentType = postBody.contentType === 'multipart/form-data' && postBody.boundary
+        ? `${postBody.contentType}; boundary=${postBody.boundary}`
+        : postBody.contentType
+      options.extraHeaders = `Content-Type: ${contentType}`
+    }
+    openEmbeddedBrowser(window, url, options)
     return { action: 'deny' }
   })
 
@@ -759,16 +769,19 @@ const createEntry = (window: BrowserWindow): BrowserEntry => {
 
 export const openEmbeddedBrowser = (
   window: BrowserWindow,
-  rawUrl: string
+  rawUrl: string,
+  options?: LoadURLOptions
 ): boolean => {
   const url = tryNormalizeHttpUrl(rawUrl)
   if (!url) return false
   const retained = pages.get(window.id) ?? []
   // 优先匹配正在显示的准确地址，再匹配稳定入口和重定向别名。
   // SPA 的 replaceState/pushState 会重置 aliases，不能仅靠别名避免重复标签。
-  const matched = retained.find((page) => page.view.webContents.getURL() === url)
+  // 每次 POST 都代表新的提交，即使 URL 相同也不能复用并跳过请求。
+  const isPost = options?.postData !== undefined
+  const matched = isPost ? undefined : retained.find((page) => page.view.webContents.getURL() === url)
     ?? retained.find((page) => page.aliases.has(url))
-  const existing = matched ?? retained.find((page) => page.requestedUrl === url)
+  const existing = isPost ? undefined : matched ?? retained.find((page) => page.requestedUrl === url)
   const entry = existing ?? createEntry(window)
   if (!existing) {
     entry.requestedUrl = url
@@ -780,7 +793,7 @@ export const openEmbeddedBrowser = (
   // 前端路由无法通用地判断是否同一文档，此时宁可重新加载，也不展示错误内容。
   entry.aliases.clear()
   entry.aliases.add(url)
-  return loadUrl(entry, url)
+  return loadUrl(entry, url, options)
 }
 
 /** 先隐藏旧页，再显示目标页；沿用当前面板尺寸，切换不触发 loadURL。 */
@@ -970,6 +983,11 @@ const retryDownload = (downloadId: string): void => {
 }
 
 export const initializeEmbeddedBrowser = (): void => {
+  // 复用完整销毁流程：清空页面状态，并等待所有原生视图释放。
+  ipcMain.handle('embedded-browser:close-all-tabs', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    return window ? closeEmbeddedBrowserForCleanup(window) : undefined
+  })
   loadPersistedDownloads()
   app.on('before-quit', persistDownloadsSync)
 

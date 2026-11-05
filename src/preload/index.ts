@@ -87,6 +87,7 @@ const electronAPI = {
   showEmbeddedBrowser: (): Promise<void> => ipcRenderer.invoke('embedded-browser:show'),
   selectEmbeddedBrowserTab: (id: string): Promise<void> => ipcRenderer.invoke('embedded-browser:select-tab', id),
   closeEmbeddedBrowserTab: (id: string): Promise<void> => ipcRenderer.invoke('embedded-browser:close-tab', id),
+  closeAllEmbeddedBrowserTabs: (): Promise<void> => ipcRenderer.invoke('embedded-browser:close-all-tabs'),
   /** 补充自动发现的需求链接，返回持久化后的完整列表。 */
   scanRequirementLinks: (scope: RequirementLinkScope, links: RequirementLinkInput[], restoreDeleted = false): Promise<RequirementLink[]> =>
     ipcRenderer.invoke('requirement-links:scan', scope, links, restoreDeleted),
