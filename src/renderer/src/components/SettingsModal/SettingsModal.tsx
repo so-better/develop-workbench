@@ -17,6 +17,7 @@ import MeegleSettings from '../MeegleSettings/MeegleSettings'
 import RepositorySettings from '../RepositorySettings/RepositorySettings'
 import SkillSettings from '../SkillSettings/SkillSettings'
 import StorageCleanup from '../StorageCleanup/StorageCleanup'
+import MigrationSettings from '../MigrationSettings/MigrationSettings'
 
 const CodeEditor = lazy(() => import('../CodeEditor/CodeEditor'))
 
@@ -434,6 +435,14 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
+            className={`settings-nav-item${activeSection === 'migration' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'migration' ? 'page' : undefined}
+            onClick={() => setActiveSection('migration')}
+          >
+            一键迁移
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item${activeSection === 'app-info' ? ' is-active' : ''}`}
             aria-current={activeSection === 'app-info' ? 'page' : undefined}
             onClick={() => setActiveSection('app-info')}
@@ -635,6 +644,7 @@ export default function SettingsModal({
           ) : null}
 
           {activeSection === 'cleanup' ? <StorageCleanup /> : null}
+          {activeSection === 'migration' ? <MigrationSettings /> : null}
 
           {activeSection === 'app-info' ? (
             <>

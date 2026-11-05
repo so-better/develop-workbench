@@ -15,6 +15,10 @@ import type {
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
 import type { QuickNoteState } from '../types/quick-note'
+import type {
+  MigrationExportResult,
+  MigrationImportResult
+} from '../types/migration'
 import type { RequirementLink, RequirementLinkInput, RequirementLinkScope } from '../types/requirement-links'
 import type {
   UpdateCheckResult,
@@ -100,6 +104,14 @@ const electronAPI = {
   /** 删除需求链接，并防止自动扫描重新添加。 */
   removeRequirementLink: (scope: RequirementLinkScope, id: string): Promise<RequirementLink[]> =>
     ipcRenderer.invoke('requirement-links:remove', scope, id),
+  /** 导出本机应用数据为压缩包。 */
+  exportMigrationData: (): Promise<MigrationExportResult> =>
+    ipcRenderer.invoke('migration:export'),
+  /** 导入迁移压缩包，自动备份当前数据。 */
+  importMigrationData: (): Promise<MigrationImportResult> =>
+    ipcRenderer.invoke('migration:import'),
+  /** 重启应用，使导入的数据生效。 */
+  restartApp: (): Promise<void> => ipcRenderer.invoke('migration:restart'),
   // 当前运行平台，渲染进程可在首次渲染时同步读取。
   platform: process.platform,
 

@@ -10,6 +10,7 @@ export type SettingsSection =
   | 'ai'
   | 'skills'
   | 'cleanup'
+  | 'migration'
   | 'app-info'
 
 /** 设置弹窗默认打开的第一个分类。 */

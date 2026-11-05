@@ -22,6 +22,7 @@ import { initializeMeegle } from './meegle'
 import { initializeProductGuide } from './product-guide'
 import { initializeQuickNotes } from './quick-notes'
 import { initializeRequirementLinks } from './requirement-links'
+import { initializeMigration } from './migration'
 import { initializeRepositories } from './repositories'
 import { initializeRequirementBindings } from './requirement-bindings'
 import { initializeRequirementStatuses } from './requirement-statuses'
@@ -71,6 +72,7 @@ if (!hasSingleInstanceLock) {
     initializeProductGuide()
     initializeQuickNotes()
     initializeRequirementLinks()
+    initializeMigration()
     initializeEmbeddedBrowser()
     initializeGit()
     initializeIde()

@@ -13,6 +13,10 @@ import type {
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
 import type { QuickNoteState } from '../types/quick-note'
+import type {
+  MigrationExportResult,
+  MigrationImportResult
+} from '../types/migration'
 import type { RequirementLink, RequirementLinkInput, RequirementLinkScope } from '../types/requirement-links'
 import type {
   UpdateCheckResult,
@@ -97,6 +101,12 @@ export interface ElectronAPI {
   updateRequirementLink: (scope: RequirementLinkScope, id: string, link: RequirementLinkInput) => Promise<RequirementLink[]>
   /** 删除需求链接，并防止自动扫描重新添加。 */
   removeRequirementLink: (scope: RequirementLinkScope, id: string) => Promise<RequirementLink[]>
+  /** 导出本机应用数据为压缩包。 */
+  exportMigrationData: () => Promise<MigrationExportResult>
+  /** 导入迁移压缩包，自动备份当前数据。 */
+  importMigrationData: () => Promise<MigrationImportResult>
+  /** 重启应用，使导入的数据生效。 */
+  restartApp: () => Promise<void>
   platform: string
   /** 获取应用与运行时版本信息。 */
   getAppInfo: () => Promise<AppInfo>
