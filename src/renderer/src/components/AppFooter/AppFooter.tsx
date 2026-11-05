@@ -8,7 +8,7 @@ import {
   SearchOutlined,
   SettingOutlined
 } from '@ant-design/icons'
-import { Badge, Button, Tag, Tooltip } from 'antd'
+import { Badge, Button, Tooltip } from 'antd'
 import RobotMark from '../RobotMark/RobotMark'
 import ThemeSwitcher from '../ThemeSwitcher/ThemeSwitcher'
 import type { AppInfo } from '../../../../types/app'
@@ -53,106 +53,112 @@ export default function AppFooter({
   const quickAccessShortcut = isMac ? '⌘K' : 'Ctrl K'
   return (
     <footer className="app-footer">
-      <div className="footer-leading">
+      <div className="footer-meta">
         {appInfo ? (
-          <span className="footer-version">
-            <span>当前版本：</span>
-            <Tag bordered={false}>v{appInfo.appVersion}</Tag>
-          </span>
+          <span className="footer-version">v{appInfo.appVersion}</span>
         ) : null}
         <Button
           type="text"
           size="small"
           icon={<HistoryOutlined />}
+          title="更新日志"
           onClick={onOpenChangelog}
         >
-          更新日志
+          <span className="footer-meta-label">更新日志</span>
         </Button>
-        <Badge count={quickNoteCount} size="small">
-          <Button
-            type="text"
-            size="small"
-            icon={<CheckSquareOutlined />}
-            data-quick-notes-trigger
-            onClick={onOpenQuickNotes}
-          >
-            待办简记
-          </Button>
-        </Badge>
-        <Badge count={downloadCount} size="small">
-          <Button
-            type="text"
-            size="small"
-            icon={<DownloadOutlined />}
-            onClick={onOpenDownloads}
-          >
-            下载管理
-          </Button>
-        </Badge>
-        {browserTabCount > 0 ? (
-          <Badge count={browserTabCount} size="small">
-            <Tooltip title="恢复已收起的浏览器页面">
-              <Button
-                type="text"
-                size="small"
-                icon={<GlobalOutlined />}
-                onClick={onResumeBrowser}
-              >
-                浏览器
-              </Button>
-            </Tooltip>
-          </Badge>
-        ) : null}
-      </div>
-
-      <div className="footer-actions">
         <Button
           type="text"
           size="small"
-          className="footer-search-trigger"
-          icon={<SearchOutlined />}
-          onClick={onOpenQuickAccess}
+          icon={<ReadOutlined />}
+          title="使用手册"
+          onClick={onOpenGuide}
         >
-          搜索
-          <kbd>{quickAccessShortcut}</kbd>
+          <span className="footer-meta-label">使用手册</span>
         </Button>
-        <Tooltip title="使用手册">
-          <Button
-            type="text"
-            size="middle"
-            icon={<ReadOutlined />}
-            aria-label="打开使用手册"
-            onClick={onOpenGuide}
-          />
-        </Tooltip>
-        <Tooltip title="飞书云文档">
-          <Button
-            type="text"
-            size="middle"
-            icon={<CloudOutlined />}
-            aria-label="打开飞书云文档"
-            onClick={onOpenCloudDocs}
-          />
-        </Tooltip>
-        <Tooltip title="AI 助手">
-          <Button
-            type="text"
-            size="middle"
-            icon={<RobotMark />}
-            aria-label="打开 AI 助手"
-            onClick={onOpenAi}
-          />
-        </Tooltip>
-        <Tooltip title="设置">
-          <Button
-            type="text"
-            size="middle"
-            icon={<SettingOutlined />}
-            aria-label="设置"
-            onClick={onOpenSettings}
-          />
-        </Tooltip>
-        <ThemeSwitcher />
+        <Button
+          type="text"
+          size="small"
+          icon={<CloudOutlined />}
+          title="飞书云文档"
+          onClick={onOpenCloudDocs}
+        >
+          <span className="footer-meta-label">飞书云文档</span>
+        </Button>
+      </div>
+
+      <Button
+        type="text"
+        size="small"
+        className="footer-search-trigger"
+        icon={<SearchOutlined />}
+        onClick={onOpenQuickAccess}
+      >
+        <span className="footer-action-label">搜索</span>
+        <kbd>{quickAccessShortcut}</kbd>
+      </Button>
+
+      <div className="footer-end">
+        <div className="footer-activity">
+          {browserTabCount > 0 ? (
+            <Badge count={browserTabCount} size="small">
+              <Tooltip title="恢复已收起的浏览器页面">
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<GlobalOutlined />}
+                  onClick={onResumeBrowser}
+                >
+                  <span className="footer-action-label">浏览器</span>
+                </Button>
+              </Tooltip>
+            </Badge>
+          ) : null}
+          <Badge count={quickNoteCount} size="small">
+            <Button
+              type="text"
+              size="small"
+              icon={<CheckSquareOutlined />}
+              data-quick-notes-trigger
+              onClick={onOpenQuickNotes}
+            >
+              <span className="footer-action-label">待办简记</span>
+            </Button>
+          </Badge>
+          <Badge count={downloadCount} size="small">
+            <Button
+              type="text"
+              size="small"
+              icon={<DownloadOutlined />}
+              onClick={onOpenDownloads}
+            >
+              <span className="footer-action-label">下载管理</span>
+            </Button>
+          </Badge>
+        </div>
+
+        <span className="footer-divider" aria-hidden="true" />
+
+        <div className="footer-actions">
+          <Tooltip title="AI 助手">
+            <Button
+              type="text"
+              size="small"
+              icon={<RobotMark />}
+              aria-label="打开 AI 助手"
+              onClick={onOpenAi}
+            />
+          </Tooltip>
+          <Tooltip title="设置">
+            <Button
+              type="text"
+              size="small"
+              icon={<SettingOutlined />}
+              aria-label="设置"
+              onClick={onOpenSettings}
+            />
+          </Tooltip>
+          <ThemeSwitcher />
+        </div>
       </div>
     </footer>
   )

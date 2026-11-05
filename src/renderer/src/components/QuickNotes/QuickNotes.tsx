@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   CheckCircleFilled,
   CheckSquareOutlined,
@@ -27,7 +27,7 @@ interface QuickNotesProps {
 
 /**
  * 全局待办简记。
- * 左下浮动面板，适合随开随记。
+ * 浮动面板跟随底部状态栏的“待办简记”入口定位。
  */
 export default function QuickNotes({
   open,
@@ -47,10 +47,48 @@ export default function QuickNotes({
   const [submitting, setSubmitting] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set())
+  const [panelPosition, setPanelPosition] = useState<{
+    left: number
+    bottom: number
+    width: number
+  } | null>(null)
   const panelRef = useRef<HTMLElement>(null)
   const inputRef = useRef<InputRef>(null)
   const isMac = window.electron.platform === 'darwin'
   const shortcut = isMac ? '⌘⇧K' : 'Ctrl Shift K'
+
+  // 面板锚定底栏入口；用布局副作用在首帧前定位，避免先出现在旧位置再跳动。
+  useLayoutEffect(() => {
+    if (!open) return
+
+    const updatePosition = (): void => {
+      const width = Math.min(368, window.innerWidth - 16)
+      const trigger = document.querySelector<HTMLElement>(
+        '[data-quick-notes-trigger]'
+      )
+      const rect = trigger?.getBoundingClientRect() ?? null
+      const left = rect
+        ? Math.max(
+            8,
+            Math.min(
+              rect.left + rect.width / 2 - width / 2,
+              window.innerWidth - width - 8
+            )
+          )
+        : window.innerWidth - width - 16
+
+      setPanelPosition({
+        left,
+        bottom: rect ? Math.max(8, window.innerHeight - rect.top + 8) : 62,
+        width
+      })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+
+    return () => window.removeEventListener('resize', updatePosition)
+  }, [open])
 
   // 全局快捷键和内置浏览器内转发的事件。
   useEffect(() => {
@@ -266,6 +304,15 @@ export default function QuickNotes({
       className="quick-notes-panel"
       role="dialog"
       aria-label="待办简记"
+      style={
+        panelPosition
+          ? {
+              left: panelPosition.left,
+              bottom: panelPosition.bottom,
+              width: panelPosition.width
+            }
+          : undefined
+      }
     >
       <header className="quick-notes-head">
         <div className="quick-notes-title">
