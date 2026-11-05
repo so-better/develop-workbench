@@ -1,3 +1,5 @@
+import { trimUrlTrailingText } from '../utils'
+
 /** 自动提取和手动录入共用的链接内容，名称不依赖目标页面的网络请求。 */
 export interface RequirementLinkInput {
   name: string
@@ -17,7 +19,7 @@ export interface RequirementLinkScope {
 
 /** 保留查询参数和锚点，只规范化 URL 本身。 */
 export const normalizeRequirementLinkUrl = (value: string): string => {
-  const url = new URL(value.trim())
+  const url = new URL(trimUrlTrailingText(value))
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('请输入 HTTP 或 HTTPS 链接')
   return url.href
 }

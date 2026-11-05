@@ -2,6 +2,7 @@ import {
   CheckSquareOutlined,
   CloudOutlined,
   DownloadOutlined,
+  GlobalOutlined,
   HistoryOutlined,
   ReadOutlined,
   SearchOutlined,
@@ -17,6 +18,9 @@ interface AppFooterProps {
   onOpenSettings: () => void
   downloadCount: number
   quickNoteCount: number
+  /** 浏览器收起后保留的页面数量；为 0 时不展示恢复入口。 */
+  browserTabCount: number
+  onResumeBrowser: () => void
   onOpenDownloads: () => void
   onOpenQuickNotes: () => void
   onOpenGuide: () => void
@@ -35,6 +39,8 @@ export default function AppFooter({
   onOpenSettings,
   downloadCount,
   quickNoteCount,
+  browserTabCount,
+  onResumeBrowser,
   onOpenDownloads,
   onOpenQuickNotes,
   onOpenGuide,
@@ -83,6 +89,20 @@ export default function AppFooter({
             下载管理
           </Button>
         </Badge>
+        {browserTabCount > 0 ? (
+          <Badge count={browserTabCount} size="small">
+            <Tooltip title="恢复已收起的浏览器页面">
+              <Button
+                type="text"
+                size="small"
+                icon={<GlobalOutlined />}
+                onClick={onResumeBrowser}
+              >
+                浏览器
+              </Button>
+            </Tooltip>
+          </Badge>
+        ) : null}
       </div>
 
       <div className="footer-actions">

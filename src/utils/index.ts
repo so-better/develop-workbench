@@ -76,6 +76,22 @@ export const tryNormalizeHttpUrl = (value: string): string | null => {
   }
 }
 
+/** RFC 3986 中无需编码即可出现在 URL 中的字符。 */
+const URL_CHARACTER = /[A-Za-z0-9\-._~:/?#\[\]@!$&'()*+,;=%]/
+
+/**
+ * 自动识别或粘贴的地址后面常紧跟中文正文、破折号等非 URL 字符。
+ * 截断到第一个非法字符，并去掉句末标点，避免把正文当成地址。
+ */
+export const trimUrlTrailingText = (value: string): string => {
+  const text = value.trim()
+  let end = 0
+
+  while (end < text.length && URL_CHARACTER.test(text[end])) end += 1
+
+  return text.slice(0, end).replace(/[.,;:!?]+$/, '')
+}
+
 /**
  * 把异常转换成适合界面展示的简短文本。
  * 同时剥掉 Electron IPC 的包装前缀，并折叠多余空白。

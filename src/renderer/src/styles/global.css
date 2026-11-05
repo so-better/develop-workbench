@@ -182,14 +182,6 @@
   white-space: nowrap;
 }
 
-.embedded-browser-resume {
-  position: fixed;
-  right: 16px;
-  bottom: 48px;
-  z-index: 900;
-  box-shadow: var(--control-shadow);
-}
-
 :root[data-theme="dark"] {
   color-scheme: dark;
   color: #e6e7e9;

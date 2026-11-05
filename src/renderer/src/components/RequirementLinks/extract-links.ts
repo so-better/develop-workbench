@@ -3,6 +3,7 @@ import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
 import { normalizeRequirementLinkUrl } from '../../../../types/requirement-links'
 import type { RequirementLinkInput } from '../../../../types/requirement-links'
+import { trimUrlTrailingText } from '../../../../utils'
 
 interface LinkNode {
   type: string
@@ -14,6 +15,7 @@ interface LinkNode {
 }
 /** 合并链接内的强调等嵌套节点，保留用户看到的文字作为名称。 */
 const textOf = (node: LinkNode): string => node.value ?? node.children?.map(textOf).join('') ?? ''
+
 const parser = unified().use(remarkParse).use(remarkGfm)
 const parseHtml = (value: string): DocumentFragment => {
   // template 内容保持惰性，图片、iframe 等不会因提取链接而加载。
@@ -22,14 +24,34 @@ const parseHtml = (value: string): DocumentFragment => {
   return template.content
 }
 
-/** 当前 Story 的不同页签、查询参数和锚点仍视为同一需求页面。 */
+/** 从 Story 详情路径中读取需求 ID，兼容不同空间前缀写法。 */
+const STORY_DETAIL_PATH = /\/story\/detail\/([^/]+)\/?$/i
+
+const getStoryDetailId = (url: URL): string | null => {
+  try {
+    return STORY_DETAIL_PATH.exec(decodeURIComponent(url.pathname))?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+/** 当前 Story 的不同页签、查询参数、空间前缀和锚点仍视为同一需求页面。 */
 export const isCurrentRequirementUrl = (url: string, requirementUrl: string | null): boolean => {
   if (!requirementUrl) return false
   try {
     const candidate = new URL(url)
     const current = new URL(requirementUrl)
-    return candidate.host === current.host &&
-      decodeURIComponent(candidate.pathname).replace(/\/+$/, '') === decodeURIComponent(current.pathname).replace(/\/+$/, '')
+
+    if (candidate.host !== current.host) return false
+
+    // 同一需求可能通过 simpleName 或完整 projectKey 生成链接，按需求 ID 判断更可靠。
+    const currentId = getStoryDetailId(current)
+    const candidateId = getStoryDetailId(candidate)
+
+    if (currentId && candidateId) return currentId === candidateId
+
+    return decodeURIComponent(candidate.pathname).replace(/\/+$/, '') ===
+      decodeURIComponent(current.pathname).replace(/\/+$/, '')
   } catch {
     return false
   }
@@ -40,11 +62,15 @@ export const extractRequirementLinks = (description: string | null, documentUrl:
   // 按规范化后的完整 URL 去重并保留首次名称，查询参数和锚点不同仍是不同入口。
   const links = new Map<string, RequirementLinkInput>()
   const add = (raw: string, title = ''): void => {
+    const candidate = trimUrlTrailingText(raw)
+    if (!candidate) return
     try {
-      const url = normalizeRequirementLinkUrl(raw)
+      const url = normalizeRequirementLinkUrl(candidate)
       if (isCurrentRequirementUrl(url, requirementUrl)) return
       const parsed = new URL(url)
-      const name = title.replace(/\s+/g, ' ').trim().slice(0, 200) || `${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}`.slice(0, 200)
+      // 自动识别链接的文字通常就是带污染的 URL，改用地址本身生成名称。
+      const visibleTitle = /^https?:\/\//i.test(title.trim()) ? '' : title
+      const name = visibleTitle.replace(/\s+/g, ' ').trim().slice(0, 200) || `${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}`.slice(0, 200)
       if (!links.has(url)) links.set(url, { name, url })
     } catch { /* 非网页链接不加入列表。 */ }
   }

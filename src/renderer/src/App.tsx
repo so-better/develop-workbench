@@ -60,6 +60,8 @@ export default function App(): JSX.Element {
   // 内嵌浏览器下载状态统一由应用层维护，Footer 和浏览器面板共用。
   const { downloads, activeCount } = useEmbeddedDownloads()
   const [browserVisible, setBrowserVisible] = useState(false)
+  // 面板收起后仍保留的页面数量，用于底部栏恢复入口。
+  const [browserTabCount, setBrowserTabCount] = useState(0)
   const [downloadsPanelOpen, setDownloadsPanelOpen] = useState(false)
   const [downloadsModalOpen, setDownloadsModalOpen] = useState(false)
   const [guideOpen, setGuideOpen] = useState(false)
@@ -127,12 +129,16 @@ export default function App(): JSX.Element {
     window.electron
       .getEmbeddedBrowserState()
       .then((state) => {
-        if (mounted) setBrowserVisible(state.visible)
+        if (mounted) {
+          setBrowserVisible(state.visible)
+          setBrowserTabCount(state.tabs.length)
+        }
       })
       .catch(() => undefined)
 
     const unsubscribe = window.electron.onEmbeddedBrowserState((state) => {
       setBrowserVisible(state.visible)
+      setBrowserTabCount(state.tabs.length)
     })
 
     return () => {
@@ -419,6 +425,10 @@ export default function App(): JSX.Element {
         onOpenSettings={() => openSettings()}
         downloadCount={activeCount}
         quickNoteCount={quickNotes.openCount}
+        browserTabCount={browserVisible ? 0 : browserTabCount}
+        onResumeBrowser={() => {
+          void window.electron.showEmbeddedBrowser()
+        }}
         onOpenDownloads={handleOpenDownloads}
         onOpenQuickNotes={() => {
           if (quickNotesOpen) {

@@ -342,11 +342,7 @@ export default function EmbeddedBrowserPanel({
     }
   }, [expanded, opening, state?.visible])
 
-  if (!state?.visible) return state?.tabs.length ? (
-    <Button className="embedded-browser-resume" icon={<GlobalOutlined />} onClick={() => window.electron.showEmbeddedBrowser()}>
-      浏览器 · {state.tabs.length} 个页面
-    </Button>
-  ) : null
+  if (!state?.visible) return null
 
   let host = ''
 

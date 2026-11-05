@@ -23,6 +23,29 @@ const storeSchema = z.record(z.string(), z.object({
 }))
 type Store = z.infer<typeof storeSchema>
 const storePath = (): string => join(app.getPath('userData'), 'requirement-links.json')
+
+/** 旧数据可能同时存在污染地址和规范化地址，读取后按 URL 去重并修正名称。 */
+const dedupeLinks = (store: Store): Store => {
+  for (const state of Object.values(store)) {
+    const seen = new Set<string>()
+    state.links = state.links.filter((link) => {
+      // 旧版自动识别会把正文并入名称，名称是纯地址时改用地址生成更易辨认的标题。
+      if (/^https?:\/\//i.test(link.name)) {
+        try {
+          const parsed = new URL(link.url)
+          link.name = `${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}`.slice(0, 200)
+        } catch {
+          // 地址异常时保留原名称，交给后续编辑处理。
+        }
+      }
+      if (seen.has(link.url)) return false
+      seen.add(link.url)
+      return true
+    })
+  }
+  return store
+}
+
 /** 文件不存在视为首次使用；读取失败直接上抛，损坏内容先备份再提示。 */
 const readStore = async (): Promise<Store> => {
   let raw: string
@@ -30,7 +53,7 @@ const readStore = async (): Promise<Store> => {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return {}
     throw error
   }
-  try { return storeSchema.parse(JSON.parse(raw)) } catch {
+  try { return dedupeLinks(storeSchema.parse(JSON.parse(raw))) } catch {
     await backupCorruptStore(storePath())
     throw new Error('相关链接数据损坏，已备份，请检查备份后重试')
   }

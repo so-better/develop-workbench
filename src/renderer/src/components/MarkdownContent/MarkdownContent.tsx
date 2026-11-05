@@ -13,6 +13,54 @@ import MarkdownImage from '../MarkdownImage/MarkdownImage'
 import CodeBlock from './CodeBlock'
 import EChartBlock from './EChartBlock'
 import MermaidDiagram from './MermaidDiagram'
+import { trimUrlTrailingText } from '../../../../utils'
+
+interface MarkdownNode {
+  type: string
+  url?: string
+  value?: string
+  children?: MarkdownNode[]
+}
+
+/**
+ * GFM 自动链接会把紧邻地址的中文和破折号并入 URL，例如“...KGnmb——说明”。
+ * 在 mdast 阶段截断地址，并把尾部正文拆回普通文本，代码块中的内容不受影响。
+ */
+const remarkTrimAutolinkTrailingText = () => (tree: MarkdownNode): void => {
+  const walk = (node: MarkdownNode): void => {
+    if (!node.children) return
+
+    for (let index = 0; index < node.children.length; index += 1) {
+      const child = node.children[index]
+
+      if (child.type === 'link' && typeof child.url === 'string') {
+        child.url = trimUrlTrailingText(child.url)
+
+        // 自动链接的文字通常就是完整的污染地址，需要把尾部正文拆到链接外。
+        const onlyText =
+          child.children?.length === 1 && child.children[0].type === 'text'
+
+        if (onlyText && child.children) {
+          const text = child.children[0].value ?? ''
+          const visible = trimUrlTrailingText(text)
+
+          if (visible !== text) {
+            child.children[0].value = visible
+            node.children.splice(index + 1, 0, {
+              type: 'text',
+              value: text.slice(visible.length)
+            })
+            index += 1
+          }
+        }
+      }
+
+      walk(child)
+    }
+  }
+
+  walk(tree)
+}
 
 /**
  * 飞书导出的图片地址可能包含换行，导致 Markdown 图片语法失效。
@@ -170,7 +218,7 @@ const MarkdownContent = memo(function MarkdownContent({
   return (
     <div className={`markdown-content${className ? ` ${className}` : ''}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkGfm, remarkTrimAutolinkTrailingText, remarkMath]}
         rehypePlugins={[
           rehypeRaw,
           [rehypeSanitize, markdownSanitizeSchema],
