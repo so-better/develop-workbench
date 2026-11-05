@@ -110,6 +110,18 @@ export interface MeegleRequirement {
   /** 研发难度估分。 */
   developmentDifficulty: number | null
 
+  /** 按端拆分的难度估分，单位人天；仅 Meegle 需求提供，未填写时为 null。 */
+  difficultyEstimation?: {
+    /** 前端 app 难度估分。 */
+    frontendApp: number | null
+
+    /** 前端 PC 难度估分。 */
+    frontendPc: number | null
+
+    /** 后端难度估分。 */
+    backend: number | null
+  }
+
   /** 预估开发量。 */
   estimatedWorkload: string | null
 

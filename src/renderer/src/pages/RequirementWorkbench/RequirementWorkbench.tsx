@@ -925,6 +925,36 @@ export default function RequirementWorkbench({
   /** 默认展示的需求关键信息。 */
   const primaryInfoGroups: BasicInfoGroup[] = selectedRequirement
     ? [
+        // 按端难度估分只来自 Meegle；本地临时需求没有这些字段。
+        ...(!selectedRequirementIsLocal
+          ? [
+              {
+                title: '难度估分',
+                fields: [
+                  {
+                    label: '前端app',
+                    value: formatWorkTime(
+                      selectedRequirement.difficultyEstimation?.frontendApp ??
+                        null
+                    )
+                  },
+                  {
+                    label: '前端PC',
+                    value: formatWorkTime(
+                      selectedRequirement.difficultyEstimation?.frontendPc ??
+                        null
+                    )
+                  },
+                  {
+                    label: '后端',
+                    value: formatWorkTime(
+                      selectedRequirement.difficultyEstimation?.backend ?? null
+                    )
+                  }
+                ]
+              }
+            ]
+          : []),
         {
           title: '需求信息',
           fields: [

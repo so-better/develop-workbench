@@ -875,6 +875,11 @@ const parseRequirement = (row: MoqlRow): MeegleRequirement | null => {
     requirementNature: readFieldString(row, '需求性质'),
     complexity: readFieldNumber(row, '需求复杂度'),
     developmentDifficulty: readFieldNumber(row, '研发难度估分'),
+    difficultyEstimation: {
+      frontendApp: readFieldNumber(row, '难度估分-前端app'),
+      frontendPc: readFieldNumber(row, '难度估分-前端PC'),
+      backend: readFieldNumber(row, '难度估分-后端')
+    },
     estimatedWorkload: readFieldString(row, '预估开发量'),
     technicalSolution: readFieldString(row, '技术方案'),
     application: readFieldString(row, '应用'),
@@ -1775,7 +1780,7 @@ const buildRequirementClosedCondition = (statusNames: string[]): string => {
 
 /** 关键词搜索使用的需求字段。 */
 const REQUIREMENT_SEARCH_FIELDS =
-  '`工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `产品线`, `需求等级`, `需求性质`, `标签`, risk_label()'
+  '`工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `产品线`, `需求等级`, `需求性质`, `研发难度估分`, `难度估分-前端app`, `难度估分-前端PC`, `难度估分-后端`, `标签`, risk_label()'
 
 /** 生成名称/ID 的 MQL 搜索条件。 */
 const buildRequirementSearchCondition = (value: unknown): string => {
@@ -1856,7 +1861,7 @@ export const getMyRequirements = async (
           await fetchMqlRows(
             project,
             [
-              'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `提出时间`, `预计上线时间`, `完成日期`, `规划版本`, `实际上车版本`, `产品线`, `需求等级`, `需求性质`, `需求复杂度`, `研发难度估分`, `预估开发量`, `技术方案`, `应用`, `标签`, `是否涉及权限`, `是否涉及历史数据`, `是否涉及性能测试`, `备注`, risk_label(), `__产品经理`, `__产品负责人`, `__研发负责人`, `__前端负责人`, `__前端开发`, `__前端APP负责人`, `__前端APP开发`, `__后端负责人`, `__后端开发`, `__数仓开发`, `__QA`, `__QA负责人`, `__测试owner`, `__测试组长`, `__性能测试负责人`, `__UI&UX`, `__PMO项目经理`, `__技术专家`, `__研发总监`',
+              'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `提出时间`, `预计上线时间`, `完成日期`, `规划版本`, `实际上车版本`, `产品线`, `需求等级`, `需求性质`, `需求复杂度`, `研发难度估分`, `难度估分-前端app`, `难度估分-前端PC`, `难度估分-后端`, `预估开发量`, `技术方案`, `应用`, `标签`, `是否涉及权限`, `是否涉及历史数据`, `是否涉及性能测试`, `备注`, risk_label(), `__产品经理`, `__产品负责人`, `__研发负责人`, `__前端负责人`, `__前端开发`, `__前端APP负责人`, `__前端APP开发`, `__后端负责人`, `__后端开发`, `__数仓开发`, `__QA`, `__QA负责人`, `__测试owner`, `__测试组长`, `__性能测试负责人`, `__UI&UX`, `__PMO项目经理`, `__技术专家`, `__研发总监`',
               `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
               `WHERE (${roleCondition})${
                 includeClosed || !closedCondition
