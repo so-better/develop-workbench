@@ -498,6 +498,46 @@ export const addQingzhouRequirementBinding = async (
 }
 
 /**
+ * 修改普通绑定的开发分支。
+ * 轻舟分支由轻舟侧维护，只能通过同步更新。
+ */
+export const updateRequirementBindingBranch = async (
+  requirementId: string,
+  bindingId: string,
+  branchName: string
+): Promise<RequirementBindingState> => {
+  if (!isValidRequirementId(requirementId)) throw new Error('需求 ID 不合法')
+  if (!bindingId.trim()) throw new Error('绑定 ID 不合法')
+
+  const normalizedBranch = branchName.trim()
+
+  if (!normalizedBranch) throw new Error('请选择开发分支')
+
+  const state = await getRequirementBindingState(requirementId)
+  const binding = state.bindings.find((item) => item.id === bindingId)
+
+  if (!binding) throw new Error('绑定记录不存在')
+  if (binding.mode !== 'normal') throw new Error('轻舟绑定请使用同步更新分支')
+
+  await assertBranchExists(binding.repositoryId, normalizedBranch)
+
+  return updateBindings(requirementId, (bindings) => {
+    const target = bindings.find((item) => item.id === bindingId)
+
+    if (!target) throw new Error('绑定记录不存在')
+    if (target.mode !== 'normal') throw new Error('轻舟绑定请使用同步更新分支')
+
+    const now = new Date().toISOString()
+
+    return bindings.map((item) =>
+      item.id === bindingId
+        ? { ...item, branchName: normalizedBranch, updatedAt: now }
+        : item
+    )
+  })
+}
+
+/**
  * 同步轻舟工作项的分支信息。
  */
 export const syncQingzhouRequirementBinding = async (
@@ -592,6 +632,21 @@ export const initializeRequirementBindings = (): void => {
       }
 
       return addRequirementBinding(requirementId, repositoryId, branchName)
+    }
+  )
+
+  ipcMain.handle(
+    'bindings:update-branch',
+    (_event, requirementId: unknown, bindingId: unknown, branchName: unknown) => {
+      if (
+        typeof requirementId !== 'string' ||
+        typeof bindingId !== 'string' ||
+        typeof branchName !== 'string'
+      ) {
+        throw new Error('绑定参数不合法')
+      }
+
+      return updateRequirementBindingBranch(requirementId, bindingId, branchName)
     }
   )
 

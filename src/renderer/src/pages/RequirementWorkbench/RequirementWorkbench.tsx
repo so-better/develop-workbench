@@ -657,6 +657,10 @@ export default function RequirementWorkbench({
   const [bindingSaving, setBindingSaving] = useState(false)
   const [removingBindingId, setRemovingBindingId] = useState<string | null>(null)
   const [syncingBindingId, setSyncingBindingId] = useState<string | null>(null)
+  const [branchEditBinding, setBranchEditBinding] =
+    useState<RequirementRepoBinding | null>(null)
+  const [branchEditName, setBranchEditName] = useState<string | null>(null)
+  const [branchEditSaving, setBranchEditSaving] = useState(false)
   const [createBranchOpen, setCreateBranchOpen] = useState(false)
   const [createBranchBase, setCreateBranchBase] = useState<string | null>(null)
   const [createBranchName, setCreateBranchName] = useState('')
@@ -921,6 +925,19 @@ export default function RequirementWorkbench({
   const newRepositoryBranchesLoading = Boolean(
     newRepositoryId && branchLoadingIds.has(newRepositoryId)
   )
+
+  /** 修改普通绑定分支时的可选项，保留当前值以便分支已删除时仍可展示。 */
+  const branchEditBranchOptions = branchEditBinding
+    ? Array.from(
+      new Set([
+        ...(repoBranches[branchEditBinding.repositoryId] ?? []),
+        ...(branchEditBinding.branchName ? [branchEditBinding.branchName] : [])
+      ])
+    ).map((branch) => ({ value: branch, label: branch }))
+    : []
+  const branchEditBranchLoading = branchEditBinding
+    ? branchLoadingIds.has(branchEditBinding.repositoryId)
+    : false
 
   /** 默认展示的需求关键信息。 */
   const primaryInfoGroups: BasicInfoGroup[] = selectedRequirement
@@ -1529,6 +1546,8 @@ export default function RequirementWorkbench({
     setNewRepositoryId(null)
     setNewBranchName(null)
     setCreateBranchOpen(false)
+    setBranchEditBinding(null)
+    setBranchEditName(null)
 
     window.electron
       .getRequirementBindings(selectedRequirementId)
@@ -1660,6 +1679,54 @@ export default function RequirementWorkbench({
       message.error(getErrorMessage(bindingError))
     } finally {
       setBindingSaving(false)
+    }
+  }
+
+  /**
+   * 打开修改普通绑定开发分支的弹窗。
+   */
+  const handleOpenEditBindingBranch = async (
+    binding: RequirementRepoBinding
+  ): Promise<void> => {
+    if (binding.mode !== 'normal') return
+
+    setBranchEditBinding(binding)
+    setBranchEditName(binding.branchName)
+
+    // 读取最新分支列表；没有缓存时会同时刷新远程引用。
+    await loadBranches(binding.repositoryId, false, true)
+  }
+
+  /**
+   * 保存普通绑定的开发分支。
+   */
+  const handleSaveBindingBranch = async (): Promise<void> => {
+    if (!selectedRequirementId || !branchEditBinding || !branchEditName) return
+
+    if (branchEditName === branchEditBinding.branchName) {
+      setBranchEditBinding(null)
+      setBranchEditName(null)
+      return
+    }
+
+    setBranchEditSaving(true)
+
+    try {
+      const state = await window.electron.updateRequirementBindingBranch(
+        selectedRequirementId,
+        branchEditBinding.id,
+        branchEditName
+      )
+
+      setBindings(state.bindings)
+      setBindingStatusVersion((value) => value + 1)
+      setBranchEditBinding(null)
+      setBranchEditName(null)
+      message.success('开发分支已更新')
+    } catch (bindingError) {
+      message.error(getErrorMessage(bindingError))
+    } finally {
+      setBranchEditSaving(false)
     }
   }
 
@@ -3619,6 +3686,19 @@ export default function RequirementWorkbench({
                                         未设置
                                       </span>
                                     )}
+                                    <Tooltip title="修改开发分支">
+                                      <Button
+                                        type="text"
+                                        size="small"
+                                        className="requirement-repo-edit-branch"
+                                        icon={<EditOutlined />}
+                                        aria-label="修改开发分支"
+                                        disabled={!repository?.available}
+                                        onClick={() =>
+                                          handleOpenEditBindingBranch(binding)
+                                        }
+                                      />
+                                    </Tooltip>
                                     {targetBranchMissing ? (
                                       <Tag color="red" bordered={false}>
                                         不存在
@@ -4720,6 +4800,45 @@ export default function RequirementWorkbench({
             onChange={(event) => setCreateBranchName(event.target.value)}
           />
           <p>会从基线分支创建本地分支，并自动绑定到当前需求。</p>
+        </div>
+      </Modal>
+
+      <Modal
+        title="修改开发分支"
+        open={Boolean(branchEditBinding)}
+        okText="保存"
+        cancelText="取消"
+        okButtonProps={{
+          disabled:
+            !branchEditName || branchEditName === branchEditBinding?.branchName
+        }}
+        confirmLoading={branchEditSaving}
+        destroyOnHidden
+        onOk={() => handleSaveBindingBranch()}
+        onCancel={() => {
+          setBranchEditBinding(null)
+          setBranchEditName(null)
+        }}
+      >
+        <div className="requirement-branch-create-form">
+          <label>仓库</label>
+          <div className="requirement-branch-create-repo">
+            {branchEditBinding
+              ? repositoryMap.get(branchEditBinding.repositoryId)?.name ??
+                branchEditBinding.repositoryId
+              : ''}
+          </div>
+          <label>开发分支</label>
+          <Select
+            showSearch
+            value={branchEditName ?? undefined}
+            options={branchEditBranchOptions}
+            loading={branchEditBranchLoading}
+            placeholder="选择开发分支"
+            optionFilterProp="label"
+            onChange={(value: string) => setBranchEditName(value)}
+          />
+          <p>只更新需求与分支的绑定，不会切换本地工作区的当前分支。</p>
         </div>
       </Modal>
 

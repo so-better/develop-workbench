@@ -3405,7 +3405,8 @@ body {
   flex: 0 0 auto;
 }
 
-.requirement-repo-copy-branch {
+.requirement-repo-copy-branch,
+.requirement-repo-edit-branch {
   flex: 0 0 20px;
   width: 20px;
   height: 20px;
@@ -3414,7 +3415,8 @@ body {
   font-size: 11px;
 }
 
-.requirement-repo-copy-branch:hover {
+.requirement-repo-copy-branch:hover,
+.requirement-repo-edit-branch:hover {
   color: var(--app-text) !important;
   background: var(--workbench-hover) !important;
 }
