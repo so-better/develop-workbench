@@ -17,6 +17,11 @@ import type {
   MigrationExportResult,
   MigrationImportResult
 } from '../types/migration'
+import type {
+  ClipboardHistorySettings,
+  ClipboardHistoryState,
+  ClipboardPasteResult
+} from '../types/clipboard-history'
 import type { RequirementLink, RequirementLinkInput, RequirementLinkScope } from '../types/requirement-links'
 import type {
   UpdateCheckResult,
@@ -107,6 +112,32 @@ export interface ElectronAPI {
   importMigrationData: () => Promise<MigrationImportResult>
   /** 重启应用，使导入的数据生效。 */
   restartApp: () => Promise<void>
+  /** 读取剪贴板历史状态。 */
+  getClipboardHistoryState: () => Promise<ClipboardHistoryState>
+  /** 读取设置页需要的快捷键和注册状态。 */
+  getClipboardHistorySettings: () => Promise<ClipboardHistorySettings>
+  /** 打开剪贴板历史浮层。 */
+  showClipboardHistory: () => Promise<void>
+  /** 关闭剪贴板历史浮层。 */
+  hideClipboardHistory: () => Promise<void>
+  /** 粘贴指定历史记录。 */
+  pasteClipboardHistoryItem: (id: string) => Promise<ClipboardPasteResult>
+  /** 清空历史。 */
+  clearClipboardHistory: () => Promise<ClipboardHistorySettings>
+  /** 修改全局快捷键。 */
+  setClipboardHistoryShortcut: (shortcut: string) => Promise<ClipboardHistorySettings>
+  /** 录制快捷键时临时注销全局快捷键。 */
+  setClipboardHistoryRecording: (recording: boolean) => Promise<void>
+  /** 按需读取图片缩略图。 */
+  getClipboardHistoryImage: (id: string, maxWidth?: number) => Promise<string | null>
+  /** 订阅浮层状态。 */
+  onClipboardHistoryState: (
+    listener: (state: ClipboardHistoryState) => void
+  ) => () => void
+  /** 订阅历史变化。 */
+  onClipboardHistoryChanged: (listener: () => void) => () => void
+  /** 订阅浮层显示。 */
+  onClipboardHistoryShown: (listener: () => void) => () => void
   platform: string
   /** 获取应用与运行时版本信息。 */
   getAppInfo: () => Promise<AppInfo>

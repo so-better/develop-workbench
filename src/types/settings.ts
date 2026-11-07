@@ -11,6 +11,7 @@ export type SettingsSection =
   | 'skills'
   | 'cleanup'
   | 'migration'
+  | 'clipboard'
   | 'app-info'
 
 /** 设置弹窗默认打开的第一个分类。 */

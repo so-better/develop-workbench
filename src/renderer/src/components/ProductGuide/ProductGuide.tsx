@@ -16,6 +16,7 @@ import {
   ProjectOutlined,
   SearchOutlined,
   SettingOutlined,
+  SnippetsOutlined,
 } from '@ant-design/icons'
 import { Button, Modal } from 'antd'
 import RobotMark from '../RobotMark/RobotMark'
@@ -132,6 +133,18 @@ const CAPABILITIES: GuideCapability[] = [
       'Cmd/Ctrl+Shift+K 打开待办简记，随手记录、完成和删除',
       '消息与群聊交给飞书 App，其他结果可在应用内打开',
       '搜索结果支持上下键选择、回车打开'
+    ]
+  },
+  {
+    title: '粘贴选择',
+    icon: <SnippetsOutlined />,
+    items: [
+      '读取系统剪贴板，保留最近复制内容，供快速选择粘贴',
+      '不接管或修改系统剪贴板，只有选择粘贴时才写入目标内容',
+      '支持文本、图片和文件引用',
+      '在任意应用按 Cmd/Ctrl+Shift+V 呼出底部浮层，方向键选择，Enter 粘贴，Esc 取消',
+      '文件只保存路径引用，源文件移动或删除后记录失效',
+      'macOS 自动粘贴可能需要在系统设置中授予辅助功能权限'
     ]
   },
   {
@@ -259,14 +272,14 @@ export default function ProductGuide({
       label: '打开待办简记'
     },
     {
+      key: 'paste-picker',
+      keys: isMac ? ['⌘', '⇧', 'V'] : ['Ctrl', 'Shift', 'V'],
+      label: '打开粘贴选择（默认快捷键）'
+    },
+    {
       key: 'theme',
       keys: isMac ? ['⌘', '⇧', 'L'] : ['Ctrl', 'Shift', 'L'],
       label: '切换主题模式'
-    },
-    {
-      key: 'navigate',
-      keys: ['↑', '↓', 'Enter'],
-      label: '选择并打开搜索结果'
     },
     {
       key: 'close',

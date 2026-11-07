@@ -23,6 +23,7 @@ import { initializeProductGuide } from './product-guide'
 import { initializeQuickNotes } from './quick-notes'
 import { initializeRequirementLinks } from './requirement-links'
 import { initializeMigration } from './migration'
+import { initializeClipboardHistory } from './clipboard-history'
 import { initializeRepositories } from './repositories'
 import { initializeRequirementBindings } from './requirement-bindings'
 import { initializeRequirementStatuses } from './requirement-statuses'
@@ -73,6 +74,7 @@ if (!hasSingleInstanceLock) {
     initializeQuickNotes()
     initializeRequirementLinks()
     initializeMigration()
+    initializeClipboardHistory()
     initializeEmbeddedBrowser()
     initializeGit()
     initializeIde()

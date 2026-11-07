@@ -1,0 +1,116 @@
+.clipboard-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.clipboard-settings-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 12px;
+}
+
+.clipboard-settings-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.clipboard-settings-copy strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.clipboard-settings-copy span {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.clipboard-settings-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  align-items: center;
+}
+
+.clipboard-shortcut-field {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  min-width: 104px;
+  height: 30px;
+  padding: 0 8px;
+  color: var(--app-text);
+  cursor: pointer;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.clipboard-shortcut-field:hover:not(:disabled) {
+  border-color: rgba(22, 119, 255, 0.4);
+}
+
+.clipboard-shortcut-field.is-recording {
+  color: var(--workbench-secondary);
+  cursor: default;
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.14);
+}
+
+.clipboard-shortcut-field kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 5px;
+}
+
+.clipboard-shortcut-tip {
+  margin: -4px 2px 0;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.clipboard-shortcut-tip.is-error {
+  color: #d92d20;
+}
+
+.clipboard-settings-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px 0;
+}
+
+.clipboard-settings-footer span {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.clipboard-settings-hint {
+  margin: 2px 0 0;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}

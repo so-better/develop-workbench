@@ -1,0 +1,356 @@
+html.clipboard-overlay-root,
+html.clipboard-overlay-root body,
+html.clipboard-overlay-root #root {
+  background: transparent !important;
+  overflow: hidden;
+}
+
+.clipboard-overlay {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 8px;
+}
+
+.clipboard-overlay-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--workbench-panel);
+  background: color-mix(in srgb, var(--workbench-panel) 90%, transparent);
+  backdrop-filter: blur(26px) saturate(160%);
+  border: 1px solid var(--workbench-divider);
+  border-bottom-color: color-mix(in srgb, var(--workbench-divider) 82%, transparent);
+  border-radius: 18px;
+  box-shadow:
+    0 32px 80px -34px rgba(15, 23, 42, 0.55),
+    0 2px 10px -6px rgba(15, 23, 42, 0.32);
+}
+
+:root[data-theme="dark"] .clipboard-overlay-panel {
+  background: #18191c;
+  background: color-mix(in srgb, #18191c 88%, transparent);
+  border-color: #303238;
+  box-shadow:
+    0 34px 84px -34px rgba(0, 0, 0, 0.85),
+    0 2px 10px -6px rgba(0, 0, 0, 0.55);
+}
+
+.clipboard-overlay-head {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--workbench-divider) 78%, transparent);
+}
+
+.clipboard-overlay-title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.clipboard-overlay-mark {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  color: #1677ff;
+  font-size: 12px;
+  background: rgba(22, 119, 255, 0.12);
+  border-radius: 7px;
+  place-items: center;
+}
+
+.clipboard-overlay-title strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.clipboard-overlay-hints {
+  display: flex;
+  flex-shrink: 0;
+  gap: 12px;
+  align-items: center;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+}
+
+.clipboard-overlay-hints > span {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.clipboard-overlay-hints kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  color: var(--workbench-secondary);
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 4px;
+}
+
+.clipboard-overlay-loading {
+  display: grid;
+  flex: 1;
+  place-items: center;
+}
+
+.clipboard-overlay-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.clipboard-overlay-empty .anticon {
+  font-size: 22px;
+  opacity: 0.55;
+}
+
+.clipboard-cards {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.clipboard-cards::-webkit-scrollbar {
+  display: none;
+}
+
+/* Chromium 会把可滚动容器设为可聚焦，去掉窗口打开时的默认焦点框。 */
+.clipboard-cards:focus,
+.clipboard-cards:focus-visible,
+.clipboard-card:focus,
+.clipboard-card:focus-visible {
+  outline: none;
+}
+
+.clipboard-card {
+  position: relative;
+  display: flex;
+  flex: 0 0 196px;
+  flex-direction: column;
+  min-width: 0;
+  padding: 9px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 12px;
+  box-shadow: 0 8px 18px -18px rgba(15, 23, 42, 0.45);
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+}
+
+.clipboard-card:hover {
+  border-color: rgba(22, 119, 255, 0.28);
+}
+
+.clipboard-card.is-active {
+  background: var(--workbench-selected-bg);
+  background: color-mix(in srgb, var(--workbench-panel) 88%, #1677ff 12%);
+  border-color: #1677ff;
+  box-shadow:
+    0 0 0 2px rgba(22, 119, 255, 0.14),
+    0 12px 24px -20px rgba(22, 119, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.clipboard-card-body {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.clipboard-card-text {
+  display: -webkit-box;
+  width: 100%;
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 12px;
+  line-height: 1.55;
+  word-break: break-word;
+  white-space: pre-wrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.clipboard-card-image-slot {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.clipboard-card-image {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.clipboard-card-placeholder {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 56px;
+  color: var(--workbench-secondary);
+  font-size: 20px;
+  background: linear-gradient(
+    135deg,
+    var(--workbench-soft),
+    var(--workbench-panel)
+  );
+  border: 1px dashed var(--workbench-divider);
+  border-radius: 8px;
+  place-items: center;
+}
+
+.clipboard-card-files {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  min-width: 0;
+  color: var(--app-text);
+}
+
+.clipboard-file-tile {
+  display: grid;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  color: #1677ff;
+  font-size: 16px;
+  background: linear-gradient(
+    135deg,
+    rgba(22, 119, 255, 0.18),
+    rgba(22, 119, 255, 0.05)
+  );
+  border-radius: 9px;
+  place-items: center;
+}
+
+.clipboard-file-tile.is-folder {
+  color: #d97706;
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.2),
+    rgba(245, 158, 11, 0.06)
+  );
+}
+
+.clipboard-file-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.clipboard-file-info strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clipboard-file-info span {
+  color: var(--workbench-secondary);
+  font-size: 10px;
+}
+
+.clipboard-card-foot {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  margin-top: 6px;
+  border-top: 1px solid var(--workbench-divider);
+  border-top-color: color-mix(in srgb, var(--workbench-divider) 72%, transparent);
+}
+
+.clipboard-card-type {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+  align-items: center;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+}
+
+.clipboard-card-type::before {
+  width: 5px;
+  height: 5px;
+  content: '';
+  background: var(--workbench-secondary);
+  border-radius: 50%;
+}
+
+.clipboard-card-type.is-text::before {
+  background: #1677ff;
+}
+
+.clipboard-card-type.is-image::before {
+  background: #16a34a;
+}
+
+.clipboard-card-type.is-files::before {
+  background: #d97706;
+}
+
+.clipboard-card-meta {
+  overflow: hidden;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clipboard-card-busy {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  background: rgba(255, 255, 255, 0.62);
+  background: color-mix(in srgb, var(--workbench-panel) 62%, transparent);
+  backdrop-filter: blur(2px);
+  place-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .clipboard-card {
+    transition: none;
+  }
+
+  .clipboard-card.is-active {
+    transform: none;
+  }
+}

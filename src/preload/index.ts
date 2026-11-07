@@ -19,6 +19,11 @@ import type {
   MigrationExportResult,
   MigrationImportResult
 } from '../types/migration'
+import type {
+  ClipboardHistorySettings,
+  ClipboardHistoryState,
+  ClipboardPasteResult
+} from '../types/clipboard-history'
 import type { RequirementLink, RequirementLinkInput, RequirementLinkScope } from '../types/requirement-links'
 import type {
   UpdateCheckResult,
@@ -112,6 +117,54 @@ const electronAPI = {
     ipcRenderer.invoke('migration:import'),
   /** 重启应用，使导入的数据生效。 */
   restartApp: (): Promise<void> => ipcRenderer.invoke('migration:restart'),
+  /** 读取剪贴板历史状态。 */
+  getClipboardHistoryState: (): Promise<ClipboardHistoryState> =>
+    ipcRenderer.invoke('clipboard-history:get-state'),
+  /** 读取设置页需要的快捷键和注册状态。 */
+  getClipboardHistorySettings: (): Promise<ClipboardHistorySettings> =>
+    ipcRenderer.invoke('clipboard-history:get-settings'),
+  /** 打开剪贴板历史浮层。 */
+  showClipboardHistory: (): Promise<void> => ipcRenderer.invoke('clipboard-history:show'),
+  /** 关闭剪贴板历史浮层。 */
+  hideClipboardHistory: (): Promise<void> => ipcRenderer.invoke('clipboard-history:hide'),
+  /** 粘贴指定历史记录。 */
+  pasteClipboardHistoryItem: (id: string): Promise<ClipboardPasteResult> =>
+    ipcRenderer.invoke('clipboard-history:paste', id),
+  /** 清空历史。 */
+  clearClipboardHistory: (): Promise<ClipboardHistorySettings> =>
+    ipcRenderer.invoke('clipboard-history:clear'),
+  /** 修改全局快捷键。 */
+  setClipboardHistoryShortcut: (shortcut: string): Promise<ClipboardHistorySettings> =>
+    ipcRenderer.invoke('clipboard-history:set-shortcut', shortcut),
+  /** 录制快捷键时临时注销全局快捷键。 */
+  setClipboardHistoryRecording: (recording: boolean): Promise<void> =>
+    ipcRenderer.invoke('clipboard-history:set-recording', recording),
+  /** 按需读取图片缩略图。 */
+  getClipboardHistoryImage: (id: string, maxWidth?: number): Promise<string | null> =>
+    ipcRenderer.invoke('clipboard-history:get-image', id, maxWidth),
+  /** 订阅浮层状态。 */
+  onClipboardHistoryState: (
+    listener: (state: ClipboardHistoryState) => void
+  ): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: ClipboardHistoryState): void => {
+      listener(state)
+    }
+
+    ipcRenderer.on('clipboard-history:state', handler)
+    return () => ipcRenderer.removeListener('clipboard-history:state', handler)
+  },
+  /** 订阅历史变化。 */
+  onClipboardHistoryChanged: (listener: () => void): (() => void) => {
+    const handler = (): void => listener()
+    ipcRenderer.on('clipboard-history:changed', handler)
+    return () => ipcRenderer.removeListener('clipboard-history:changed', handler)
+  },
+  /** 订阅浮层显示。 */
+  onClipboardHistoryShown: (listener: () => void): (() => void) => {
+    const handler = (): void => listener()
+    ipcRenderer.on('clipboard-history:shown', handler)
+    return () => ipcRenderer.removeListener('clipboard-history:shown', handler)
+  },
   // 当前运行平台，渲染进程可在首次渲染时同步读取。
   platform: process.platform,
 

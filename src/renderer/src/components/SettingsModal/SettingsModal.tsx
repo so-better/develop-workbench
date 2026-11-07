@@ -18,6 +18,7 @@ import RepositorySettings from '../RepositorySettings/RepositorySettings'
 import SkillSettings from '../SkillSettings/SkillSettings'
 import StorageCleanup from '../StorageCleanup/StorageCleanup'
 import MigrationSettings from '../MigrationSettings/MigrationSettings'
+import ClipboardSettings from '../ClipboardSettings/ClipboardSettings'
 
 const CodeEditor = lazy(() => import('../CodeEditor/CodeEditor'))
 
@@ -427,6 +428,14 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
+            className={`settings-nav-item${activeSection === 'clipboard' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'clipboard' ? 'page' : undefined}
+            onClick={() => setActiveSection('clipboard')}
+          >
+            粘贴选择
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item${activeSection === 'cleanup' ? ' is-active' : ''}`}
             aria-current={activeSection === 'cleanup' ? 'page' : undefined}
             onClick={() => setActiveSection('cleanup')}
@@ -644,6 +653,7 @@ export default function SettingsModal({
           ) : null}
 
           {activeSection === 'cleanup' ? <StorageCleanup /> : null}
+          {activeSection === 'clipboard' ? <ClipboardSettings /> : null}
           {activeSection === 'migration' ? <MigrationSettings /> : null}
 
           {activeSection === 'app-info' ? (
