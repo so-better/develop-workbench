@@ -127,9 +127,34 @@ const normalizeChatInput = (input: unknown): AiChatStartInput => {
   }
 }
 
+/** 从模型服务返回的 JSON 中提取可读错误信息，避免把整段响应塞进界面。 */
+const getProviderErrorMessage = (responseBody: unknown): string | null => {
+  if (typeof responseBody !== 'string' || !responseBody.trim()) return null
+
+  try {
+    const parsed = JSON.parse(responseBody) as {
+      error?: { message?: unknown }
+      message?: unknown
+    }
+    const message = parsed.error?.message ?? parsed.message
+
+    return typeof message === 'string' && message.trim()
+      ? message.trim().slice(0, 300)
+      : null
+  } catch {
+    return null
+  }
+}
+
 /** 在通用错误文本基础上补充模型服务相关的状态提示。 */
 const getAiErrorMessage = (error: unknown): string => {
-  const statusCode = (error as { statusCode?: unknown } | null)?.statusCode
+  // AI SDK 重试后抛出 RetryError，真正的 HTTP 状态在 lastError 上。
+  const cause =
+    (error as { lastError?: unknown } | null)?.lastError ?? error
+  const statusCode = (cause as { statusCode?: unknown } | null)?.statusCode
+
+  const responseBody = (cause as { responseBody?: unknown } | null)?.responseBody
+  const providerMessage = getProviderErrorMessage(responseBody)
 
   if (statusCode === 401 || statusCode === 403) {
     return '模型服务鉴权失败，请检查 API Key'
@@ -140,11 +165,18 @@ const getAiErrorMessage = (error: unknown): string => {
   if (statusCode === 429) {
     return '模型服务请求过于频繁，请稍后重试'
   }
+  if (statusCode === 400) {
+    return providerMessage
+      ? `模型请求参数不合法（400）：${providerMessage}`
+      : '模型请求参数不合法（400），请检查模型配置'
+  }
   if (typeof statusCode === 'number' && statusCode >= 500) {
-    return `模型服务暂时不可用（${statusCode}）`
+    return providerMessage
+      ? `模型服务暂时不可用（${statusCode}）：${providerMessage}`
+      : `模型服务暂时不可用（${statusCode}），请稍后重试`
   }
 
-  const message = formatErrorMessage(error, '模型调用失败')
+  const message = formatErrorMessage(cause, '模型调用失败')
 
   if (/fetch failed|ECONN|ENOTFOUND|socket|network/i.test(message)) {
     return '无法连接模型服务，请检查网络和 baseUrl'
