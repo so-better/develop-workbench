@@ -9,6 +9,7 @@ import {
   CloudOutlined,
   CodeOutlined,
   CompassOutlined,
+  DesktopOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
   HistoryOutlined,
@@ -99,6 +100,19 @@ const CAPABILITIES: GuideCapability[] = [
     ]
   },
   {
+    title: '终端',
+    icon: <DesktopOutlined />,
+    items: [
+      '左侧导航最后一项进入多标签终端，每个标签对应一个独立 shell',
+      '支持新建、关闭、重命名、拖拽排序和标签右键菜单',
+      '支持在默认目录或指定目录新建终端，拖入文件会自动插入路径',
+      '支持终端内容搜索、路径点击打开和 WebGL 加速',
+      '可开启选中即复制；多行粘贴前会二次确认',
+      'macOS 使用 Cmd+K 清屏，Windows 使用 cls 命令清屏',
+      '重启应用后不恢复历史终端，只打开一个全新的默认终端'
+    ]
+  },
+  {
     title: '站点导航',
     icon: <AppstoreOutlined />,
     items: [
@@ -165,7 +179,7 @@ const CAPABILITIES: GuideCapability[] = [
     icon: <SettingOutlined />,
     items: [
       '检测并登录本机 Lark CLI 和 Meegle CLI',
-      '配置 Git、仓库根目录、IDE、AI 模型和技能目录',
+      '配置 Git、仓库根目录、IDE、终端、AI 模型和技能目录',
       '管理深浅主题、下载记录、缓存和临时数据',
       '一键迁移可导出应用数据并在新电脑导入恢复；导入前会二次确认并自动备份，完成后重启应用生效',
       '迁移包包含模型配置和 API Key，不包含浏览器登录态、缓存和 AI 生成文件'
@@ -220,6 +234,12 @@ const SETTINGS_GROUPS: GuideSettingGroup[] = [
         icon: <FolderOpenOutlined />,
         description:
           '设置代码根目录后自动扫描仓库，也可以从 Git 克隆；支持标记轻舟仓库，移除配置不会删除本地代码。'
+      },
+      {
+        title: '终端',
+        icon: <DesktopOutlined />,
+        description:
+          '配置默认 Shell、字号、滚动历史和 WebGL 加速；支持自动检测或选择 Shell，并提供选中即复制开关。'
       }
     ]
   },
@@ -287,6 +307,30 @@ export default function ProductGuide({
       keys: isMac ? ['⌘', '⇧', 'L'] : ['Ctrl', 'Shift', 'L'],
       label: '切换主题模式'
     },
+    {
+      key: 'terminal-copy',
+      keys: isMac ? ['⌘', 'C'] : ['Ctrl', 'Shift', 'C'],
+      label: '终端复制选中内容'
+    },
+    {
+      key: 'terminal-paste',
+      keys: isMac ? ['⌘', 'V'] : ['Ctrl', 'V'],
+      label: '终端粘贴'
+    },
+    {
+      key: 'terminal-search',
+      keys: isMac ? ['⌘', 'F'] : ['Ctrl', 'Shift', 'F'],
+      label: '终端内搜索'
+    },
+    ...(isMac
+      ? [
+          {
+            key: 'terminal-clear',
+            keys: ['⌘', 'K'],
+            label: '终端清屏'
+          }
+        ]
+      : []),
     {
       key: 'close',
       keys: ['Esc'],
