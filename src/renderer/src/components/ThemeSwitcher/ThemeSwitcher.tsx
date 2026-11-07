@@ -40,12 +40,14 @@ export default function ThemeSwitcher(): JSX.Element {
 
       const target = event.target
 
-      if (
-        target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
-      ) {
-        return
+      if (target instanceof HTMLElement) {
+        // xterm 用隐藏 textarea 接收键盘输入，终端聚焦时仍然允许切换主题。
+        const inTerminal = Boolean(target.closest('.xterm'))
+        const isTextInput =
+          target.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
+
+        if (isTextInput && !inTerminal) return
       }
 
       event.preventDefault()

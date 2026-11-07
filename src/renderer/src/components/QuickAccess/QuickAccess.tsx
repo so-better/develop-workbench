@@ -365,6 +365,23 @@ export default function QuickAccess(): JSX.Element {
   /** Cmd/Ctrl+K 打开快速访问；浏览器已打开时优先关闭浏览器。 */
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
+      // 终端聚焦时 Cmd+K 用于清屏，保留给 xterm 处理。
+      const terminalClearShortcut =
+        event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        !event.altKey &&
+        event.key.toLowerCase() === 'k'
+      const activeElement = document.activeElement
+
+      if (
+        terminalClearShortcut &&
+        activeElement instanceof HTMLElement &&
+        activeElement.closest('.xterm')
+      ) {
+        return
+      }
+
       if (
         (event.metaKey || event.ctrlKey) &&
         !event.shiftKey &&
