@@ -77,6 +77,7 @@ export default function ExecutablePathField({
         <Button
           variant="filled"
           disabled={disabled || detecting}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={onChoose}
         >
           {chooseLabel}
@@ -85,6 +86,7 @@ export default function ExecutablePathField({
           variant="filled"
           disabled={disabled}
           loading={detecting}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={onDetect}
         >
           {detectLabel}
