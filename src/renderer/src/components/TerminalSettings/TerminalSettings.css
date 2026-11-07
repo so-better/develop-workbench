@@ -1,0 +1,105 @@
+.terminal-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 720px;
+}
+
+.terminal-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.terminal-settings-section + .terminal-settings-section {
+  padding-top: 22px;
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.terminal-settings-section-heading h4 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.terminal-settings-section-heading p {
+  margin: 4px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 外层已经用 section gap 控制间距，避免再叠加 Lark 组件的默认 margin。 */
+.terminal-settings .lark-status {
+  margin-bottom: 0;
+}
+
+.terminal-settings .lark-path-field {
+  margin-top: 0;
+}
+
+.terminal-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 16px 24px;
+}
+
+.terminal-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.terminal-settings-field > label {
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.terminal-settings-field .ant-input-number {
+  width: 100%;
+}
+
+.terminal-settings-toggle {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.terminal-settings-toggle + .terminal-settings-toggle {
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.terminal-settings-toggle-copy {
+  min-width: 0;
+}
+
+.terminal-settings-toggle-copy strong {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.terminal-settings-toggle-copy p {
+  margin: 3px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.terminal-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+@media (max-width: 700px) {
+  .terminal-settings-grid {
+    grid-template-columns: 1fr;
+  }
+}

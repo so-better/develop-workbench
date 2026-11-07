@@ -6,6 +6,7 @@ export type SettingsSection =
   | 'meegle'
   | 'git'
   | 'ide'
+  | 'terminal'
   | 'repositories'
   | 'ai'
   | 'skills'

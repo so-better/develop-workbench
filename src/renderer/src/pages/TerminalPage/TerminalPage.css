@@ -1,0 +1,290 @@
+.terminal-page {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  height: 100%;
+  min-height: 0;
+  padding: 4px;
+}
+
+.terminal-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  min-height: 42px;
+  padding: 7px 8px;
+  background: #16171a;
+  border: 1px solid #2a2c31;
+  border-bottom: 1px solid #26282d;
+  border-radius: 0;
+}
+
+.terminal-tab-list {
+  display: flex;
+  flex: 0 1 auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 1px;
+  overflow-x: auto;
+  scrollbar-color: #303238 transparent;
+  scrollbar-width: thin;
+}
+
+.terminal-tab-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.terminal-tab-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.terminal-tab-list::-webkit-scrollbar-thumb {
+  background: #303238;
+  border-radius: 999px;
+}
+
+.terminal-tab {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  height: 28px;
+  padding: 0 4px 0 11px;
+  color: #8b909a;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  outline: none;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.terminal-tab:hover {
+  color: #e6e8eb;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.terminal-tab:focus-visible {
+  box-shadow: inset 0 0 0 1px rgba(105, 177, 255, 0.55);
+}
+
+.terminal-tab.is-active {
+  color: #f2f4f7;
+  background: #101114;
+  box-shadow: inset 0 0 0 1px #303238;
+}
+
+.terminal-tab.is-exited {
+  color: #6b7280;
+}
+
+.terminal-tab.is-exited .terminal-tab-title {
+  text-decoration: line-through;
+}
+
+.terminal-tab-title {
+  max-width: 160px;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.terminal-tab-title:active {
+  cursor: grabbing;
+}
+
+.terminal-tab-rename {
+  width: 120px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.terminal-tab-close {
+  flex: 0 0 20px;
+  width: 20px !important;
+  height: 20px !important;
+  padding: 0 !important;
+  color: inherit !important;
+  font-size: 10px !important;
+  border-radius: 5px !important;
+  opacity: 0.45;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.terminal-tab:hover .terminal-tab-close,
+.terminal-tab.is-active .terminal-tab-close {
+  opacity: 1;
+}
+
+.terminal-tab-close:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+.terminal-toolbar-button {
+  flex: 0 0 auto;
+  width: 28px !important;
+  height: 28px !important;
+  color: #8b909a !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+}
+
+.terminal-toolbar-button:hover {
+  color: #f2f4f7 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.terminal-search-toggle {
+  margin-right: 2px;
+}
+
+.terminal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #101114;
+  border: 1px solid #2a2c31;
+  border-top: 0;
+  border-radius: 0;
+}
+
+.terminal-host {
+  position: absolute;
+  inset: 0;
+  padding: 8px 10px 10px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.terminal-host.is-active {
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.terminal-host .xterm {
+  height: 100%;
+}
+
+.terminal-host .xterm-viewport {
+  background: transparent !important;
+}
+
+.terminal-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.terminal-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #e6e8eb;
+  font-size: 13px;
+  background: rgba(16, 17, 20, 0.72);
+  border: 1px dashed #69b1ff;
+  pointer-events: none;
+}
+
+.terminal-search {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 20;
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  max-width: calc(100% - 24px);
+  padding: 4px;
+  background: #18191c;
+  border: 1px solid #303238;
+  border-radius: 9px;
+  box-shadow: 0 14px 32px -18px rgba(0, 0, 0, 0.7);
+}
+
+.terminal-search .ant-input-affix-wrapper {
+  width: 220px;
+}
+
+.terminal-search-empty {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  color: #f97066;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.terminal-context-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+.terminal-context-menu {
+  position: fixed;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  padding: 6px;
+  background: #18191c;
+  border: 1px solid #303238;
+  border-radius: 10px;
+  box-shadow: 0 20px 44px -20px rgba(0, 0, 0, 0.7);
+}
+
+.terminal-context-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  color: #e6e8eb;
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.terminal-context-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.terminal-context-item:disabled {
+  color: #8b909a;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.terminal-context-item.is-danger {
+  color: #f97066;
+}
+
+.terminal-context-divider {
+  height: 1px;
+  margin: 5px 6px;
+  background: #303238;
+}

@@ -17,6 +17,7 @@ import MeegleSettings from '../MeegleSettings/MeegleSettings'
 import RepositorySettings from '../RepositorySettings/RepositorySettings'
 import SkillSettings from '../SkillSettings/SkillSettings'
 import StorageCleanup from '../StorageCleanup/StorageCleanup'
+import TerminalSettings from '../TerminalSettings/TerminalSettings'
 import MigrationSettings from '../MigrationSettings/MigrationSettings'
 import ClipboardSettings from '../ClipboardSettings/ClipboardSettings'
 
@@ -401,6 +402,14 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
+            className={`settings-nav-item${activeSection === 'terminal' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'terminal' ? 'page' : undefined}
+            onClick={() => setActiveSection('terminal')}
+          >
+            终端
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item${activeSection === 'repositories' ? ' is-active' : ''}`}
             aria-current={activeSection === 'repositories' ? 'page' : undefined}
             onClick={() => setActiveSection('repositories')}
@@ -651,6 +660,8 @@ export default function SettingsModal({
           {activeSection === 'ide' ? (
             <IdeSettings />
           ) : null}
+
+          {activeSection === 'terminal' ? <TerminalSettings /> : null}
 
           {activeSection === 'cleanup' ? <StorageCleanup /> : null}
           {activeSection === 'clipboard' ? <ClipboardSettings /> : null}

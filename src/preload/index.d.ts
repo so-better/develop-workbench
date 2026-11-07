@@ -35,6 +35,14 @@ import type {
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
+  TerminalCreateInput,
+  TerminalDataEvent,
+  TerminalExitEvent,
+  TerminalSessionInfo,
+  TerminalSettings,
+  TerminalShellInfo
+} from '../types/terminal'
+import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserDownload,
   EmbeddedBrowserState
@@ -233,6 +241,48 @@ export interface ElectronAPI {
     currentPath?: string | null,
     presetId?: IdePresetId
   ) => Promise<string | null>
+  /** 恢复当前窗口的终端会话；没有会话时自动创建一个。 */
+  restoreTerminals: () => Promise<TerminalSessionInfo[]>
+  /** 新建一个终端会话。 */
+  createTerminal: (input?: TerminalCreateInput) => Promise<TerminalSessionInfo>
+  /** 向终端写入用户输入。 */
+  writeTerminal: (id: string, data: string) => void
+  /** 调整终端尺寸。 */
+  resizeTerminal: (id: string, cols: number, rows: number) => void
+  /** 关闭终端会话。 */
+  closeTerminal: (id: string) => void
+  /** 读取系统剪贴板文本，供终端右键粘贴使用。 */
+  readTerminalClipboard: () => Promise<string>
+  /** 获取拖入文件的本地绝对路径。 */
+  getPathForFile: (file: File) => string
+  /** 用系统默认程序打开终端里点击的路径。 */
+  openTerminalPath: (path: string) => Promise<void>
+  /** 选择新建终端的工作目录。 */
+  selectTerminalDirectory: () => Promise<string | null>
+  /** 读取终端设置。 */
+  getTerminalSettings: () => Promise<TerminalSettings>
+  /** 读取当前生效的 shell 信息。 */
+  getTerminalShellInfo: () => Promise<TerminalShellInfo>
+  /** 自动检测系统默认 shell，忽略已保存的自定义路径。 */
+  detectTerminalShell: () => Promise<TerminalShellInfo>
+  /** 更新终端设置。 */
+  updateTerminalSettings: (
+    patch: Partial<TerminalSettings>
+  ) => Promise<TerminalSettings>
+  /** 选择自定义 shell 可执行文件。 */
+  selectTerminalShell: () => Promise<string | null>
+  /** 订阅终端设置变化。 */
+  onTerminalSettingsChange: (
+    listener: (settings: TerminalSettings) => void
+  ) => () => void
+  /** 更新终端标签标题；custom 为 true 表示用户手动命名。 */
+  updateTerminalTitle: (id: string, title: string, custom: boolean) => void
+  /** 同步终端标签顺序。 */
+  reorderTerminals: (ids: string[]) => void
+  /** 订阅终端输出。 */
+  onTerminalData: (listener: (event: TerminalDataEvent) => void) => () => void
+  /** 订阅终端进程退出。 */
+  onTerminalExit: (listener: (event: TerminalExitEvent) => void) => () => void
   /** 将文本写入系统剪贴板。 */
   copyText: (text: string) => Promise<void>
   /** 读取 Git 路径、来源和版本。 */

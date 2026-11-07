@@ -12,6 +12,10 @@ extraResources:
   - from: build/icon.png
     to: icon.png
 asar: true
+# node-pty 使用 N-API 预编译产物，无需针对 Electron ABI 重新编译。
+npmRebuild: false
+asarUnpack:
+  - node_modules/node-pty/**/*
 mac:
   target:
     - dmg

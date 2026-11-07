@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { IpcRendererEvent } from 'electron'
 import type { AiConfigDocument } from '../types/ai-config'
 import type {
@@ -36,6 +36,14 @@ import type {
 } from '../types/storage-cleanup'
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
+import type {
+  TerminalCreateInput,
+  TerminalDataEvent,
+  TerminalExitEvent,
+  TerminalSessionInfo,
+  TerminalSettings,
+  TerminalShellInfo
+} from '../types/terminal'
 import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserDownload,
@@ -381,6 +389,166 @@ const electronAPI = {
     presetId?: IdePresetId
   ): Promise<string | null> =>
     ipcRenderer.invoke('ide:select-command', currentPath, presetId),
+
+  /**
+   * 恢复当前窗口的终端会话；没有任何会话时自动创建一个。
+   */
+  restoreTerminals: (): Promise<TerminalSessionInfo[]> =>
+    ipcRenderer.invoke('terminal:restore'),
+
+  /**
+   * 新建一个终端会话。
+   */
+  createTerminal: (input?: TerminalCreateInput): Promise<TerminalSessionInfo> =>
+    ipcRenderer.invoke('terminal:create', input),
+
+  /**
+   * 向终端写入用户输入。
+   */
+  writeTerminal: (id: string, data: string): void => {
+    ipcRenderer.send('terminal:write', id, data)
+  },
+
+  /**
+   * 调整终端尺寸。
+   */
+  resizeTerminal: (id: string, cols: number, rows: number): void => {
+    ipcRenderer.send('terminal:resize', id, cols, rows)
+  },
+
+  /**
+   * 关闭终端会话。
+   */
+  closeTerminal: (id: string): void => {
+    ipcRenderer.send('terminal:close', id)
+  },
+
+  /**
+   * 读取系统剪贴板文本，供终端右键粘贴使用。
+   */
+  readTerminalClipboard: (): Promise<string> =>
+    ipcRenderer.invoke('terminal:read-clipboard'),
+
+  /**
+   * 获取拖入文件的本地绝对路径。
+   */
+  getPathForFile: (file: File): string => webUtils.getPathForFile(file),
+
+  /**
+   * 用系统默认程序打开终端里点击的路径。
+   */
+  openTerminalPath: (path: string): Promise<void> =>
+    ipcRenderer.invoke('terminal:open-path', path),
+
+  /**
+   * 选择新建终端的工作目录。
+   */
+  selectTerminalDirectory: (): Promise<string | null> =>
+    ipcRenderer.invoke('terminal:select-directory'),
+
+  /**
+   * 读取终端设置。
+   */
+  getTerminalSettings: (): Promise<TerminalSettings> =>
+    ipcRenderer.invoke('terminal:get-settings'),
+
+  /**
+   * 读取当前生效的 shell 信息。
+   */
+  getTerminalShellInfo: (): Promise<TerminalShellInfo> =>
+    ipcRenderer.invoke('terminal:get-shell-info'),
+
+  /**
+   * 自动检测系统默认 shell，忽略已保存的自定义路径。
+   */
+  detectTerminalShell: (): Promise<TerminalShellInfo> =>
+    ipcRenderer.invoke('terminal:detect-shell'),
+
+  /**
+   * 更新终端设置。
+   */
+  updateTerminalSettings: (
+    patch: Partial<TerminalSettings>
+  ): Promise<TerminalSettings> =>
+    ipcRenderer.invoke('terminal:update-settings', patch),
+
+  /**
+   * 选择自定义 shell 可执行文件。
+   */
+  selectTerminalShell: (): Promise<string | null> =>
+    ipcRenderer.invoke('terminal:select-shell'),
+
+  /**
+   * 订阅终端设置变化。
+   */
+  onTerminalSettingsChange: (
+    listener: (settings: TerminalSettings) => void
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      settings: TerminalSettings
+    ): void => {
+      listener(settings)
+    }
+
+    ipcRenderer.on('terminal:settings-changed', handler)
+
+    return () => {
+      ipcRenderer.removeListener('terminal:settings-changed', handler)
+    }
+  },
+
+  /**
+   * 更新终端标签标题；custom 为 true 表示用户手动命名。
+   */
+  updateTerminalTitle: (
+    id: string,
+    title: string,
+    custom: boolean
+  ): void => {
+    ipcRenderer.send('terminal:update-title', id, title, custom)
+  },
+
+  /**
+   * 同步终端标签顺序，退出时按此顺序持久化。
+   */
+  reorderTerminals: (ids: string[]): void => {
+    ipcRenderer.send('terminal:reorder', ids)
+  },
+
+  /**
+   * 订阅终端输出。
+   */
+  onTerminalData: (
+    listener: (event: TerminalDataEvent) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, payload: TerminalDataEvent): void => {
+      listener(payload)
+    }
+
+    ipcRenderer.on('terminal:data', handler)
+
+    return () => {
+      ipcRenderer.removeListener('terminal:data', handler)
+    }
+  },
+
+  /**
+   * 订阅终端进程退出。
+   */
+  onTerminalExit: (
+    listener: (event: TerminalExitEvent) => void
+  ): (() => void) => {
+    const handler = (_event: IpcRendererEvent, payload: TerminalExitEvent): void => {
+      listener(payload)
+    }
+
+    ipcRenderer.on('terminal:exit', handler)
+
+    return () => {
+      ipcRenderer.removeListener('terminal:exit', handler)
+    }
+  },
 
   /**
    * 读取 Git 路径、来源和版本。

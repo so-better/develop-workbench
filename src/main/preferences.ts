@@ -1,11 +1,25 @@
 import { app } from 'electron'
-import { closeSync, fsyncSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  closeSync,
+  fsyncSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import { backupCorruptStoreSync } from './store-backup'
 import type { ThemeMode } from '../types/theme'
 import { isIdePresetId } from '../types/ide'
 import type { IdeConfig } from '../types/ide'
+import {
+  DEFAULT_TERMINAL_FONT_FAMILY,
+  DEFAULT_TERMINAL_SETTINGS
+} from '../types/terminal'
+import type { TerminalSettings } from '../types/terminal'
 
 /**
  * 应用级偏好。
@@ -21,10 +35,12 @@ export interface AppPreferences {
   ide?: IdeConfig
   skillDirectories?: string[]
   productGuideSeenVersion?: number
+  terminal: TerminalSettings
 }
 
 const DEFAULT_PREFERENCES: AppPreferences = {
-  theme: 'system'
+  theme: 'system',
+  terminal: { ...DEFAULT_TERMINAL_SETTINGS }
 }
 
 // 内存缓存，避免频繁访问磁盘。
@@ -51,6 +67,54 @@ const isIdeConfig = (value: unknown): value is IdeConfig => {
     Array.isArray(config.args) &&
     config.args.every((arg) => typeof arg === 'string')
   )
+}
+
+/** 校验路径指向一个存在的文件。 */
+const isExistingFile = (path: string): boolean => {
+  try {
+    return statSync(path).isFile()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 校验并补全终端设置。
+ */
+export const normalizeTerminalSettings = (value: unknown): TerminalSettings => {
+  if (!value || typeof value !== 'object') {
+    return { ...DEFAULT_TERMINAL_SETTINGS }
+  }
+
+  const item = value as Record<string, unknown>
+  const shell =
+    typeof item.shell === 'string' &&
+    item.shell.trim() &&
+    isExistingFile(item.shell.trim())
+      ? item.shell.trim()
+      : null
+  const fontFamily =
+    typeof item.fontFamily === 'string' && item.fontFamily.trim()
+      ? item.fontFamily.trim()
+      : DEFAULT_TERMINAL_FONT_FAMILY
+  const fontSize =
+    typeof item.fontSize === 'number' && Number.isFinite(item.fontSize)
+      ? Math.min(24, Math.max(10, Math.round(item.fontSize)))
+      : DEFAULT_TERMINAL_SETTINGS.fontSize
+  const scrollback =
+    typeof item.scrollback === 'number' && Number.isFinite(item.scrollback)
+      ? Math.min(100_000, Math.max(1_000, Math.round(item.scrollback)))
+      : DEFAULT_TERMINAL_SETTINGS.scrollback
+  const webgl =
+    typeof item.webgl === 'boolean'
+      ? item.webgl
+      : DEFAULT_TERMINAL_SETTINGS.webgl
+  const copyOnSelect =
+    typeof item.copyOnSelect === 'boolean'
+      ? item.copyOnSelect
+      : DEFAULT_TERMINAL_SETTINGS.copyOnSelect
+
+  return { shell, fontFamily, fontSize, scrollback, webgl, copyOnSelect }
 }
 
 /**
@@ -116,6 +180,7 @@ const readPreferences = (): AppPreferences => {
     ide?: unknown
     skillDirectories?: unknown
     productGuideSeenVersion?: unknown
+    terminal?: unknown
   }
 
   cachedPreferences = {
@@ -137,7 +202,8 @@ const readPreferences = (): AppPreferences => {
       Number.isInteger(value.productGuideSeenVersion) &&
       value.productGuideSeenVersion >= 0
         ? value.productGuideSeenVersion
-        : undefined
+        : undefined,
+    terminal: normalizeTerminalSettings(value.terminal)
   }
 
   return cachedPreferences
@@ -146,7 +212,11 @@ const readPreferences = (): AppPreferences => {
 /**
  * 读取应用偏好副本。
  */
-export const getPreferences = (): AppPreferences => ({ ...readPreferences() })
+export const getPreferences = (): AppPreferences => {
+  const preferences = readPreferences()
+
+  return { ...preferences, terminal: { ...preferences.terminal } }
+}
 
 /**
  * 合并并保存应用偏好。
@@ -173,6 +243,7 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
     next.productGuideSeenVersion >= 0
       ? next.productGuideSeenVersion
       : undefined
+  next.terminal = normalizeTerminalSettings(next.terminal)
   const targetPath = getPreferencesPath()
   const temporaryPath = `${targetPath}.${randomUUID()}.tmp`
   let temporaryCreated = false
@@ -199,5 +270,19 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
   }
 
   cachedPreferences = next
-  return { ...next }
+  return { ...next, terminal: { ...next.terminal } }
+}
+
+/** 合并并保存终端设置。 */
+export const updateTerminalSettings = (
+  patch: Partial<TerminalSettings>
+): TerminalSettings => {
+  const next = normalizeTerminalSettings({
+    ...getPreferences().terminal,
+    ...patch
+  })
+
+  updatePreferences({ terminal: next })
+
+  return next
 }

@@ -30,6 +30,7 @@ import { initializeRequirementStatuses } from './requirement-statuses'
 import { initializeRequirements } from './requirements'
 import { initializeSites } from './sites'
 import { initializeStorageCleanup } from './storage-cleanup'
+import { initializeTerminal } from './terminal'
 import { initializeUpdater } from './updater'
 import { initializeSkillSettings } from './skill-settings'
 import { initializeSystem } from './system'
@@ -91,6 +92,7 @@ if (!hasSingleInstanceLock) {
     initializeRequirementStatuses()
     initializeSites()
     initializeStorageCleanup()
+    initializeTerminal()
     initializeUpdater()
     initializeSkillSettings()
     initializeWeeklyReport()

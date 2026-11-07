@@ -1,5 +1,6 @@
 import {
   BugOutlined,
+  CodeOutlined,
   FileTextOutlined,
   GlobalOutlined,
   ProjectOutlined
@@ -10,6 +11,7 @@ import RequirementWorkbench from './pages/RequirementWorkbench/RequirementWorkbe
 import DefectWorkbench from './pages/DefectWorkbench/DefectWorkbench'
 import WeeklyReport from './pages/WeeklyReport/WeeklyReport'
 import SitesPage from './pages/SitesPage/SitesPage'
+import TerminalPage from './pages/TerminalPage/TerminalPage'
 
 interface PageRenderContext {
   onOpenSettings: (section: SettingsSection) => void
@@ -54,6 +56,12 @@ export const APP_PAGES = [
     label: '周报',
     icon: <FileTextOutlined />,
     render: () => <WeeklyReport />
+  },
+  {
+    key: 'terminal',
+    label: '终端',
+    icon: <CodeOutlined />,
+    render: () => <TerminalPage />
   }
 ] as const satisfies ReadonlyArray<AppPageDefinition & { key: string }>
 
