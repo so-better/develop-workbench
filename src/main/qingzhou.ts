@@ -3,9 +3,9 @@
  * 复用内嵌浏览器的持久化 Session，避免在应用数据中保存 Cookie 或 Token。
  */
 import { BrowserWindow, session } from 'electron'
-import type { Session } from 'electron'
 import { BROWSER_PARTITION } from './embedded-browser'
 import { withBrowserAuth } from './browser-auth'
+import { persistSessionCookies } from './session-cookies'
 
 /** 查询轻舟工作项代码任务的接口。 */
 const CODE_TASKS_URL =
@@ -13,9 +13,6 @@ const CODE_TASKS_URL =
 
 /** 轻舟需求页面地址，用于登录和打开具体工作项。 */
 const QINGZHOU_REQUIREMENT_URL = 'https://z.xlbsoft.com/workList/requirement'
-
-/** 登录成功后将会话 Cookie 延长为 30 天。 */
-const AUTH_COOKIE_TTL_SECONDS = 30 * 24 * 60 * 60
 
 /**
  * 代码任务关联的分支信息。
@@ -164,35 +161,6 @@ const normalizeCodeTask = (
 }
 
 /**
- * 轻舟登录会把 token 写在会话 Cookie 里，应用重启后会被 Chromium 丢弃。
- * 登录成功后将 xlbsoft.com 下的会话 Cookie 转成 30 天持久化 Cookie。
- */
-const persistQingzhouCookies = async (browserSession: Session): Promise<void> => {
-  const cookies = await browserSession.cookies.get({ domain: 'xlbsoft.com' })
-  const expirationDate = Math.floor(Date.now() / 1000) + AUTH_COOKIE_TTL_SECONDS
-
-  for (const cookie of cookies) {
-    if (cookie.expirationDate || !cookie.domain) continue
-
-    try {
-      await browserSession.cookies.set({
-        url: `https://${cookie.domain.replace(/^\./, '')}${cookie.path || '/'}`,
-        name: cookie.name,
-        value: cookie.value,
-        ...(cookie.hostOnly ? {} : { domain: cookie.domain }),
-        path: cookie.path,
-        secure: cookie.secure,
-        httpOnly: cookie.httpOnly,
-        sameSite: cookie.sameSite,
-        expirationDate
-      })
-    } catch {
-      // 单个 Cookie 写入失败不影响当前请求。
-    }
-  }
-}
-
-/**
  * 通过 workItemId 查询代码任务。
  * 非 JSON 响应或 401/403 都按未登录处理，交给内嵌浏览器完成 OAuth。
  */
@@ -239,7 +207,7 @@ const requestCodeTasks = async (
     throw new Error(payload.msg?.trim() || '查询轻舟代码任务失败')
   }
 
-  await persistQingzhouCookies(browserSession)
+  await persistSessionCookies(browserSession, ['xlbsoft.com'])
 
   return (payload.data?.tasks ?? []).map((task) =>
     normalizeCodeTask(task, workItemId)

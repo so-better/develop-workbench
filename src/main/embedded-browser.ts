@@ -5,6 +5,7 @@ import { open, rename, rm } from 'node:fs/promises'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { backupCorruptStoreSync } from './store-backup'
+import { matchesCookieDomain, persistSessionCookie } from './session-cookies'
 import { tryNormalizeHttpUrl } from '../utils'
 import type {
   EmbeddedBrowserBounds,
@@ -14,6 +15,11 @@ import type {
 
 export const BROWSER_PARTITION = 'persist:workbench-browser'
 const BATCH_LOAD_ABORTED = -3
+/**
+ * 需要跨应用重启保持登录态的站点域。
+ * 会有意延长这些域下所有会话 Cookie 的有效期，而不只登录票据本身。
+ */
+const PERSISTED_LOGIN_DOMAINS = ['aliyun.com']
 
 interface BrowserEntry {
   id: string
@@ -304,6 +310,15 @@ const configureBrowserSession = (): void => {
   })
   browserSession.setPermissionCheckHandler(() => false)
 
+  // 登录票据多以 session cookie 写入，应用退出后会被 Chromium 丢弃。
+  // 在 Cookie 变更时立即延长有效期，也能覆盖 XHR、重定向等非页面加载场景。
+  browserSession.cookies.on('changed', (_event, cookie, _cause, removed) => {
+    if (removed || cookie.expirationDate) return
+    if (!matchesCookieDomain(cookie.domain, PERSISTED_LOGIN_DOMAINS)) return
+
+    void persistSessionCookie(browserSession, cookie)
+  })
+
   // 保留 Electron 默认保存对话框，同时记录下载状态供面板展示和操作。
   browserSession.on('will-download', (_event, item, webContents) => {
     const state: EmbeddedBrowserDownload = {
@@ -349,7 +364,6 @@ const configureBrowserSession = (): void => {
     })
   })
 }
-
 
 const toState = (entry: BrowserEntry): EmbeddedBrowserState => {
   const webContents = entry.view.webContents
