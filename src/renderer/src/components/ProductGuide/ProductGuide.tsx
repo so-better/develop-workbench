@@ -233,6 +233,12 @@ const SETTINGS_GROUPS: GuideSettingGroup[] = [
           '在同一栏目切换模型配置和技能目录；模型支持 OpenAI Chat Completions 兼容 JSON 自动保存，技能支持扫描多个绝对路径目录。'
       },
       {
+        title: '粘贴选择',
+        icon: <SnippetsOutlined />,
+        description:
+          '设置全局快捷键，查看和清空本机保存的最近内容；只读取系统剪贴板来提供粘贴选择，不接管系统剪贴板。'
+      },
+      {
         title: '存储清理',
         icon: <ClearOutlined />,
         description:
