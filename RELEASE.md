@@ -129,26 +129,16 @@ npm run typecheck
 
 ## 3. 构建安装包
 
-macOS 使用 macOS 机器构建：
+按顺序在同一台机器构建两个平台的安装包：
 
 ```bash
 npm run dist:mac
-```
-
-Windows 使用 Windows 机器构建：
-
-```bash
 npm run dist:win
 ```
 
 发布时禁止使用 `npm run dist`。
 
-必须分别在对应机器构建两个平台的安装包：
-
-- macOS 机器：`npm run dist:mac`
-- Windows 机器：`npm run dist:win`
-
-两个平台都构建完成并检查通过后，才能上传发布。
+先构建 macOS 包，再构建 Windows 包；两个平台都构建完成并检查通过后，才能上传发布。
 
 说明：
 
@@ -360,13 +350,9 @@ echo "当前版本：${CURRENT_VERSION}"
 # VERSION=$(node -p "require('./package.json').version")
 # 同时在根目录 CHANGELOG.md 顶部添加该版本的更新内容
 
-# 2. 检查并构建
-# macOS 机器执行
+# 2. 检查并构建（按顺序执行）
 npm run typecheck
 npm run dist:mac
-
-# Windows 机器执行
-npm run typecheck
 npm run dist:win
 
 # 3. 检查产物
