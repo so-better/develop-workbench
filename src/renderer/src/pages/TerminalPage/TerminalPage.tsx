@@ -9,7 +9,6 @@ import {
   ConfigProvider,
   Input,
   Spin,
-  Tooltip,
   theme as antdTheme
 } from 'antd'
 import type { InputRef } from 'antd'
@@ -1426,16 +1425,14 @@ export default function TerminalPage({
     >
       <ConfigProvider theme={TERMINAL_DARK_THEME}>
       <div className="terminal-tabs">
-        <Tooltip title="搜索（⌘/Ctrl+F）">
-          <Button
-            type="text"
-            size="small"
-            className="terminal-toolbar-button terminal-search-toggle"
-            icon={<SearchOutlined />}
-            aria-label="搜索终端内容"
-            onClick={() => setSearchOpen(true)}
-          />
-        </Tooltip>
+        <Button
+          type="text"
+          size="small"
+          className="terminal-toolbar-button terminal-search-toggle"
+          icon={<SearchOutlined />}
+          aria-label="搜索终端内容"
+          onClick={() => setSearchOpen(true)}
+        />
 
         <div className="terminal-tab-list" role="tablist" aria-label="终端标签">
           <DndContext
@@ -1467,28 +1464,24 @@ export default function TerminalPage({
           </DndContext>
         </div>
 
-        <Tooltip title="新建终端">
-          <Button
-            type="text"
-            size="small"
-            className="terminal-toolbar-button terminal-new-tab"
-            icon={<PlusOutlined />}
-            loading={creating}
-            aria-label="新建终端"
-            onClick={() => void handleCreate()}
-          />
-        </Tooltip>
+        <Button
+          type="text"
+          size="small"
+          className="terminal-toolbar-button terminal-new-tab"
+          icon={<PlusOutlined />}
+          loading={creating}
+          aria-label="新建终端"
+          onClick={() => void handleCreate()}
+        />
 
-        <Tooltip title="在指定目录新建终端">
-          <Button
-            type="text"
-            size="small"
-            className="terminal-toolbar-button terminal-new-tab-directory"
-            icon={<FolderOpenOutlined />}
-            aria-label="在指定目录新建终端"
-            onClick={() => void handleCreateWithDirectory()}
-          />
-        </Tooltip>
+        <Button
+          type="text"
+          size="small"
+          className="terminal-toolbar-button terminal-new-tab-directory"
+          icon={<FolderOpenOutlined />}
+          aria-label="在指定目录新建终端"
+          onClick={() => void handleCreateWithDirectory()}
+        />
       </div>
 
       <div
@@ -1554,33 +1547,27 @@ export default function TerminalPage({
               {searchNoResult ? (
                 <span className="terminal-search-empty">无结果</span>
               ) : null}
-              <Tooltip title="上一个">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<UpOutlined />}
-                  aria-label="上一个匹配"
-                  onClick={() => runSearch('previous')}
-                />
-              </Tooltip>
-              <Tooltip title="下一个">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<DownOutlined />}
-                  aria-label="下一个匹配"
-                  onClick={() => runSearch('next')}
-                />
-              </Tooltip>
-              <Tooltip title="关闭">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<CloseOutlined />}
-                  aria-label="关闭搜索"
-                  onClick={() => closeSearch()}
-                />
-              </Tooltip>
+              <Button
+                type="text"
+                size="small"
+                icon={<UpOutlined />}
+                aria-label="上一个匹配"
+                onClick={() => runSearch('previous')}
+              />
+              <Button
+                type="text"
+                size="small"
+                icon={<DownOutlined />}
+                aria-label="下一个匹配"
+                onClick={() => runSearch('next')}
+              />
+              <Button
+                type="text"
+                size="small"
+                icon={<CloseOutlined />}
+                aria-label="关闭搜索"
+                onClick={() => closeSearch()}
+              />
           </div>
         ) : null}
 
