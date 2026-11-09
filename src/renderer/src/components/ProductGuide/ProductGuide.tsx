@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react'
 import {
+  AndroidOutlined,
   ApiOutlined,
   AppstoreOutlined,
   BranchesOutlined,
@@ -109,6 +110,19 @@ const CAPABILITIES: GuideCapability[] = [
       '操作列支持在终端打开、远程仓库和切换分支；「更多」菜单支持打开 IDE、创建 MR、新建分支、合并代码和移除仓库，合并成功后自动推送',
       '支持从 Git 克隆仓库到配置的代码根目录',
       '代码根目录仍在设置的「代码目录」中配置'
+    ]
+  },
+  {
+    title: 'ADB 工具',
+    icon: <AndroidOutlined />,
+    items: [
+      '连接本地 Android 模拟器，查看设备和第三方应用包',
+      '自动识别当前前台应用包名，并从 adb reverse 端口识别 Dev Server 端口',
+      '支持查看和添加 adb reverse 端口，默认适配 Metro 8081 和 Re.Pack 8083',
+      '支持刷新页面、打开 RN 开发菜单，以及应用设置、深链、应用信息、权限和录屏',
+      '右侧可切换 React Native DevTools 和 PageSpy 网络；PageSpy 会按当前 App 进程和型号自动定位调试房间',
+      'DevTools 支持 console、Sources、React 组件和性能面板；PageSpy 用于查看 Network 请求',
+      '截图和录屏统一保存到系统下载目录的 Develop Workbench 文件夹'
     ]
   },
   {
@@ -229,6 +243,12 @@ const SETTINGS_GROUPS: GuideSettingGroup[] = [
         icon: <BranchesOutlined />,
         description:
           '选择或自动检测本机 Git；仓库扫描、克隆、分支创建与切换、拉取都会调用它。'
+      },
+      {
+        title: 'ADB',
+        icon: <AndroidOutlined />,
+        description:
+          '选择或自动检测 Android SDK 中的 adb；ADB 工具用于连接模拟器、刷新页面、截图录屏和调试。'
       }
     ]
   },

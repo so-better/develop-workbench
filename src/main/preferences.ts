@@ -32,6 +32,7 @@ export interface AppPreferences {
   meegleProjectKey?: string
   repositoryRoot?: string
   gitPath?: string
+  adbPath?: string
   ide?: IdeConfig
   skillDirectories?: string[]
   productGuideSeenVersion?: number
@@ -177,6 +178,7 @@ const readPreferences = (): AppPreferences => {
     meegleProjectKey?: unknown
     repositoryRoot?: unknown
     gitPath?: unknown
+    adbPath?: unknown
     ide?: unknown
     skillDirectories?: unknown
     productGuideSeenVersion?: unknown
@@ -190,6 +192,7 @@ const readPreferences = (): AppPreferences => {
     meegleProjectKey: normalizePath(value.meegleProjectKey),
     repositoryRoot: normalizePath(value.repositoryRoot),
     gitPath: normalizePath(value.gitPath),
+    adbPath: normalizePath(value.adbPath),
     ide: isIdeConfig(value.ide) ? value.ide : undefined,
     skillDirectories: Array.isArray(value.skillDirectories)
       ? value.skillDirectories
@@ -233,6 +236,7 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
   next.meegleProjectKey = normalizePath(next.meegleProjectKey)
   next.repositoryRoot = normalizePath(next.repositoryRoot)
   next.gitPath = normalizePath(next.gitPath)
+  next.adbPath = normalizePath(next.adbPath)
   next.ide = isIdeConfig(next.ide) ? next.ide : undefined
   next.skillDirectories = next.skillDirectories
     ?.map((item) => item.trim())

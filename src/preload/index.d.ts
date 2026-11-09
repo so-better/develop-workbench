@@ -35,6 +35,18 @@ import type {
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
+  AdbAppInfo,
+  AdbCommandResult,
+  AdbDevice,
+  AdbInfo,
+  AdbPermissionInfo,
+  AdbReverseEntry,
+  PageSpyRoomInfo,
+  AdbScreenRecordFinishedEvent,
+  AdbScreenRecordStartResult,
+  AdbScreenshotResult
+} from '../types/adb'
+import type {
   TerminalCreateInput,
   TerminalDataEvent,
   TerminalExitEvent,
@@ -300,6 +312,85 @@ export interface ElectronAPI {
   setGitPath: (gitPath: string | null) => Promise<GitInfo>
   /** 打开系统文件选择器选择 Git。 */
   selectGitPath: (currentPath?: string | null) => Promise<string | null>
+  /** 读取 ADB 路径、来源和版本。 */
+  getAdbInfo: () => Promise<AdbInfo>
+  /** 只执行 ADB 自动检测。 */
+  detectAdbInfo: () => Promise<AdbInfo>
+  /** 保存 ADB 路径，传 null 恢复自动检测。 */
+  setAdbPath: (adbPath: string | null) => Promise<AdbInfo>
+  /** 打开文件选择器选择 ADB。 */
+  selectAdbPath: () => Promise<string | null>
+  /** 读取 ADB 设备。 */
+  listAdbDevices: () => Promise<AdbDevice[]>
+  /** 读取当前前台应用包名。 */
+  getAdbForegroundPackage: (serial: string) => Promise<string | null>
+  /** 通过开发服务器触发 Reload。 */
+  reloadReactNativeApp: (port: number) => Promise<AdbCommandResult>
+  /** 打开 React Native 开发菜单。 */
+  openAdbDevMenu: (serial: string) => Promise<AdbCommandResult>
+  /** 打开应用设置页。 */
+  openAdbAppSettings: (
+    serial: string,
+    packageName: string
+  ) => Promise<AdbCommandResult>
+  /** 打开深链。 */
+  openAdbDeepLink: (
+    serial: string,
+    url: string,
+    packageName?: string
+  ) => Promise<AdbCommandResult>
+  /** 读取应用信息。 */
+  getAdbAppInfo: (
+    serial: string,
+    packageName: string
+  ) => Promise<AdbAppInfo>
+  /** 读取应用权限。 */
+  listAdbPermissions: (
+    serial: string,
+    packageName: string
+  ) => Promise<AdbPermissionInfo[]>
+  /** 授予或撤销应用权限。 */
+  setAdbPermission: (
+    serial: string,
+    packageName: string,
+    permission: string,
+    granted: boolean
+  ) => Promise<AdbCommandResult>
+  /** 开始录制设备屏幕。 */
+  startAdbScreenRecord: (
+    serial: string
+  ) => Promise<AdbScreenRecordStartResult>
+  /** 停止录制设备屏幕。 */
+  stopAdbScreenRecord: (sessionId: string) => Promise<boolean>
+  /** 订阅录屏完成事件。 */
+  onAdbScreenRecordFinished: (
+    listener: (event: AdbScreenRecordFinishedEvent) => void
+  ) => () => void
+  /** 读取 reverse 列表。 */
+  listAdbReverse: (serial: string) => Promise<AdbReverseEntry[]>
+  /** 根据设备 reverse 端口识别开发服务器端口。 */
+  detectAdbDevServerPort: (
+    serial: string,
+    packageName?: string
+  ) => Promise<number | null>
+  /** 添加 reverse 端口。 */
+  addAdbReverse: (serial: string, port: number) => Promise<AdbCommandResult>
+  /** 移除 reverse 端口。 */
+  removeAdbReverse: (
+    serial: string,
+    port: number
+  ) => Promise<AdbCommandResult>
+  /** 获取 DevTools 嵌入地址。 */
+  getAdbDevToolsUrl: (port: number, packageName?: string) => Promise<string>
+  /** 自动定位当前设备对应的 PageSpy 调试房间。 */
+  getAdbPageSpyRoom: (
+    serial: string,
+    packageName?: string
+  ) => Promise<PageSpyRoomInfo>
+  /** 获取截图。 */
+  takeAdbScreenshot: (serial: string) => Promise<AdbScreenshotResult>
+  /** 复制截图到剪贴板。 */
+  copyAdbScreenshot: (dataUrl: string) => Promise<void>
   /** 读取 lark-cli 当前登录用户，未登录时返回 null。 */
   getLarkUser: () => Promise<LarkUser | null>
   /** 搜索飞书云文档。 */

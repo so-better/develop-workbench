@@ -5,6 +5,7 @@ export type SettingsSection =
   | 'lark-cli'
   | 'meegle'
   | 'git'
+  | 'adb'
   | 'ide'
   | 'terminal'
   | 'repositories'

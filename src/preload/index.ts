@@ -37,6 +37,18 @@ import type {
 import type { AuthExpiredEvent } from '../types/auth'
 import type { GitInfo } from '../types/git'
 import type {
+  AdbAppInfo,
+  AdbCommandResult,
+  AdbDevice,
+  AdbInfo,
+  AdbPermissionInfo,
+  AdbReverseEntry,
+  PageSpyRoomInfo,
+  AdbScreenRecordFinishedEvent,
+  AdbScreenRecordStartResult,
+  AdbScreenshotResult
+} from '../types/adb'
+import type {
   TerminalCreateInput,
   TerminalDataEvent,
   TerminalExitEvent,
@@ -578,6 +590,196 @@ const electronAPI = {
    */
   selectGitPath: (currentPath?: string | null): Promise<string | null> =>
     ipcRenderer.invoke('git:select-path', currentPath),
+
+  /**
+   * 读取 ADB 路径、来源、版本和可用状态。
+   */
+  getAdbInfo: (): Promise<AdbInfo> => ipcRenderer.invoke('adb:get-info'),
+
+  /**
+   * 只执行 ADB 自动检测，不修改已保存路径。
+   */
+  detectAdbInfo: (): Promise<AdbInfo> => ipcRenderer.invoke('adb:detect'),
+
+  /**
+   * 保存 ADB 路径；传 null 恢复自动检测。
+   */
+  setAdbPath: (adbPath: string | null): Promise<AdbInfo> =>
+    ipcRenderer.invoke('adb:set-path', adbPath),
+
+  /**
+   * 选择 ADB 可执行文件。
+   */
+  selectAdbPath: (): Promise<string | null> =>
+    ipcRenderer.invoke('adb:select-path'),
+
+  /**
+   * 读取 ADB 设备列表。
+   */
+  listAdbDevices: (): Promise<AdbDevice[]> => ipcRenderer.invoke('adb:list-devices'),
+
+  /**
+   * 读取当前前台应用包名。
+   */
+  getAdbForegroundPackage: (serial: string): Promise<string | null> =>
+    ipcRenderer.invoke('adb:foreground-package', serial),
+
+  /**
+   * 通过 React Native 开发服务器触发 Reload。
+   */
+  reloadReactNativeApp: (port: number): Promise<AdbCommandResult> =>
+    ipcRenderer.invoke('adb:reload-app', port),
+
+  /**
+   * 打开 React Native 开发菜单。
+   */
+  openAdbDevMenu: (serial: string): Promise<AdbCommandResult> =>
+    ipcRenderer.invoke('adb:open-dev-menu', serial),
+
+  /**
+   * 打开应用设置页。
+   */
+  openAdbAppSettings: (
+    serial: string,
+    packageName: string
+  ): Promise<AdbCommandResult> =>
+    ipcRenderer.invoke('adb:open-app-settings', serial, packageName),
+
+  /**
+   * 打开深链。
+   */
+  openAdbDeepLink: (
+    serial: string,
+    url: string,
+    packageName?: string
+  ): Promise<AdbCommandResult> =>
+    ipcRenderer.invoke('adb:open-deep-link', serial, url, packageName),
+
+  /**
+   * 读取应用信息。
+   */
+  getAdbAppInfo: (
+    serial: string,
+    packageName: string
+  ): Promise<AdbAppInfo> =>
+    ipcRenderer.invoke('adb:app-info', serial, packageName),
+
+  /**
+   * 读取应用权限。
+   */
+  listAdbPermissions: (
+    serial: string,
+    packageName: string
+  ): Promise<AdbPermissionInfo[]> =>
+    ipcRenderer.invoke('adb:list-permissions', serial, packageName),
+
+  /**
+   * 授予或撤销应用权限。
+   */
+  setAdbPermission: (
+    serial: string,
+    packageName: string,
+    permission: string,
+    granted: boolean
+  ): Promise<AdbCommandResult> =>
+    ipcRenderer.invoke('adb:set-permission', serial, packageName, permission, granted),
+
+  /**
+   * 开始录制设备屏幕。
+   */
+  startAdbScreenRecord: (
+    serial: string
+  ): Promise<AdbScreenRecordStartResult> =>
+    ipcRenderer.invoke('adb:record-screen-start', serial),
+
+  /**
+   * 停止录制设备屏幕。
+   */
+  stopAdbScreenRecord: (sessionId: string): Promise<boolean> =>
+    ipcRenderer.invoke('adb:record-screen-stop', sessionId),
+
+  /**
+   * 订阅录屏完成事件。
+   */
+  onAdbScreenRecordFinished: (
+    listener: (event: AdbScreenRecordFinishedEvent) => void
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      payload: AdbScreenRecordFinishedEvent
+    ): void => {
+      listener(payload)
+    }
+
+    ipcRenderer.on('adb:screen-record-finished', handler)
+
+    return () => {
+      ipcRenderer.removeListener('adb:screen-record-finished', handler)
+    }
+  },
+
+  /**
+   * 读取 adb reverse 列表。
+   */
+  listAdbReverse: (serial: string): Promise<AdbReverseEntry[]> =>
+    ipcRenderer.invoke('adb:reverse-list', serial),
+
+  /**
+   * 根据设备 reverse 端口和 DevTools target 识别开发服务器端口。
+   */
+  detectAdbDevServerPort: (
+    serial: string,
+    packageName?: string
+  ): Promise<number | null> =>
+    ipcRenderer.invoke('adb:detect-dev-server-port', serial, packageName),
+
+  /**
+   * 添加 adb reverse 端口。
+   */
+  addAdbReverse: (
+    serial: string,
+    port: number
+  ): Promise<AdbCommandResult> =>
+    ipcRenderer.invoke('adb:reverse-add', serial, port),
+
+  /**
+   * 移除 adb reverse 端口。
+   */
+  removeAdbReverse: (
+    serial: string,
+    port: number
+  ): Promise<AdbCommandResult> =>
+    ipcRenderer.invoke('adb:reverse-remove', serial, port),
+
+  /**
+   * 获取 React Native DevTools 嵌入地址。
+   */
+  getAdbDevToolsUrl: (
+    port: number,
+    packageName?: string
+  ): Promise<string> =>
+    ipcRenderer.invoke('adb:devtools-url', port, packageName),
+
+  /**
+   * 自动定位当前设备对应的 PageSpy 调试房间。
+   */
+  getAdbPageSpyRoom: (
+    serial: string,
+    packageName?: string
+  ): Promise<PageSpyRoomInfo> =>
+    ipcRenderer.invoke('adb:pagespy-room', serial, packageName),
+
+  /**
+   * 获取设备截图。
+   */
+  takeAdbScreenshot: (serial: string): Promise<AdbScreenshotResult> =>
+    ipcRenderer.invoke('adb:screenshot', serial),
+
+  /**
+   * 将截图写入系统剪贴板。
+   */
+  copyAdbScreenshot: (dataUrl: string): Promise<void> =>
+    ipcRenderer.invoke('adb:copy-screenshot', dataUrl),
 
   /**
    * 将文本写入系统剪贴板。

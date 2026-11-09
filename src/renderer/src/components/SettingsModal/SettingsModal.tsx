@@ -10,6 +10,7 @@ import {
 import type { SettingsSection } from '../../../../types/settings'
 import { getErrorMessage } from '../../../../utils'
 import ExecutablePathField from '../ExecutablePathField/ExecutablePathField'
+import AdbSettings from '../AdbSettings/AdbSettings'
 import GitSettings from '../GitSettings/GitSettings'
 import LarkAuth from '../LarkAuth/LarkAuth'
 import IdeSettings from '../IdeSettings/IdeSettings'
@@ -394,6 +395,14 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
+            className={`settings-nav-item${activeSection === 'adb' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'adb' ? 'page' : undefined}
+            onClick={() => setActiveSection('adb')}
+          >
+            ADB
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item${activeSection === 'ide' ? ' is-active' : ''}`}
             aria-current={activeSection === 'ide' ? 'page' : undefined}
             onClick={() => setActiveSection('ide')}
@@ -650,6 +659,8 @@ export default function SettingsModal({
           {activeSection === 'git' ? (
             <GitSettings />
           ) : null}
+
+          {activeSection === 'adb' ? <AdbSettings /> : null}
 
           {activeSection === 'repositories' ? (
             <RepositorySettings mode="settings" />

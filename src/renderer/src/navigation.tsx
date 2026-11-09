@@ -1,5 +1,6 @@
 import {
   BugOutlined,
+  AndroidOutlined,
   CodeOutlined,
   FileTextOutlined,
   FolderOpenOutlined,
@@ -13,6 +14,7 @@ import DefectWorkbench from './pages/DefectWorkbench/DefectWorkbench'
 import WeeklyReport from './pages/WeeklyReport/WeeklyReport'
 import SitesPage from './pages/SitesPage/SitesPage'
 import RepositoriesPage from './pages/RepositoriesPage/RepositoriesPage'
+import AdbToolsPage from './pages/AdbToolsPage/AdbToolsPage'
 import TerminalPage from './pages/TerminalPage/TerminalPage'
 
 interface PageRenderContext {
@@ -55,6 +57,14 @@ export const APP_PAGES = [
     icon: <FolderOpenOutlined />,
     render: ({ onOpenSettings }) => (
       <RepositoriesPage onOpenSettings={onOpenSettings} />
+    )
+  },
+  {
+    key: 'adb',
+    label: 'ADB',
+    icon: <AndroidOutlined />,
+    render: ({ onOpenSettings }) => (
+      <AdbToolsPage onOpenSettings={onOpenSettings} />
     )
   },
   {

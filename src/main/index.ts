@@ -4,6 +4,7 @@
  */
 import { app } from 'electron'
 import { join } from 'node:path'
+import { initializeAdb } from './adb'
 import { initializeAiArtifacts } from './ai/artifacts'
 import { initializeAiAttachments } from './ai/attachments'
 import { initializeAiAssistantSession } from './ai/session'
@@ -78,6 +79,7 @@ if (!hasSingleInstanceLock) {
     initializeClipboardHistory()
     initializeEmbeddedBrowser()
     initializeGit()
+    initializeAdb()
     initializeIde()
     initializeLark()
     initializeLarkSearch()
