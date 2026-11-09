@@ -363,7 +363,7 @@ export default function SettingsModal({
       width={1040}
       centered
       open={open}
-      onCancel={() => void handleClose()}
+      onCancel={() => handleClose()}
       maskClosable
       footer={null}
     >

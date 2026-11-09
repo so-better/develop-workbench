@@ -85,7 +85,7 @@ function CopyButton({ value, label }: CopyButtonProps): JSX.Element {
         className={`iteration-summary-copy${copied ? ' is-copied' : ''}`}
         icon={copied ? <CheckOutlined /> : <CopyOutlined />}
         aria-label={`复制${label}`}
-        onClick={() => void handleCopy()}
+        onClick={() => handleCopy()}
       />
     </Tooltip>
   )

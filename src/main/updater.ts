@@ -237,7 +237,7 @@ export const downloadUpdatePackage = async (
     return sizes.reduce((total, size) => total + size, 0)
   }
   const pollTimer = setInterval(() => {
-    void getDownloadedBytes()
+    getDownloadedBytes()
       .then((bytes) => download.update(bytes))
       .catch(() => undefined)
   }, 500)

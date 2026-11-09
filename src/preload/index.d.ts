@@ -264,6 +264,8 @@ export interface ElectronAPI {
   restoreTerminals: (cwd?: string) => Promise<TerminalSessionInfo[]>
   /** 新建一个终端会话。 */
   createTerminal: (input?: TerminalCreateInput) => Promise<TerminalSessionInfo>
+  /** 读取终端 shell 当前所在目录。 */
+  getTerminalCurrentDirectory: (id: string) => Promise<string | null>
   /** 向终端写入用户输入。 */
   writeTerminal: (id: string, data: string) => void
   /** 调整终端尺寸。 */

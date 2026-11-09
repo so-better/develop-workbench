@@ -161,19 +161,19 @@ export default function ClipboardOverlay(): JSX.Element {
 
   // 浮层展示期间持续订阅主进程状态，并用轻量通知同步设置页。
   useEffect(() => {
-    void load()
+    load()
 
     const unsubscribeState = window.electron.onClipboardHistoryState((next) => {
       setState(next)
     })
     const unsubscribeChanged = window.electron.onClipboardHistoryChanged(() => {
-      void load()
+      load()
     })
     const unsubscribeShown = window.electron.onClipboardHistoryShown(() => {
       // 重新打开时回到最新一条，后续状态更新不重置选择。
       setSelectedId(null)
       setHoverId(null)
-      void load()
+      load()
     })
 
     return () => {
@@ -233,7 +233,7 @@ export default function ClipboardOverlay(): JSX.Element {
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        void window.electron.hideClipboardHistory()
+        window.electron.hideClipboardHistory()
         return
       }
 
@@ -261,7 +261,7 @@ export default function ClipboardOverlay(): JSX.Element {
         const item =
           items.find((entry) => entry.id === activeId) ??
           (selectedIndex >= 0 ? items[selectedIndex] : items[0])
-        if (item) void paste(item)
+        if (item) paste(item)
       }
     }
 
@@ -315,7 +315,7 @@ export default function ClipboardOverlay(): JSX.Element {
                   else cardRefs.current.delete(item.id)
                 }}
                 className={`clipboard-card${item.id === activeId ? ' is-active' : ''}`}
-                onClick={() => void paste(item)}
+                onClick={() => paste(item)}
                 onMouseEnter={() => setHoverId(item.id)}
                 role="button"
                 tabIndex={-1}

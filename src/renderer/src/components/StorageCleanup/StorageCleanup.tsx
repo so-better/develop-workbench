@@ -116,7 +116,7 @@ export default function StorageCleanup(): JSX.Element {
   }, [])
 
   useEffect(() => {
-    void loadStats()
+    loadStats()
   }, [loadStats])
 
   const handleClear = async (item: CleanupDefinition): Promise<void> => {
@@ -166,7 +166,7 @@ export default function StorageCleanup(): JSX.Element {
                   type="primary"
                   danger
                   size="small"
-                  onClick={() => void loadStats()}
+                  onClick={() => loadStats()}
                 >
                   重试
                 </Button>

@@ -256,7 +256,7 @@ const getSettings = async (): Promise<ClipboardHistorySettings> => {
 
 /** 浮层接收完整状态；其他窗口只收到变更通知，避免传输大量文本。 */
 const broadcastState = (): void => {
-  void getState().then((state) => {
+  getState().then((state) => {
     for (const window of BrowserWindow.getAllWindows()) {
       if (window.isDestroyed()) continue
 
@@ -817,8 +817,8 @@ const pollClipboard = async (): Promise<void> => {
 const startWatcher = (): void => {
   if (pollTimer) return
 
-  void pollClipboard()
-  pollTimer = setInterval(() => void pollClipboard(), POLL_INTERVAL_MS)
+  pollClipboard()
+  pollTimer = setInterval(() => pollClipboard(), POLL_INTERVAL_MS)
 }
 
 /** 退出前停止轮询。 */
@@ -877,9 +877,9 @@ const createOverlayWindow = (): BrowserWindow => {
 
   const target = getOverlayUrl()
   if (target.url) {
-    void window.loadURL(target.url)
+    window.loadURL(target.url)
   } else if (target.file) {
-    void window.loadFile(target.file, { hash: 'clipboard-overlay' })
+    window.loadFile(target.file, { hash: 'clipboard-overlay' })
   }
 
   return window
@@ -928,7 +928,7 @@ const toggleOverlay = (): void => {
     return
   }
 
-  void showOverlay()
+  showOverlay()
 }
 
 /** 把历史记录按类型写回系统剪贴板。 */
@@ -1077,7 +1077,7 @@ const getImageDataUrl = async (
 
 /** 启动监听、注册快捷键并暴露渲染进程接口。 */
 export const initializeClipboardHistory = (): void => {
-  void readStore()
+  readStore()
     .then(async (store) => {
       await cleanupOrphanImages(store)
 

@@ -177,6 +177,23 @@ interface TerminalContextMenu {
 }
 
 const DEFAULT_TERMINAL_TITLE = '终端'
+const TAB_TITLE_SYNC_DELAY_MS = 350
+
+/** 从绝对路径提取末级目录名，兼容 Windows 和 POSIX 路径。 */
+const getDirectoryName = (cwd: string): string => {
+  const trimmed = cwd.trim()
+  const normalized = trimmed.replace(/[\\/]+$/, '')
+
+  if (!normalized) return trimmed || DEFAULT_TERMINAL_TITLE
+
+  const index = Math.max(
+    normalized.lastIndexOf('/'),
+    normalized.lastIndexOf('\\')
+  )
+
+  return normalized.slice(index + 1) || normalized
+}
+
 const CONTEXT_MENU_WIDTH = 168
 const CONTEXT_MENU_HEIGHT = 236
 const IS_MAC = navigator.userAgent.includes('Mac')
@@ -289,6 +306,7 @@ export default function TerminalPage({
   const selectionTimersRef = useRef(new Map<string, number>())
   const settingsRef = useRef<TerminalSettings>({ ...DEFAULT_TERMINAL_SETTINGS })
   const initialRequestTokenRef = useRef(openRequest?.token ?? null)
+  const titleSyncTimersRef = useRef(new Map<string, number>())
 
   useEffect(() => {
     tabsRef.current = tabs
@@ -362,6 +380,67 @@ export default function TerminalPage({
     },
     [modal]
   )
+
+  /** 把指定标签标题更新为 shell 当前目录的末级名称。 */
+  const syncTabTitle = useCallback(async (id: string): Promise<void> => {
+    const tab = tabsRef.current.find((item) => item.id === id)
+
+    if (!tab || tab.customTitle) return
+
+    const cwd = await window.electron
+      .getTerminalCurrentDirectory(id)
+      .catch(() => null)
+
+    if (!cwd) return
+
+    const current = tabsRef.current.find((item) => item.id === id)
+
+    if (!current || current.customTitle) return
+
+    const title = getDirectoryName(cwd).slice(0, 60)
+
+    if (current.title === title) return
+
+    const nextTabs = tabsRef.current.map((item) =>
+      item.id === id ? { ...item, title } : item
+    )
+
+    tabsRef.current = nextTabs
+    setTabs(nextTabs)
+    window.electron.updateTerminalTitle(id, title, false)
+  }, [])
+
+  /** 终端输出后防抖同步标题，避免每次输出都触发目录查询。 */
+  const scheduleTabTitleSync = useCallback(
+    (id: string): void => {
+      const existing = titleSyncTimersRef.current.get(id)
+
+      if (existing !== undefined) window.clearTimeout(existing)
+
+      const timer = window.setTimeout(() => {
+        titleSyncTimersRef.current.delete(id)
+        syncTabTitle(id)
+      }, TAB_TITLE_SYNC_DELAY_MS)
+
+      titleSyncTimersRef.current.set(id, timer)
+    },
+    [syncTabTitle]
+  )
+
+  useEffect(() => {
+    if (!activeId) return
+
+    scheduleTabTitleSync(activeId)
+  }, [activeId, scheduleTabTitleSync])
+
+  useEffect(() => {
+    return () => {
+      for (const timer of titleSyncTimersRef.current.values()) {
+        window.clearTimeout(timer)
+      }
+      titleSyncTimersRef.current.clear()
+    }
+  }, [])
 
   /** 只为当前活动终端启用 WebGL，避免多标签占用过多绘图上下文。 */
   const enableWebgl = useCallback((id: string): void => {
@@ -501,11 +580,11 @@ export default function TerminalPage({
     terminal.loadAddon(
       new WebLinksAddon((_event, uri) => {
         if (/^https?:\/\//i.test(uri)) {
-          void window.electron.openEmbeddedBrowser(uri)
+          window.electron.openEmbeddedBrowser(uri)
           return
         }
 
-        void window.electron.openExternalUrl(uri).catch(() => undefined)
+        window.electron.openExternalUrl(uri).catch(() => undefined)
       })
     )
     terminal.open(container)
@@ -548,7 +627,7 @@ export default function TerminalPage({
 
         event.preventDefault()
         event.stopPropagation()
-        void copyToClipboard(selection)
+        copyToClipboard(selection)
 
         return false
       }
@@ -574,7 +653,7 @@ export default function TerminalPage({
       if (isPasteShortcut) {
         event.preventDefault()
         event.stopPropagation()
-        void window.electron
+        window.electron
           .readTerminalClipboard()
           .then((text) => {
             if (text) pasteIntoTerminal(id, text)
@@ -690,7 +769,7 @@ export default function TerminalPage({
             range: { start, end },
             text: raw,
             activate: () => {
-              void window.electron.openTerminalPath(raw).catch(() => {
+              window.electron.openTerminalPath(raw).catch(() => {
                 message.error('路径不存在或无法打开')
               })
             }
@@ -722,7 +801,7 @@ export default function TerminalPage({
           const selection = terminal.getSelection()
 
           if (selection.trim()) {
-            void copyToClipboard(selection)
+            copyToClipboard(selection)
           }
         } catch {
           // 终端销毁瞬间读取选区可能失败。
@@ -730,23 +809,6 @@ export default function TerminalPage({
       }, 180)
 
       selectionTimersRef.current.set(id, timer)
-    })
-
-    // 跟随 shell 或 TUI 通过 OSC 0/2 设置的标题，保持标签名有意义。
-    terminal.onTitleChange((title) => {
-      const normalized = title.trim()
-      const tab = tabsRef.current.find((item) => item.id === id)
-
-      if (!normalized || tab?.customTitle) return
-
-      const nextTitle = normalized.slice(0, 60)
-
-      setTabs((current) =>
-        current.map((item) =>
-          item.id === id ? { ...item, title: nextTitle } : item
-        )
-      )
-      window.electron.updateTerminalTitle(id, nextTitle, false)
     })
 
     terminalsRef.current.set(id, terminal)
@@ -801,6 +863,7 @@ export default function TerminalPage({
     let cancelled = false
     const offData = window.electron.onTerminalData(({ id, data }) => {
       terminalsRef.current.get(id)?.write(data)
+      scheduleTabTitleSync(id)
     })
     const offExit = window.electron.onTerminalExit(({ id }) => {
       const terminal = terminalsRef.current.get(id)
@@ -868,7 +931,7 @@ export default function TerminalPage({
       containersRef.current.clear()
       containerRefCallbacks.current.clear()
     }
-  }, [message])
+  }, [message, scheduleTabTitleSync])
 
   useEffect(() => {
     const element = pageRef.current
@@ -1088,7 +1151,7 @@ export default function TerminalPage({
       return
     }
 
-    void handleCreate({ cwd: openRequest.cwd }).finally(() => {
+    handleCreate({ cwd: openRequest.cwd }).finally(() => {
       onOpenRequestHandled?.()
     })
   }, [handleCreate, onOpenRequestHandled, openRequest])
@@ -1126,6 +1189,11 @@ export default function TerminalPage({
 
   const disposeTab = useCallback((id: string): void => {
     window.electron.closeTerminal(id)
+
+    const titleTimer = titleSyncTimersRef.current.get(id)
+
+    if (titleTimer !== undefined) window.clearTimeout(titleTimer)
+    titleSyncTimersRef.current.delete(id)
 
     const selectionTimer = selectionTimersRef.current.get(id)
 
@@ -1204,25 +1272,28 @@ export default function TerminalPage({
 
     if (!title) return
 
-    setTabs((current) =>
-      current.map((tab) =>
-        tab.id === id ? { ...tab, title, customTitle: true } : tab
-      )
+    const nextTabs = tabsRef.current.map((tab) =>
+      tab.id === id ? { ...tab, title, customTitle: true } : tab
     )
+
+    tabsRef.current = nextTabs
+    setTabs(nextTabs)
     window.electron.updateTerminalTitle(id, title, true)
   }, [renameDraft, renamingTabId])
 
   const resetTabTitle = useCallback((id: string): void => {
     setTabContextMenu(null)
-    setTabs((current) =>
-      current.map((tab) =>
-        tab.id === id
-          ? { ...tab, title: DEFAULT_TERMINAL_TITLE, customTitle: false }
-          : tab
-      )
+    const nextTabs = tabsRef.current.map((tab) =>
+      tab.id === id
+        ? { ...tab, title: DEFAULT_TERMINAL_TITLE, customTitle: false }
+        : tab
     )
+
+    tabsRef.current = nextTabs
+    setTabs(nextTabs)
     window.electron.updateTerminalTitle(id, DEFAULT_TERMINAL_TITLE, false)
-  }, [])
+    scheduleTabTitleSync(id)
+  }, [scheduleTabTitleSync])
 
   const handleDragEnd = useCallback((event: DragEndEvent): void => {
     const { active, over } = event
@@ -1266,6 +1337,7 @@ export default function TerminalPage({
     (
       action:
         | 'rename'
+        | 'same-directory'
         | 'reset-title'
         | 'close'
         | 'close-others'
@@ -1285,6 +1357,22 @@ export default function TerminalPage({
         case 'rename':
           startRename(tab)
           break
+        case 'same-directory': {
+          const info = infosRef.current.get(tab.id)
+
+          if (!info?.cwd) {
+            message.warning('无法读取终端目录')
+            break
+          }
+
+          const fallbackCwd = info.cwd
+
+          window.electron
+            .getTerminalCurrentDirectory(tab.id)
+            .catch(() => null)
+            .then((cwd) => handleCreate({ cwd: cwd ?? fallbackCwd }))
+          break
+        }
         case 'reset-title':
           resetTabTitle(tab.id)
           break
@@ -1310,7 +1398,15 @@ export default function TerminalPage({
         }
       }
     },
-    [handleClose, handleCloseTabs, resetTabTitle, startRename, tabContextMenu]
+    [
+      handleClose,
+      handleCloseTabs,
+      handleCreate,
+      message,
+      resetTabTitle,
+      startRename,
+      tabContextMenu
+    ]
   )
 
   // 没有终端时直接补一个默认会话，不展示空状态；失败时可用工具栏的 + 重试。
@@ -1323,7 +1419,7 @@ export default function TerminalPage({
     if (!ready || creating || emptyAutoCreateRef.current) return
 
     emptyAutoCreateRef.current = true
-    void handleCreate()
+    handleCreate()
   }, [creating, handleCreate, ready, tabs.length])
 
   const handleContextAction = useCallback(
@@ -1471,7 +1567,7 @@ export default function TerminalPage({
           icon={<PlusOutlined />}
           loading={creating}
           aria-label="新建终端"
-          onClick={() => void handleCreate()}
+          onClick={() => handleCreate()}
         />
 
         <Button
@@ -1480,7 +1576,7 @@ export default function TerminalPage({
           className="terminal-toolbar-button terminal-new-tab-directory"
           icon={<FolderOpenOutlined />}
           aria-label="在指定目录新建终端"
-          onClick={() => void handleCreateWithDirectory()}
+          onClick={() => handleCreateWithDirectory()}
         />
       </div>
 
@@ -1596,28 +1692,28 @@ export default function TerminalPage({
               type="button"
               className="terminal-context-item"
               disabled={!canCopy}
-              onClick={() => void handleContextAction('copy')}
+              onClick={() => handleContextAction('copy')}
             >
               复制
             </button>
             <button
               type="button"
               className="terminal-context-item"
-              onClick={() => void handleContextAction('paste')}
+              onClick={() => handleContextAction('paste')}
             >
               粘贴
             </button>
             <button
               type="button"
               className="terminal-context-item"
-              onClick={() => void handleContextAction('select-all')}
+              onClick={() => handleContextAction('select-all')}
             >
               全选
             </button>
             <button
               type="button"
               className="terminal-context-item"
-              onClick={() => void handleContextAction('clear')}
+              onClick={() => handleContextAction('clear')}
             >
               清屏
             </button>
@@ -1625,14 +1721,14 @@ export default function TerminalPage({
             <button
               type="button"
               className="terminal-context-item"
-              onClick={() => void handleContextAction('new-tab')}
+              onClick={() => handleContextAction('new-tab')}
             >
               新建标签
             </button>
             <button
               type="button"
               className="terminal-context-item is-danger"
-              onClick={() => void handleContextAction('close-tab')}
+              onClick={() => handleContextAction('close-tab')}
             >
               关闭标签
             </button>
@@ -1670,6 +1766,13 @@ export default function TerminalPage({
                 恢复默认名称
               </button>
             ) : null}
+            <button
+              type="button"
+              className="terminal-context-item"
+              onClick={() => handleTabContextAction('same-directory')}
+            >
+              同目录新开终端
+            </button>
             <div className="terminal-context-divider" />
             <button
               type="button"

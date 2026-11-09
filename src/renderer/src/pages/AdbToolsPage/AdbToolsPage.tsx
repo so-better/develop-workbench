@@ -258,7 +258,7 @@ export default function AdbToolsPage({
   }, [devServerPort, online, packageName, serial])
 
   useEffect(() => {
-    void loadDevTools()
+    loadDevTools()
   }, [loadDevTools])
 
   const loadPageSpyRoom = useCallback(async (): Promise<void> => {
@@ -297,7 +297,7 @@ export default function AdbToolsPage({
 
   useEffect(() => {
     if (inspectorTab === 'pagespy') {
-      void loadPageSpyRoom()
+      loadPageSpyRoom()
     }
   }, [inspectorTab, loadPageSpyRoom])
 
@@ -351,12 +351,12 @@ export default function AdbToolsPage({
 
   useEffect(() => {
     if (!info?.available) return
-    void refreshDevices()
+    refreshDevices()
   }, [info?.available, refreshDevices])
 
   useEffect(() => {
     const handleFocus = (): void => {
-      void refreshAdb()
+      refreshAdb()
     }
 
     window.addEventListener('focus', handleFocus)
@@ -372,7 +372,7 @@ export default function AdbToolsPage({
 
   useEffect(() => {
     if (!online || !serial) return
-    void refreshRuntimeInfo(serial)
+    refreshRuntimeInfo(serial)
   }, [online, refreshRuntimeInfo, serial])
 
   useEffect(() => {
@@ -381,7 +381,7 @@ export default function AdbToolsPage({
       return
     }
 
-    void refreshReverse(serial)
+    refreshReverse(serial)
   }, [online, refreshReverse, serial])
 
   useEffect(() => {
@@ -405,7 +405,7 @@ export default function AdbToolsPage({
   useEffect(() => {
     return () => {
       if (recordSessionRef.current) {
-        void window.electron
+        window.electron
           .stopAdbScreenRecord(recordSessionRef.current)
           .catch(() => undefined)
       }
@@ -447,7 +447,7 @@ export default function AdbToolsPage({
       return
     }
 
-    void execute(
+    execute(
       '刷新页面',
       () => window.electron.reloadReactNativeApp(port),
       '已发送刷新信号'
@@ -456,7 +456,7 @@ export default function AdbToolsPage({
 
   const handleDevMenu = (): void => {
     if (!requireOnline()) return
-    void execute('打开开发菜单', () =>
+    execute('打开开发菜单', () =>
       window.electron.openAdbDevMenu(serial)
     )
   }
@@ -471,7 +471,7 @@ export default function AdbToolsPage({
       return
     }
 
-    void execute(
+    execute(
       `添加 reverse ${port}`,
       async () => {
         const result = await window.electron.addAdbReverse(serial, port)
@@ -485,7 +485,7 @@ export default function AdbToolsPage({
   const handleRemoveReverse = (port: number): void => {
     if (!requireOnline()) return
 
-    void execute(
+    execute(
       `移除 reverse ${port}`,
       async () => {
         const result = await window.electron.removeAdbReverse(serial, port)
@@ -532,7 +532,7 @@ export default function AdbToolsPage({
   const handleOpenAppSettings = (): void => {
     if (!requirePackage()) return
 
-    void execute(
+    execute(
       '打开应用设置',
       () => window.electron.openAdbAppSettings(serial, packageName.trim()),
       '已打开应用设置'
@@ -585,7 +585,7 @@ export default function AdbToolsPage({
   const handleOpenAppInfo = (): void => {
     if (!requirePackage()) return
     setAppInfoOpen(true)
-    void loadAppInfo()
+    loadAppInfo()
   }
 
   const loadPermissions = async (): Promise<void> => {
@@ -610,7 +610,7 @@ export default function AdbToolsPage({
     if (!requirePackage()) return
     setPermissionsKeyword('')
     setPermissionsOpen(true)
-    void loadPermissions()
+    loadPermissions()
   }
 
   const filteredPermissions = useMemo(() => {
@@ -715,7 +715,7 @@ export default function AdbToolsPage({
               type="text"
               icon={<ReloadOutlined />}
               loading={infoRefreshing || devicesLoading}
-              onClick={() => void refreshAdb(true)}
+              onClick={() => refreshAdb(true)}
             >
               重新检测
             </Button>
@@ -755,7 +755,7 @@ export default function AdbToolsPage({
                       size="small"
                       icon={<ReloadOutlined />}
                       loading={devicesLoading}
-                      onClick={() => void refreshDevices()}
+                      onClick={() => refreshDevices()}
                     >
                       刷新
                     </Button>
@@ -834,7 +834,7 @@ export default function AdbToolsPage({
                       icon={<StopOutlined />}
                       loading={recordStopping}
                       disabled={recordStopping}
-                      onClick={() => void handleStopRecord()}
+                      onClick={() => handleStopRecord()}
                     >
                       停止录屏
                     </Button>
@@ -843,7 +843,7 @@ export default function AdbToolsPage({
                       icon={<VideoCameraOutlined />}
                       loading={recordStarting}
                       disabled={!online || recordStarting || Boolean(executing)}
-                      onClick={() => void handleRecordScreen()}
+                      onClick={() => handleRecordScreen()}
                     >
                       录屏
                     </Button>
@@ -899,7 +899,7 @@ export default function AdbToolsPage({
                     size="small"
                     icon={<ReloadOutlined />}
                     loading={reverseLoading}
-                    onClick={() => void refreshReverse(serial)}
+                    onClick={() => refreshReverse(serial)}
                   />
                 </div>
 
@@ -1005,7 +1005,7 @@ export default function AdbToolsPage({
                         size="small"
                         icon={<ReloadOutlined />}
                         loading={devToolsLoading}
-                        onClick={() => void loadDevTools()}
+                        onClick={() => loadDevTools()}
                       >
                         重连
                       </Button>
@@ -1021,7 +1021,7 @@ export default function AdbToolsPage({
                         size="small"
                         icon={<ReloadOutlined />}
                         loading={pageSpyLoading}
-                        onClick={() => void loadPageSpyRoom()}
+                        onClick={() => loadPageSpyRoom()}
                       >
                         重新定位
                       </Button>
@@ -1111,7 +1111,7 @@ export default function AdbToolsPage({
         cancelText="取消"
         confirmLoading={executing === '打开深链'}
         destroyOnHidden
-        onOk={() => void handleOpenDeepLink()}
+        onOk={() => handleOpenDeepLink()}
         onCancel={() => setDeepLinkOpen(false)}
       >
         <p className="adb-modal-hint">
@@ -1137,7 +1137,7 @@ export default function AdbToolsPage({
             key="refresh"
             icon={<ReloadOutlined />}
             loading={appInfoLoading}
-            onClick={() => void loadAppInfo()}
+            onClick={() => loadAppInfo()}
           >
             刷新
           </Button>,
@@ -1199,7 +1199,7 @@ export default function AdbToolsPage({
             key="refresh"
             icon={<ReloadOutlined />}
             loading={permissionsLoading}
-            onClick={() => void loadPermissions()}
+            onClick={() => loadPermissions()}
           >
             刷新
           </Button>,
@@ -1276,7 +1276,7 @@ export default function AdbToolsPage({
                             checked={permission.granted}
                             loading={permissionUpdating === permission.name}
                             onChange={(granted) =>
-                              void handlePermissionChange(permission, granted)
+                              handlePermissionChange(permission, granted)
                             }
                           />
                         </div>
@@ -1317,7 +1317,7 @@ export default function AdbToolsPage({
                 size="small"
                 icon={<FolderOpenOutlined />}
                 aria-label="打开录屏文件夹"
-                onClick={() => void handleOpenRecordFolder()}
+                onClick={() => handleOpenRecordFolder()}
               />
             </Tooltip>
           </div>
@@ -1347,7 +1347,7 @@ export default function AdbToolsPage({
                     size="small"
                     icon={<FolderOpenOutlined />}
                     aria-label="打开截图文件夹"
-                    onClick={() => void handleOpenScreenshotFolder()}
+                    onClick={() => handleOpenScreenshotFolder()}
                   />
                 </Tooltip>
                 <Tooltip title="复制图片">
@@ -1356,7 +1356,7 @@ export default function AdbToolsPage({
                     size="small"
                     icon={<CopyOutlined />}
                     aria-label="复制截图"
-                    onClick={() => void handleCopyScreenshot()}
+                    onClick={() => handleCopyScreenshot()}
                   />
                 </Tooltip>
               </div>

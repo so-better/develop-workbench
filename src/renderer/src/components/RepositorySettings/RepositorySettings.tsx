@@ -388,7 +388,7 @@ export default function RepositorySettings({
       return
     }
 
-    void window.electron.openEmbeddedBrowser(url)
+    window.electron.openEmbeddedBrowser(url)
   }
 
   /** 打开创建 MR 弹窗。 */
@@ -711,13 +711,13 @@ export default function RepositorySettings({
         handleRequestOpenInIde(repository)
         break
       case 'merge-request':
-        void openMergeRequest(repository)
+        openMergeRequest(repository)
         break
       case 'create-branch':
-        void openCreateBranch(repository)
+        openCreateBranch(repository)
         break
       case 'merge':
-        void openMerge(repository)
+        openMerge(repository)
         break
       case 'remove':
         modal.confirm({
@@ -895,7 +895,7 @@ export default function RepositorySettings({
             icon={<SwapOutlined />}
             disabled={!repository.available || !repository.currentBranch}
             aria-label={`切换 ${repository.name} 的分支`}
-            onClick={() => void openSwitch(repository)}
+            onClick={() => openSwitch(repository)}
           >
             切换分支
           </Button>
@@ -1165,7 +1165,7 @@ export default function RepositorySettings({
               setOpenIdeConfirmBranch(null)
 
               if (repository && branch) {
-                void handleOpenInIde(repository, branch)
+                handleOpenInIde(repository, branch)
               }
             }}
             onCancel={() => {
@@ -1263,7 +1263,7 @@ export default function RepositorySettings({
             okButtonProps={{
               disabled: !createBranchBase || !createBranchName.trim()
             }}
-            onOk={() => void handleCreateBranch()}
+            onOk={() => handleCreateBranch()}
             onCancel={() => setCreateBranchRepository(null)}
           >
             <div className="requirement-branch-create-form">
@@ -1300,7 +1300,7 @@ export default function RepositorySettings({
             confirmLoading={merging}
             destroyOnHidden
             okButtonProps={{ disabled: !mergeSource }}
-            onOk={() => void handleMerge()}
+            onOk={() => handleMerge()}
             onCancel={() => setMergeRepository(null)}
           >
             <div className="requirement-branch-create-form">
@@ -1332,7 +1332,7 @@ export default function RepositorySettings({
             confirmLoading={switching}
             destroyOnHidden
             okButtonProps={{ disabled: !switchTarget }}
-            onOk={() => void handleSwitch()}
+            onOk={() => handleSwitch()}
             onCancel={() => setSwitchRepository(null)}
           >
             <div className="requirement-branch-create-form">

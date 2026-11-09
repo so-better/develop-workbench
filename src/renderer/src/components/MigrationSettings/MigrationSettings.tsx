@@ -102,7 +102,7 @@ export default function MigrationSettings(): JSX.Element {
               loading={exporting}
               disabled={importing}
               style={{ color: exporting || importing ? undefined : token.colorPrimary }}
-              onClick={() => void handleExport()}
+              onClick={() => handleExport()}
             >
               导出
             </Button>
@@ -136,7 +136,7 @@ export default function MigrationSettings(): JSX.Element {
               loading={importing}
               disabled={exporting}
               style={{ color: importing || exporting ? undefined : token.colorPrimary }}
-              onClick={() => void handleImport()}
+              onClick={() => handleImport()}
             >
               导入
             </Button>
@@ -166,7 +166,7 @@ export default function MigrationSettings(): JSX.Element {
                     type="primary"
                     size="small"
                     icon={<ReloadOutlined />}
-                    onClick={() => void handleRestart()}
+                    onClick={() => handleRestart()}
                   >
                     立即重启
                   </Button>

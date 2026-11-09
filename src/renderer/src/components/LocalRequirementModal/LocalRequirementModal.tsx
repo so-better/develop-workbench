@@ -283,7 +283,7 @@ export default function LocalRequirementModal({
       cancelText="取消"
       confirmLoading={saving}
       onCancel={onCancel}
-      onOk={() => void handleSubmit()}
+      onOk={() => handleSubmit()}
       forceRender
     >
       <Form

@@ -12,9 +12,12 @@ import {
 } from 'electron'
 import type { OpenDialogOptions, WebContents } from 'electron'
 import { randomUUID } from 'node:crypto'
+import { execFile } from 'node:child_process'
 import { existsSync, statSync } from 'node:fs'
+import { readlink } from 'node:fs/promises'
 import { basename, isAbsolute, join } from 'node:path'
 import { homedir } from 'node:os'
+import { promisify } from 'node:util'
 import * as pty from 'node-pty'
 import type { IPty } from 'node-pty'
 import { getCliEnvironment } from './cli-env'
@@ -34,6 +37,7 @@ const MAX_COLS = 500
 const MIN_ROWS = 5
 const MAX_ROWS = 300
 const DEFAULT_TITLE = '终端'
+const execFileAsync = promisify(execFile)
 
 interface TerminalSession {
   id: string
@@ -223,7 +227,7 @@ const createSession = (
     cwd,
     cols,
     rows,
-    title: explicitCwd ? basename(explicitCwd) || DEFAULT_TITLE : DEFAULT_TITLE,
+    title: basename(cwd) || DEFAULT_TITLE,
     customTitle: false,
     exited: false
   }
@@ -263,6 +267,54 @@ const createSession = (
   })
 
   return session
+}
+
+/** 读取 shell 当前所在目录；无法读取时回退到会话创建时的目录。 */
+const getSessionCurrentDirectory = async (
+  session: TerminalSession
+): Promise<string> => {
+  const pid = session.pty.pid
+
+  if (process.platform === 'darwin') {
+    try {
+      const lsofPath = existsSync('/usr/sbin/lsof') ? '/usr/sbin/lsof' : 'lsof'
+      const { stdout } = await execFileAsync(
+        lsofPath,
+        ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'],
+        { timeout: 3_000, encoding: 'utf8' }
+      )
+      const pathLine = stdout
+        .split(/\r?\n/)
+        .find((line) => line.startsWith('n'))
+
+      if (pathLine && pathLine.length > 1) {
+        const path = pathLine.slice(1)
+
+        if (existsSync(path)) {
+          session.cwd = path
+          return path
+        }
+      }
+    } catch {
+      // lsof 不可用时回退。
+    }
+  }
+
+  if (process.platform === 'linux') {
+    try {
+      const path = await readlink(`/proc/${pid}/cwd`)
+
+      if (existsSync(path)) {
+        session.cwd = path
+        return path
+      }
+    } catch {
+      // 进程退出或 /proc 不可用时回退。
+    }
+  }
+
+  // Windows 没有稳定的进程 cwd 查询 API，回退到会话创建目录。
+  return session.cwd
 }
 
 const getOwnedSession = (
@@ -339,6 +391,14 @@ export const initializeTerminal = (): void => {
     const session = getOwnedSession(event.sender.id, id)
 
     if (session) removeSession(session.id)
+  })
+
+  ipcMain.handle('terminal:current-directory', async (event, id: unknown) => {
+    const session = getOwnedSession(event.sender.id, id)
+
+    if (!session) return null
+
+    return getSessionCurrentDirectory(session)
   })
 
   ipcMain.handle('terminal:read-clipboard', () => clipboard.readText())

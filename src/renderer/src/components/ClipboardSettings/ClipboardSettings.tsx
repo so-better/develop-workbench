@@ -96,29 +96,29 @@ export default function ClipboardSettings(): JSX.Element {
     setRecordError(null)
     setSaving(false)
     setRecording(true)
-    void window.electron.setClipboardHistoryRecording(true)
+    window.electron.setClipboardHistoryRecording(true)
   }, [])
 
   // 结束录制并恢复全局快捷键注册；保留错误信息供用户查看。
   const endRecording = useCallback((): void => {
     setRecording(false)
     setSaving(false)
-    void window.electron.setClipboardHistoryRecording(false).then(() => {
-      void reload()
+    window.electron.setClipboardHistoryRecording(false).then(() => {
+      reload()
     })
   }, [reload])
 
   useEffect(() => {
     return () => {
       // 离开设置页时恢复全局快捷键。
-      void window.electron.setClipboardHistoryRecording(false)
+      window.electron.setClipboardHistoryRecording(false)
     }
   }, [])
 
   useEffect(() => {
-    void reload()
+    reload()
     const unsubscribe = window.electron.onClipboardHistoryChanged(() => {
-      void reload()
+      reload()
     })
 
     return unsubscribe
@@ -174,7 +174,7 @@ export default function ClipboardSettings(): JSX.Element {
       setSaving(true)
       setRecordError(null)
 
-      void window.electron
+      window.electron
         .setClipboardHistoryShortcut(accelerator)
         .then((next) => {
           setState(next)
@@ -260,7 +260,7 @@ export default function ClipboardSettings(): JSX.Element {
               type="text"
               size="small"
               disabled={recording || saving}
-              onClick={() => void handleResetShortcut()}
+              onClick={() => handleResetShortcut()}
             >
               恢复默认
             </Button>
@@ -281,7 +281,7 @@ export default function ClipboardSettings(): JSX.Element {
             okText="清空"
             cancelText="取消"
             okButtonProps={{ danger: true }}
-            onConfirm={() => void handleClear()}
+            onConfirm={() => handleClear()}
           >
             <Button type="text" size="small" danger icon={<DeleteOutlined />}>
               清空最近内容

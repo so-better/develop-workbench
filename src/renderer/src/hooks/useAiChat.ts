@@ -213,7 +213,7 @@ export const useAiChat = (options: UseAiChatOptions = {}): UseAiChatResult => {
 
     const stored = toStoredMessages(messages)
 
-    void window.electron.saveAiAssistantSession(stored).catch(() => undefined)
+    window.electron.saveAiAssistantSession(stored).catch(() => undefined)
   }, [hydrated, messages, persistAssistantSession, streaming])
 
   const flushStreamBuffer = useCallback((): void => {

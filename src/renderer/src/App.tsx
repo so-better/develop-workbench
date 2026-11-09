@@ -425,7 +425,7 @@ export default function App(): JSX.Element {
         loading={quickNotes.loading}
         error={quickNotes.error}
         onOpen={openQuickNotes}
-        onReload={() => void quickNotes.reload()}
+        onReload={() => quickNotes.reload()}
         onClose={closeQuickNotes}
         onAdd={quickNotes.add}
         onSetDone={quickNotes.setDone}
@@ -458,7 +458,7 @@ export default function App(): JSX.Element {
         quickNoteCount={quickNotes.openCount}
         browserTabCount={browserVisible ? 0 : browserTabCount}
         onResumeBrowser={() => {
-          void window.electron.showEmbeddedBrowser()
+          window.electron.showEmbeddedBrowser()
         }}
         onOpenDownloads={handleOpenDownloads}
         onOpenQuickNotes={() => {

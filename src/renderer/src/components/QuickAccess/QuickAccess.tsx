@@ -667,7 +667,7 @@ export default function QuickAccess(): JSX.Element {
         event.stopPropagation()
         const item = flatItems[activeIndex]
 
-        if (item) void handleOpen(item)
+        if (item) handleOpen(item)
       }
     }
 
@@ -755,7 +755,7 @@ export default function QuickAccess(): JSX.Element {
                         href={item.url || undefined}
                         onClick={(event) => {
                           event.preventDefault()
-                          void handleOpen(item)
+                          handleOpen(item)
                         }}
                         onMouseEnter={() => setActiveIndex(index)}
                       >

@@ -97,7 +97,7 @@ export default function RequirementLinks({ projectKey, requirementId, descriptio
     setEditing(link)
   }
   const openLink = (url: string): void => {
-    void window.electron.openEmbeddedBrowser(url).then((result) => {
+    window.electron.openEmbeddedBrowser(url).then((result) => {
       if (result === false) message.error('无法打开该链接')
     }).catch((reason) => message.error(getErrorMessage(reason)))
   }

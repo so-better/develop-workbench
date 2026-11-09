@@ -477,7 +477,7 @@ export default function EmbeddedBrowserPanel({
           title="关闭所有标签页并释放页面"
           aria-label="关闭所有标签页"
           onClick={() => {
-            void window.electron
+            window.electron
               .closeAllEmbeddedBrowserTabs()
               .catch(() => message.error('关闭所有标签页失败'))
           }}

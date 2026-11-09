@@ -57,7 +57,7 @@ export const useQuickNotes = (): QuickNotesController => {
 
   useEffect(() => {
     mountedRef.current = true
-    void reload()
+    reload()
     return () => { mountedRef.current = false; reloadRequestRef.current += 1 }
   }, [reload])
 

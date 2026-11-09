@@ -243,9 +243,9 @@ export default function TerminalSettings(): JSX.Element {
               help="选择文件、自动检测或输入后失焦会立即保存。清空路径可恢复自动检测。"
               detecting={detectingShell}
               onChange={setShellDraft}
-              onSave={() => void handleSaveShell()}
-              onChoose={() => void handleChooseShell()}
-              onDetect={() => void handleDetectShell()}
+              onSave={() => handleSaveShell()}
+              onChoose={() => handleChooseShell()}
+              onDetect={() => handleDetectShell()}
             />
           </section>
 
@@ -266,8 +266,8 @@ export default function TerminalSettings(): JSX.Element {
                   onChange={(value) =>
                     setFontSizeDraft(typeof value === 'number' ? value : null)
                   }
-                  onBlur={() => void handleSaveFontSize()}
-                  onPressEnter={() => void handleSaveFontSize()}
+                  onBlur={() => handleSaveFontSize()}
+                  onPressEnter={() => handleSaveFontSize()}
                 />
                 <p className="settings-help">范围 10–24 px。</p>
               </div>
@@ -283,8 +283,8 @@ export default function TerminalSettings(): JSX.Element {
                   onChange={(value) =>
                     setScrollbackDraft(typeof value === 'number' ? value : null)
                   }
-                  onBlur={() => void handleSaveScrollback()}
-                  onPressEnter={() => void handleSaveScrollback()}
+                  onBlur={() => handleSaveScrollback()}
+                  onPressEnter={() => handleSaveScrollback()}
                 />
                 <p className="settings-help">范围 1000–100000 行。</p>
               </div>
@@ -306,7 +306,7 @@ export default function TerminalSettings(): JSX.Element {
                 aria-label="WebGL 加速"
                 checked={settings.webgl}
                 onChange={(checked) =>
-                  void saveSettings(
+                  saveSettings(
                     { webgl: checked },
                     checked ? '已启用 WebGL 加速' : '已关闭 WebGL 加速'
                   )
@@ -327,7 +327,7 @@ export default function TerminalSettings(): JSX.Element {
                 aria-label="选中即复制"
                 checked={settings.copyOnSelect}
                 onChange={(checked) =>
-                  void saveSettings(
+                  saveSettings(
                     { copyOnSelect: checked },
                     checked ? '已开启选中即复制' : '已关闭选中即复制'
                   )
@@ -337,7 +337,7 @@ export default function TerminalSettings(): JSX.Element {
           </section>
 
           <div className="terminal-settings-actions">
-            <Button onClick={() => void handleReset()}>恢复默认设置</Button>
+            <Button onClick={() => handleReset()}>恢复默认设置</Button>
           </div>
         </div>
       ) : null}

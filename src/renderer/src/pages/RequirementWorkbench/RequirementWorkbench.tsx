@@ -1311,7 +1311,7 @@ export default function RequirementWorkbench({
       setActivity(null)
       setBindings([])
       setData(null)
-      void loadRequirements()
+      loadRequirements()
     }
 
     window.addEventListener('meegle:project-changed', handleProjectChanged)
@@ -2953,7 +2953,7 @@ export default function RequirementWorkbench({
               okText="删除"
               cancelText="取消"
               okButtonProps={{ danger: true }}
-              onConfirm={() => void handleDeleteLocalRequirement()}
+              onConfirm={() => handleDeleteLocalRequirement()}
             >
               <Button
                 type="primary"

@@ -316,7 +316,7 @@ const configureBrowserSession = (): void => {
     if (removed || cookie.expirationDate) return
     if (!matchesCookieDomain(cookie.domain, PERSISTED_LOGIN_DOMAINS)) return
 
-    void persistSessionCookie(browserSession, cookie)
+    persistSessionCookie(browserSession, cookie)
   })
 
   // 保留 Electron 默认保存对话框，同时记录下载状态供面板展示和操作。

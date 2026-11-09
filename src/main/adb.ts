@@ -713,7 +713,7 @@ export const startAdbScreenRecord = async (
 
     const sessionId = randomUUID()
     const onOwnerDestroyed = (): void => {
-      void finalizeScreenRecord(sessionId, false)
+      finalizeScreenRecord(sessionId, false)
     }
     const session: ScreenRecordSession = {
       id: sessionId,
@@ -724,7 +724,7 @@ export const startAdbScreenRecord = async (
       directory: outputDirectory,
       remotePid,
       timer: setTimeout(() => {
-        void finalizeScreenRecord(sessionId, true)
+        finalizeScreenRecord(sessionId, true)
       }, 180_000 + 800),
       finalized: false,
       onOwnerDestroyed
@@ -1188,7 +1188,7 @@ export const takeAdbScreenshot = async (
 export const initializeAdb = (): void => {
   app.on('before-quit', () => {
     for (const sessionId of [...screenRecordSessions.keys()]) {
-      void finalizeScreenRecord(sessionId, false)
+      finalizeScreenRecord(sessionId, false)
     }
   })
 

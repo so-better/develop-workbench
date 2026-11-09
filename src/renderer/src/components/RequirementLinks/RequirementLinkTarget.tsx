@@ -29,7 +29,7 @@ export default function RequirementLinkTarget({ link, onOpen }: Props): JSX.Elem
     setResult(null)
     if (isFeishu) {
       // 主进程已有缓存、请求去重及并发限制；权限或网络失败时退回原地址。
-      void window.electron.getLinkPreview(link.url).then((value) => {
+      window.electron.getLinkPreview(link.url).then((value) => {
         if (!cancelled) setResult({ url: link.url, preview: value })
       }).catch(() => undefined)
     }
