@@ -27,7 +27,6 @@ import {
   ReloadOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
-  SettingOutlined,
   StopOutlined,
   VideoCameraOutlined
 } from '@ant-design/icons'
@@ -711,15 +710,6 @@ export default function AdbToolsPage({
               ADB {info.version ?? '可用'}
             </Tag>
           ) : null}
-          <Tooltip title="打开 ADB 设置">
-            <Button
-              type="text"
-              icon={<SettingOutlined />}
-              onClick={() => onOpenSettings('adb')}
-            >
-              设置
-            </Button>
-          </Tooltip>
           <Tooltip title="重新检测 ADB 路径、版本并刷新设备">
             <Button
               type="text"

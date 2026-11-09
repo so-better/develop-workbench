@@ -375,7 +375,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'lark-cli' ? 'page' : undefined}
             onClick={() => setActiveSection('lark-cli')}
           >
-            Lark Cli
+            <span className="settings-nav-label">Lark Cli</span>
           </button>
           <button
             type="button"
@@ -383,7 +383,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'meegle' ? 'page' : undefined}
             onClick={() => setActiveSection('meegle')}
           >
-            Meegle Cli
+            <span className="settings-nav-label">Meegle Cli</span>
           </button>
           <button
             type="button"
@@ -391,7 +391,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'git' ? 'page' : undefined}
             onClick={() => setActiveSection('git')}
           >
-            Git
+            <span className="settings-nav-label">Git</span>
           </button>
           <button
             type="button"
@@ -399,7 +399,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'adb' ? 'page' : undefined}
             onClick={() => setActiveSection('adb')}
           >
-            ADB
+            <span className="settings-nav-label">ADB</span>
           </button>
           <button
             type="button"
@@ -407,7 +407,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'ide' ? 'page' : undefined}
             onClick={() => setActiveSection('ide')}
           >
-            IDE
+            <span className="settings-nav-label">IDE</span>
           </button>
           <button
             type="button"
@@ -415,7 +415,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'terminal' ? 'page' : undefined}
             onClick={() => setActiveSection('terminal')}
           >
-            终端
+            <span className="settings-nav-label">终端</span>
           </button>
           <button
             type="button"
@@ -423,7 +423,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'repositories' ? 'page' : undefined}
             onClick={() => setActiveSection('repositories')}
           >
-            代码目录
+            <span className="settings-nav-label">代码目录</span>
           </button>
           <button
             type="button"
@@ -442,7 +442,7 @@ export default function SettingsModal({
               setAiSettingsTab('model')
             }}
           >
-            模型与技能
+            <span className="settings-nav-label">模型与技能</span>
           </button>
           <button
             type="button"
@@ -450,7 +450,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'clipboard' ? 'page' : undefined}
             onClick={() => setActiveSection('clipboard')}
           >
-            粘贴选择
+            <span className="settings-nav-label">粘贴选择</span>
           </button>
           <button
             type="button"
@@ -458,7 +458,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'cleanup' ? 'page' : undefined}
             onClick={() => setActiveSection('cleanup')}
           >
-            存储清理
+            <span className="settings-nav-label">存储清理</span>
           </button>
           <button
             type="button"
@@ -466,7 +466,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'migration' ? 'page' : undefined}
             onClick={() => setActiveSection('migration')}
           >
-            一键迁移
+            <span className="settings-nav-label">一键迁移</span>
           </button>
           <button
             type="button"
@@ -474,7 +474,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'app-info' ? 'page' : undefined}
             onClick={() => setActiveSection('app-info')}
           >
-            应用信息
+            <span className="settings-nav-label">应用信息</span>
           </button>
         </nav>
 

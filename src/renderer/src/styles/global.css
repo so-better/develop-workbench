@@ -688,9 +688,9 @@ body {
 .settings-nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
   max-height: 64vh;
-  padding-right: 18px;
+  padding-right: 16px;
   overflow-y: auto;
   border-right: 1px solid var(--control-border);
   scrollbar-color: var(--control-border) transparent;
@@ -698,30 +698,56 @@ body {
 }
 
 .settings-nav-item {
-  display: block;
+  position: relative;
+  display: flex;
+  align-items: center;
   width: 100%;
-  padding: 9px 10px;
-  color: var(--app-text);
+  padding: 9px 12px 9px 14px;
+  color: var(--app-muted);
   font-family: inherit;
   font-size: 13px;
+  line-height: 20px;
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   transition:
     color 0.15s ease,
     background-color 0.15s ease;
 }
 
+.settings-nav-item::before {
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  left: 0;
+  width: 2px;
+  background: transparent;
+  border-radius: 2px;
+  content: '';
+}
+
+.settings-nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .settings-nav-item:hover {
+  color: var(--app-text);
   background: var(--control-hover);
 }
 
 .settings-nav-item.is-active {
   color: #1677ff;
   font-weight: 600;
-  background: var(--settings-active);
+  background: transparent;
+}
+
+.settings-nav-item.is-active::before {
+  background: #1677ff;
 }
 
 .settings-panel {
