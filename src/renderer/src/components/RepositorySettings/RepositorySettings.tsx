@@ -536,9 +536,27 @@ export default function RepositorySettings({
         return
       }
 
-      message.success(
-        `已将 ${mergeSource} 合并到 ${repository.currentBranch ?? '当前分支'}`
-      )
+      const mergeTarget = repository.currentBranch ?? '当前分支'
+
+      if (result.pushError) {
+        message.warning({
+          content: `已将 ${mergeSource} 合并到 ${mergeTarget}，但推送远程失败：${result.pushError}`,
+          duration: 6
+        })
+      } else if (result.pushSkipped) {
+        message.success(
+          `已将 ${mergeSource} 合并到 ${mergeTarget}（本地仓库，未推送）`
+        )
+      } else if (result.pushed) {
+        message.success(
+          `已将 ${mergeSource} 合并到 ${mergeTarget}，并推送到远程`
+        )
+      } else {
+        message.success(
+          `已将 ${mergeSource} 合并到 ${mergeTarget}（未推送）`
+        )
+      }
+
       setMergeRepository(null)
       await loadBranches(repository.id, true)
       await refreshRepositoryState(repository.id).catch(() =>
@@ -1301,7 +1319,7 @@ export default function RepositorySettings({
                 onChange={(value: string) => setMergeSource(value)}
               />
               <p>
-                合并前会拉取最新远程引用，优先使用最新远程分支，并检查未提交改动；发生冲突时会保留冲突状态，可打开 IDE 解决。
+                合并前会拉取最新远程引用，优先使用最新远程分支，并检查未提交改动；合并成功后自动推送到远程，发生冲突时会保留冲突状态，可打开 IDE 解决。
               </p>
             </div>
           </Modal>

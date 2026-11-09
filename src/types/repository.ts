@@ -75,6 +75,15 @@ export interface RepositoryMergeResult {
 
   /** 冲突文件列表。 */
   conflicts: string[]
+
+  /** 合并成功后是否已推送到远程。 */
+  pushed: boolean
+
+  /** 是否因为没有远程仓库而跳过推送。 */
+  pushSkipped: boolean
+
+  /** 推送失败原因；成功、跳过或冲突时为空。 */
+  pushError: string | null
 }
 
 /**

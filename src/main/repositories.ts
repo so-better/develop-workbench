@@ -1736,19 +1736,96 @@ export const mergeRepositoryBranch = async (
 
   const sourceRef = hasRemoteSource ? `origin/${normalized}` : normalized
 
+  // 合并前先把当前分支更新到远程状态，避免合并成功后因 non-fast-forward 推送失败。
+  if (repository.remoteUrl) {
+    const hasUpstream = await hasUpstreamBranch(cwd)
+    let pullArgs: string[] | null = null
+
+    if (hasUpstream) {
+      pullArgs = ['pull', '--ff-only']
+    } else {
+      const hasRemoteCurrent = await runGit(
+        ['rev-parse', '--verify', `refs/remotes/origin/${currentBranch}`],
+        { cwd }
+      )
+        .then(() => true)
+        .catch(() => false)
+
+      if (hasRemoteCurrent) {
+        pullArgs = ['pull', '--ff-only', 'origin', currentBranch]
+      }
+    }
+
+    if (pullArgs) {
+      try {
+        await runGit(pullArgs, {
+          cwd,
+          timeout: GIT_NETWORK_TIMEOUT_MS
+        })
+      } catch (error) {
+        throw new Error(
+          `当前分支拉取失败，无法合并：${getGitErrorMessage(error)}`
+        )
+      }
+    }
+  }
+
   try {
     await runGit(['merge', '--no-edit', sourceRef], { cwd })
-    return { conflicted: false, conflicts: [] }
   } catch (error) {
     // 有未合并文件说明是冲突，保留合并状态，交给用户在 IDE 中解决。
     const conflicts = await listUnmergedFiles(cwd)
 
     if (conflicts.length > 0) {
-      return { conflicted: true, conflicts }
+      return {
+        conflicted: true,
+        conflicts,
+        pushed: false,
+        pushSkipped: false,
+        pushError: null
+      }
     }
 
     await runGit(['merge', '--abort'], { cwd }).catch(() => undefined)
     throw new Error(`合并失败：${getGitErrorMessage(error)}`)
+  }
+
+  if (!repository.remoteUrl) {
+    return {
+      conflicted: false,
+      conflicts: [],
+      pushed: false,
+      pushSkipped: true,
+      pushError: null
+    }
+  }
+
+  const hasUpstream = await hasUpstreamBranch(cwd)
+  const pushArgs = hasUpstream
+    ? ['push']
+    : ['push', '--set-upstream', 'origin', currentBranch]
+
+  try {
+    await runGit(pushArgs, {
+      cwd,
+      timeout: GIT_NETWORK_TIMEOUT_MS
+    })
+
+    return {
+      conflicted: false,
+      conflicts: [],
+      pushed: true,
+      pushSkipped: false,
+      pushError: null
+    }
+  } catch (error) {
+    return {
+      conflicted: false,
+      conflicts: [],
+      pushed: false,
+      pushSkipped: false,
+      pushError: getGitErrorMessage(error)
+    }
   }
 }
 
