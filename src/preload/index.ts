@@ -86,7 +86,9 @@ import type {
   CloneRepositoryInput,
   RepositoryBindingStatus,
   RepositoryBranchList,
+  RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
+  RepositoryMergeResult,
   RepositoryScanResult,
   RepositoryState,
   UpdateRepositoryInput
@@ -370,6 +372,7 @@ const electronAPI = {
     switched: boolean
     pulled: boolean
     hasUpstream: boolean
+    conflicted: boolean
   }> => ipcRenderer.invoke('ide:prepare-repository', repositoryId, branchName),
 
   /**
@@ -393,8 +396,8 @@ const electronAPI = {
   /**
    * 恢复当前窗口的终端会话；没有任何会话时自动创建一个。
    */
-  restoreTerminals: (): Promise<TerminalSessionInfo[]> =>
-    ipcRenderer.invoke('terminal:restore'),
+  restoreTerminals: (cwd?: string): Promise<TerminalSessionInfo[]> =>
+    ipcRenderer.invoke('terminal:restore', cwd),
 
   /**
    * 新建一个终端会话。
@@ -1037,6 +1040,24 @@ const electronAPI = {
       branchName,
       baseBranch
     ),
+
+  /**
+   * 把指定分支合并到当前分支。
+   */
+  mergeRepositoryBranch: (
+    repositoryId: string,
+    sourceBranch: string
+  ): Promise<RepositoryMergeResult> =>
+    ipcRenderer.invoke('repositories:merge-branch', repositoryId, sourceBranch),
+
+  /**
+   * 切换仓库当前分支，并在切换后尝试拉取最新代码。
+   */
+  switchRepositoryBranch: (
+    repositoryId: string,
+    branchName: string
+  ): Promise<RepositoryBranchSwitchResult> =>
+    ipcRenderer.invoke('repositories:switch-branch', repositoryId, branchName),
 
   /**
    * 重新扫描代码根目录，同步仓库增删和 Git 信息。

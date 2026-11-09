@@ -276,9 +276,28 @@ body {
 
 .app-navigation-items {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 6px;
   width: 100%;
+  min-height: 0;
+  padding-right: 2px;
+  overflow-y: auto;
+  scrollbar-color: var(--workbench-divider) transparent;
+  scrollbar-width: thin;
+}
+
+.app-navigation-items::-webkit-scrollbar {
+  width: 4px;
+}
+
+.app-navigation-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-navigation-items::-webkit-scrollbar-thumb {
+  background: var(--workbench-divider);
+  border-radius: 999px;
 }
 
 .app-navigation-item {
@@ -670,8 +689,12 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: 64vh;
   padding-right: 18px;
+  overflow-y: auto;
   border-right: 1px solid var(--control-border);
+  scrollbar-color: var(--control-border) transparent;
+  scrollbar-width: thin;
 }
 
 .settings-nav-item {
@@ -1195,6 +1218,71 @@ body {
   }
 }
 
+.repository-merge-conflict p {
+  margin: 0 0 8px;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.repository-merge-conflict p:last-child {
+  margin-bottom: 0;
+}
+
+.repository-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  align-items: center;
+}
+
+.repository-action-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--workbench-divider);
+}
+
+.repository-action-button {
+  height: 26px !important;
+  padding: 0 6px !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  border-radius: 6px !important;
+  white-space: nowrap;
+}
+
+.repository-action-button:not(:disabled) {
+  color: var(--workbench-secondary) !important;
+}
+
+.repository-action-button:not(:disabled):hover {
+  color: var(--app-text) !important;
+  background: var(--workbench-hover) !important;
+}
+
+.repository-action-button .anticon {
+  font-size: 13px;
+}
+
+.repository-table {
+  overflow: clip;
+  border-radius: 8px;
+}
+
+.repository-table .ant-table-thead > tr > th {
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--workbench-soft);
+}
+
+.repository-table .ant-table-tbody > tr > td {
+  font-size: 12px;
+}
+
 .repository-section {
   margin-bottom: 16px;
 }
@@ -1247,13 +1335,18 @@ body {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-width: 360px;
   gap: 3px;
 }
 
 .repository-name-cell strong {
+  max-width: 100%;
+  overflow: hidden;
   color: var(--app-text);
   font-size: 12px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .repository-path-line {
@@ -1264,9 +1357,10 @@ body {
 }
 
 .repository-path-text {
+  max-width: 280px;
   overflow: hidden;
   color: var(--app-muted);
-  font-size: 10px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1292,6 +1386,23 @@ body {
   gap: 6px;
   align-items: center;
   min-width: 0;
+}
+
+.repository-branch-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 150px;
+  padding: 0 6px;
+  margin: 0;
+  overflow: hidden;
+  line-height: 18px;
+  border-radius: 4px;
+}
+
+.repository-branch-tag .repository-branch-text {
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .repository-branch-text {

@@ -22,7 +22,9 @@ import type {
   Repository,
   RepositoryBindingStatus,
   RepositoryBranchList,
+  RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
+  RepositoryMergeResult,
   RepositoryScanResult,
   RepositoryState,
   UpdateRepositoryInput
@@ -1422,9 +1424,19 @@ export const getRepositoryLocalPath = async (repositoryId: string): Promise<stri
   return repository.localPath
 }
 
+/** 列出当前仓库的未合并文件。 */
+const listUnmergedFiles = async (cwd: string): Promise<string[]> =>
+  (await runGit(['diff', '--name-only', '--diff-filter=U'], { cwd }).catch(
+    () => ''
+  ))
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
 /**
  * 为在 IDE 中打开仓库准备分支。
- * 已在目标分支时直接打开；需要切换时要求工作区干净，并尝试快进拉取。
+ * 已在目标分支时直接打开；存在未解决冲突时跳过 pull，允许在 IDE 中继续解决。
+ * 需要切换时要求工作区干净，并尝试快进拉取。
  */
 export const prepareRepositoryForIde = async (
   repositoryId: string,
@@ -1434,6 +1446,7 @@ export const prepareRepositoryForIde = async (
   switched: boolean
   pulled: boolean
   hasUpstream: boolean
+  conflicted: boolean
 }> => {
   const repositories = await readStore()
   const repository = repositories.find((item) => item.id === repositoryId)
@@ -1453,6 +1466,18 @@ export const prepareRepositoryForIde = async (
 
   if (currentBranch === branchName) {
     const hasUpstream = await hasUpstreamBranch(cwd)
+    const conflicts = await listUnmergedFiles(cwd)
+
+    // 冲突状态下 pull 会失败，但此时正是最需要打开 IDE 解决冲突的时候。
+    if (conflicts.length > 0) {
+      return {
+        localPath: cwd,
+        switched: false,
+        pulled: false,
+        hasUpstream,
+        conflicted: true
+      }
+    }
 
     if (hasUpstream) {
       try {
@@ -1471,7 +1496,8 @@ export const prepareRepositoryForIde = async (
       localPath: cwd,
       switched: false,
       pulled: hasUpstream,
-      hasUpstream
+      hasUpstream,
+      conflicted: false
     }
   }
 
@@ -1523,7 +1549,206 @@ export const prepareRepositoryForIde = async (
     localPath: cwd,
     switched: true,
     pulled: hasUpstream,
-    hasUpstream
+    hasUpstream,
+    conflicted: false
+  }
+}
+
+/**
+ * 切换仓库分支。
+ * 切换前要求工作区干净且当前分支没有未推送提交；切换成功后尝试快进 pull。
+ * 已经在目标分支时直接返回 switched=false。
+ */
+export const switchRepositoryBranch = async (
+  repositoryId: string,
+  branchName: string
+): Promise<RepositoryBranchSwitchResult> => {
+  const normalized = branchName.trim()
+
+  if (!normalized) throw new Error('请选择目标分支')
+
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) throw new Error('仓库不存在')
+  if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
+
+  const { branches } = await listRepositoryBranches(repositoryId, true)
+
+  if (!branches.includes(normalized)) throw new Error(`分支不存在：${normalized}`)
+
+  const cwd = repository.localPath
+  const currentBranch = (
+    await runGit(['branch', '--show-current'], { cwd })
+  ).trim()
+
+  if (currentBranch === normalized) {
+    return { switched: false, pulled: false, branchName: normalized }
+  }
+
+  const status = (await runGit(['status', '--porcelain'], { cwd })).trim()
+
+  if (status) {
+    throw new Error('当前仓库有未提交改动，请先提交后再切换分支')
+  }
+
+  if (currentBranch && repository.remoteUrl) {
+    if (!(await hasUpstreamBranch(cwd))) {
+      throw new Error('当前分支没有远程上游分支，请先推送后再切换')
+    }
+
+    const ahead = Number(
+      (await runGit(['rev-list', '--count', '@{u}..HEAD'], { cwd })).trim()
+    )
+
+    if (Number.isFinite(ahead) && ahead > 0) {
+      throw new Error(`当前分支有 ${ahead} 个未推送的提交，请先推送后再切换`)
+    }
+  }
+
+  const previousHead = (await runGit(['rev-parse', 'HEAD'], { cwd })).trim()
+  const previousLabel = currentBranch || previousHead
+
+  await runGit(['switch', normalized], { cwd })
+
+  const hasUpstream = await hasUpstreamBranch(cwd)
+  let pullArgs: string[] | null = null
+
+  if (hasUpstream) {
+    pullArgs = ['pull', '--ff-only']
+  } else if (repository.remoteUrl) {
+    // 本地分支没有 tracking 配置时，显式从 origin 拉取同名分支。
+    const hasRemoteBranch = await runGit(
+      ['rev-parse', '--verify', `refs/remotes/origin/${normalized}`],
+      { cwd }
+    )
+      .then(() => true)
+      .catch(() => false)
+
+    if (hasRemoteBranch) {
+      pullArgs = ['pull', '--ff-only', 'origin', normalized]
+    }
+  }
+
+  if (pullArgs) {
+    try {
+      await runGit(pullArgs, {
+        cwd,
+        timeout: GIT_NETWORK_TIMEOUT_MS
+      })
+    } catch (error) {
+      const detail = getGitErrorMessage(error)
+
+      try {
+        if (currentBranch) {
+          await runGit(['switch', currentBranch], { cwd })
+        } else if (previousHead) {
+          await runGit(['switch', '--detach', previousHead], { cwd })
+        } else {
+          throw new Error('没有可恢复的分支')
+        }
+      } catch (rollbackError) {
+        throw new Error(
+          `拉取失败，且无法恢复到原分支 ${previousLabel || '未知'}：${getGitErrorMessage(rollbackError)}`
+        )
+      }
+
+      throw new Error(
+        `拉取失败，已恢复到原分支 ${previousLabel || '未知'}。${detail}`
+      )
+    }
+  }
+
+  return {
+    switched: true,
+    pulled: pullArgs !== null,
+    branchName: normalized
+  }
+}
+
+/**
+ * 把指定分支合并到当前分支。
+ * 合并前要求工作区干净；合并冲突时保留冲突状态，交由用户在 IDE 中解决。
+ */
+export const mergeRepositoryBranch = async (
+  repositoryId: string,
+  sourceBranch: string
+): Promise<RepositoryMergeResult> => {
+  const normalized = sourceBranch.trim()
+
+  if (!normalized) throw new Error('请选择要合并的分支')
+
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) throw new Error('仓库不存在')
+  if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
+
+  const cwd = repository.localPath
+
+  // 合并前强制刷新远程引用，确保使用最新远程分支而不是旧引用。
+  if (repository.remoteUrl) {
+    try {
+      await runGit(['fetch', '--prune', 'origin'], {
+        cwd,
+        timeout: GIT_NETWORK_TIMEOUT_MS
+      })
+    } catch (error) {
+      throw new Error(
+        `拉取远程分支失败，无法合并最新远程代码：${getGitErrorMessage(error)}`
+      )
+    }
+  }
+
+  const { branches } = await listRepositoryBranches(repositoryId)
+
+  if (!branches.includes(normalized)) throw new Error(`分支不存在：${normalized}`)
+
+  const currentBranch = (
+    await runGit(['branch', '--show-current'], { cwd })
+  ).trim()
+
+  if (!currentBranch) throw new Error('当前处于分离 HEAD 状态，无法合并')
+  if (currentBranch === normalized) throw new Error('当前分支就是要合并的分支')
+
+  const status = (await runGit(['status', '--porcelain'], { cwd })).trim()
+
+  if (status) {
+    throw new Error('当前仓库有未提交改动，请先提交后再合并')
+  }
+
+  const hasRemoteSource = await runGit(
+    ['rev-parse', '--verify', `refs/remotes/origin/${normalized}`],
+    { cwd }
+  )
+    .then(() => true)
+    .catch(() => false)
+  const hasLocalSource = await runGit(
+    ['rev-parse', '--verify', `refs/heads/${normalized}`],
+    { cwd }
+  )
+    .then(() => true)
+    .catch(() => false)
+
+  if (!hasRemoteSource && !hasLocalSource) {
+    throw new Error('源分支没有可用的本地或远程引用')
+  }
+
+  const sourceRef = hasRemoteSource ? `origin/${normalized}` : normalized
+
+  try {
+    await runGit(['merge', '--no-edit', sourceRef], { cwd })
+    return { conflicted: false, conflicts: [] }
+  } catch (error) {
+    // 有未合并文件说明是冲突，保留合并状态，交给用户在 IDE 中解决。
+    const conflicts = await listUnmergedFiles(cwd)
+
+    if (conflicts.length > 0) {
+      return { conflicted: true, conflicts }
+    }
+
+    await runGit(['merge', '--abort'], { cwd }).catch(() => undefined)
+    throw new Error(`合并失败：${getGitErrorMessage(error)}`)
   }
 }
 
@@ -1582,6 +1807,21 @@ export const createRepositoryBranch = async (
   const repository = repositories.find((item) => item.id === repositoryId)
 
   if (!repository) throw new Error('仓库不存在')
+  if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
+
+  // 新建分支必须基于最新远程基线：先 fetch，再优先使用 origin/<base>。
+  if (repository.remoteUrl) {
+    try {
+      await runGit(['fetch', '--prune', 'origin'], {
+        cwd: repository.localPath,
+        timeout: GIT_NETWORK_TIMEOUT_MS
+      })
+    } catch (error) {
+      throw new Error(
+        `拉取远程分支失败，无法基于最新远程分支创建：${getGitErrorMessage(error)}`
+      )
+    }
+  }
 
   const { branches } = await listRepositoryBranches(repositoryId)
 
@@ -1596,31 +1836,31 @@ export const createRepositoryBranch = async (
     throw new Error('分支名不合法')
   }
 
-  const hasLocalBase = await runGit(
-    ['rev-parse', '--verify', `refs/heads/${normalizedBase}`],
+  const hasRemoteBase = await runGit(
+    ['rev-parse', '--verify', `refs/remotes/origin/${normalizedBase}`],
     { cwd: repository.localPath }
   )
     .then(() => true)
     .catch(() => false)
 
-  if (hasLocalBase) {
-    await runGit(['branch', normalizedBranch, normalizedBase], {
-      cwd: repository.localPath
-    })
+  if (hasRemoteBase) {
+    await runGit(
+      ['branch', '--track', normalizedBranch, `origin/${normalizedBase}`],
+      { cwd: repository.localPath }
+    )
   } else {
-    const hasRemoteBase = await runGit(
-      ['rev-parse', '--verify', `refs/remotes/origin/${normalizedBase}`],
+    const hasLocalBase = await runGit(
+      ['rev-parse', '--verify', `refs/heads/${normalizedBase}`],
       { cwd: repository.localPath }
     )
       .then(() => true)
       .catch(() => false)
 
-    if (!hasRemoteBase) throw new Error('基线分支没有可用的本地或远程引用')
+    if (!hasLocalBase) throw new Error('基线分支没有可用的本地或远程引用')
 
-    await runGit(
-      ['branch', '--track', normalizedBranch, `origin/${normalizedBase}`],
-      { cwd: repository.localPath }
-    )
+    await runGit(['branch', normalizedBranch, normalizedBase], {
+      cwd: repository.localPath
+    })
   }
 
   if (!repository.remoteUrl) return
@@ -2207,6 +2447,36 @@ export const initializeRepositories = (): void => {
       }
 
       return createRepositoryBranch(repositoryId, branchName, baseBranch)
+    }
+  )
+
+  // 把指定分支合并到当前分支。
+  ipcMain.handle(
+    'repositories:merge-branch',
+    (_event, repositoryId: unknown, sourceBranch: unknown) => {
+      if (
+        typeof repositoryId !== 'string' ||
+        typeof sourceBranch !== 'string'
+      ) {
+        throw new Error('Invalid merge input')
+      }
+
+      return mergeRepositoryBranch(repositoryId, sourceBranch)
+    }
+  )
+
+  // 切换当前仓库分支。
+  ipcMain.handle(
+    'repositories:switch-branch',
+    (_event, repositoryId: unknown, branchName: unknown) => {
+      if (
+        typeof repositoryId !== 'string' ||
+        typeof branchName !== 'string'
+      ) {
+        throw new Error('Invalid switch input')
+      }
+
+      return switchRepositoryBranch(repositoryId, branchName)
     }
   )
 

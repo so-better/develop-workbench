@@ -238,7 +238,18 @@ const TERMINAL_THEME: ITheme = {
  * 多标签终端页面。
  * 每个标签对应主进程中的一个 PTY 会话，切换标签不会丢失进程状态。
  */
-export default function TerminalPage(): JSX.Element {
+interface TerminalPageProps {
+  /** 由代码仓库页发起的“在指定目录打开终端”请求。 */
+  openRequest?: { cwd: string; token: number } | null
+
+  /** 请求处理完成后清除 App 里的待处理状态。 */
+  onOpenRequestHandled?: () => void
+}
+
+export default function TerminalPage({
+  openRequest,
+  onOpenRequestHandled
+}: TerminalPageProps): JSX.Element {
   const { message, modal } = App.useApp()
   const [tabs, setTabs] = useState<TerminalTab[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -278,6 +289,7 @@ export default function TerminalPage(): JSX.Element {
   const settingsFrameRef = useRef<number | null>(null)
   const selectionTimersRef = useRef(new Map<string, number>())
   const settingsRef = useRef<TerminalSettings>({ ...DEFAULT_TERMINAL_SETTINGS })
+  const initialRequestTokenRef = useRef(openRequest?.token ?? null)
 
   useEffect(() => {
     tabsRef.current = tabs
@@ -803,22 +815,27 @@ export default function TerminalPage(): JSX.Element {
     })
 
     window.electron
-      .restoreTerminals()
+      .restoreTerminals(openRequest?.cwd)
       .then((sessions) => {
         if (cancelled) return
 
         for (const session of sessions) infosRef.current.set(session.id, session)
 
-        const nextTabs = sessions.map((session) => ({
+        const restoredTabs = sessions.map((session) => ({
           id: session.id,
           title: session.title,
           customTitle: session.customTitle,
           exited: false
         }))
+        const restoredIds = new Set(restoredTabs.map((tab) => tab.id))
+        const nextTabs = [
+          ...restoredTabs,
+          ...tabsRef.current.filter((tab) => !restoredIds.has(tab.id))
+        ]
 
         tabsRef.current = nextTabs
         setTabs(nextTabs)
-        setActiveId(nextTabs[0]?.id ?? null)
+        setActiveId((current) => current ?? nextTabs[0]?.id ?? null)
         setReady(true)
       })
       .catch((error) => {
@@ -1062,6 +1079,20 @@ export default function TerminalPage(): JSX.Element {
       message.error(getErrorMessage(error, '选择目录失败'))
     }
   }, [handleCreate, message])
+
+  // 首次挂载时由 restoreTerminals 直接使用 cwd；页面已存在时再追加新标签。
+  useEffect(() => {
+    if (!openRequest) return
+
+    if (openRequest.token === initialRequestTokenRef.current) {
+      onOpenRequestHandled?.()
+      return
+    }
+
+    void handleCreate({ cwd: openRequest.cwd }).finally(() => {
+      onOpenRequestHandled?.()
+    })
+  }, [handleCreate, onOpenRequestHandled, openRequest])
 
   const handleTerminalDrop = useCallback(
     (event: ReactDragEvent<HTMLDivElement>): void => {

@@ -414,7 +414,7 @@ export default function SettingsModal({
             aria-current={activeSection === 'repositories' ? 'page' : undefined}
             onClick={() => setActiveSection('repositories')}
           >
-            代码仓库
+            代码目录
           </button>
           <button
             type="button"
@@ -651,7 +651,9 @@ export default function SettingsModal({
             <GitSettings />
           ) : null}
 
-          {activeSection === 'repositories' ? <RepositorySettings /> : null}
+          {activeSection === 'repositories' ? (
+            <RepositorySettings mode="settings" />
+          ) : null}
 
           {activeSection === 'meegle' ? (
             <MeegleSettings />

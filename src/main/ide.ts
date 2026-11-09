@@ -306,6 +306,7 @@ export const prepareRepositoryInIde = async (
   switched: boolean
   pulled: boolean
   hasUpstream: boolean
+  conflicted: boolean
 }> => {
   await getUsableIdeConfig()
   const prepared = await prepareRepositoryForIde(repositoryId, branchName)
@@ -313,7 +314,8 @@ export const prepareRepositoryInIde = async (
   return {
     switched: prepared.switched,
     pulled: prepared.pulled,
-    hasUpstream: prepared.hasUpstream
+    hasUpstream: prepared.hasUpstream,
+    conflicted: prepared.conflicted
   }
 }
 

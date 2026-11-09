@@ -13,7 +13,7 @@ import {
   LinkOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
-import { App as AntdApp, Button, Popconfirm } from 'antd'
+import { App as AntdApp, Button } from 'antd'
 import EmbeddedBrowserDownloads from '../EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
 import type {
   EmbeddedBrowserBounds,
@@ -470,26 +470,20 @@ export default function EmbeddedBrowserPanel({
             </div>
           ))}
         </div>
-        <Popconfirm
-          title="关闭所有标签页？"
-          description="所有页面会被释放，未提交的页面内容将丢失。"
-          okText="关闭全部"
-          cancelText="取消"
-          okButtonProps={{ danger: true }}
-          onConfirm={() => {
-            void window.electron.closeAllEmbeddedBrowserTabs().catch(() => message.error('关闭所有标签页失败'))
+        <Button
+          className="embedded-browser-close-all"
+          type="text"
+          size="small"
+          title="关闭所有标签页并释放页面"
+          aria-label="关闭所有标签页"
+          onClick={() => {
+            void window.electron
+              .closeAllEmbeddedBrowserTabs()
+              .catch(() => message.error('关闭所有标签页失败'))
           }}
         >
-          <Button
-            className="embedded-browser-close-all"
-            type="text"
-            size="small"
-            title="关闭所有标签页并释放页面"
-            aria-label="关闭所有标签页"
-          >
-            关闭全部
-          </Button>
-        </Popconfirm>
+          关闭全部
+        </Button>
       </div>
 
       {state.error ? (

@@ -100,6 +100,17 @@ const CAPABILITIES: GuideCapability[] = [
     ]
   },
   {
+    title: '代码仓库',
+    icon: <FolderOpenOutlined />,
+    items: [
+      '左侧导航「代码」查看根目录下扫描到的本地仓库列表',
+      '支持搜索、查看主分支/当前分支和切换轻舟接入标记',
+      '操作列支持在终端打开、远程仓库和切换分支；「更多」菜单支持打开 IDE、创建 MR、新建分支、合并代码和移除仓库',
+      '支持从 Git 克隆仓库到配置的代码根目录',
+      '代码根目录仍在设置的「代码目录」中配置'
+    ]
+  },
+  {
     title: '终端',
     icon: <DesktopOutlined />,
     items: [
@@ -167,7 +178,7 @@ const CAPABILITIES: GuideCapability[] = [
     items: [
       '支持多个页面切换，相同地址复用已打开页面；收起面板后保留浏览位置',
       '点击标签上的 × 关闭该页并释放资源；点击面板右上角 × 或按 Esc 收起面板，保留所有页面',
-      '点击标签栏右侧“关闭全部”可释放所有页面，操作前会二次确认',
+      '点击标签栏右侧“关闭全部”可直接释放所有页面',
       '收起后可通过底部状态栏的“浏览器”入口重新展开；完全退出应用后不保留页面',
       '外部链接在应用内打开，右键可复制或添加到站点',
       '支持前进、后退、刷新、链接复制、最大化和下载管理',
@@ -230,10 +241,10 @@ const SETTINGS_GROUPS: GuideSettingGroup[] = [
           '从 15 种内置预设中选择 IDE，检测或选择可执行文件；启动参数固定，{path} 会替换为仓库路径。'
       },
       {
-        title: '代码仓库',
+        title: '代码目录',
         icon: <FolderOpenOutlined />,
         description:
-          '设置代码根目录后自动扫描仓库，也可以从 Git 克隆；支持标记轻舟仓库，移除配置不会删除本地代码。'
+          '配置代码根目录；仓库列表、搜索、克隆和轻舟标记在左侧「代码」页查看和操作。'
       },
       {
         title: '终端',
@@ -505,7 +516,7 @@ export default function ProductGuide({
                 <div>
                   <strong>推荐配置顺序</strong>
                   <span>
-                    Lark / Meegle 授权 → Git 与代码仓库 → IDE → 模型与技能
+                    Lark / Meegle 授权 → Git 与代码目录 → IDE → 模型与技能
                   </span>
                 </div>
               </div>

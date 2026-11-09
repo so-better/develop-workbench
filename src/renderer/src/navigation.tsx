@@ -2,6 +2,7 @@ import {
   BugOutlined,
   CodeOutlined,
   FileTextOutlined,
+  FolderOpenOutlined,
   GlobalOutlined,
   ProjectOutlined
 } from '@ant-design/icons'
@@ -11,11 +12,14 @@ import RequirementWorkbench from './pages/RequirementWorkbench/RequirementWorkbe
 import DefectWorkbench from './pages/DefectWorkbench/DefectWorkbench'
 import WeeklyReport from './pages/WeeklyReport/WeeklyReport'
 import SitesPage from './pages/SitesPage/SitesPage'
+import RepositoriesPage from './pages/RepositoriesPage/RepositoriesPage'
 import TerminalPage from './pages/TerminalPage/TerminalPage'
 
 interface PageRenderContext {
   onOpenSettings: (section: SettingsSection) => void
   larkUser: LarkUser | null
+  terminalRequest: { cwd: string; token: number } | null
+  onTerminalRequestHandled: () => void
 }
 
 interface AppPageDefinition {
@@ -46,6 +50,14 @@ export const APP_PAGES = [
     )
   },
   {
+    key: 'code',
+    label: '代码',
+    icon: <FolderOpenOutlined />,
+    render: ({ onOpenSettings }) => (
+      <RepositoriesPage onOpenSettings={onOpenSettings} />
+    )
+  },
+  {
     key: 'sites',
     label: '站点',
     icon: <GlobalOutlined />,
@@ -61,7 +73,12 @@ export const APP_PAGES = [
     key: 'terminal',
     label: '终端',
     icon: <CodeOutlined />,
-    render: () => <TerminalPage />
+    render: ({ terminalRequest, onTerminalRequestHandled }) => (
+      <TerminalPage
+        openRequest={terminalRequest}
+        onOpenRequestHandled={onTerminalRequestHandled}
+      />
+    )
   }
 ] as const satisfies ReadonlyArray<AppPageDefinition & { key: string }>
 

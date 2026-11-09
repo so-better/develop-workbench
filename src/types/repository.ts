@@ -53,6 +53,31 @@ export interface RepositoryBranchList {
 }
 
 /**
+ * 切换仓库分支的结果。
+ */
+export interface RepositoryBranchSwitchResult {
+  /** 是否真的执行了切换；已经在目标分支时为 false。 */
+  switched: boolean
+
+  /** 切换后是否执行了 pull。 */
+  pulled: boolean
+
+  /** 实际切换到的分支名。 */
+  branchName: string
+}
+
+/**
+ * 合并分支的结果。
+ */
+export interface RepositoryMergeResult {
+  /** 是否发生了合并冲突；为 true 时合并状态会保留，等待手动解决。 */
+  conflicted: boolean
+
+  /** 冲突文件列表。 */
+  conflicts: string[]
+}
+
+/**
  * 需求仓库绑定的实时状态。
  */
 export interface RepositoryBindingStatus {

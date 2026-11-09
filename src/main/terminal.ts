@@ -198,10 +198,11 @@ const createSession = (
 ): TerminalSession => {
   const cols = clampDimension(input.cols, DEFAULT_COLS, MIN_COLS, MAX_COLS)
   const rows = clampDimension(input.rows, DEFAULT_ROWS, MIN_ROWS, MAX_ROWS)
-  const cwd =
+  const explicitCwd =
     typeof input.cwd === 'string' && input.cwd && existsSync(input.cwd)
       ? input.cwd
-      : homedir()
+      : null
+  const cwd = explicitCwd ?? homedir()
   const { file, args } = getDefaultShell()
   const child = pty.spawn(file, args, {
     name: 'xterm-256color',
@@ -222,7 +223,7 @@ const createSession = (
     cwd,
     cols,
     rows,
-    title: DEFAULT_TITLE,
+    title: explicitCwd ? basename(explicitCwd) || DEFAULT_TITLE : DEFAULT_TITLE,
     customTitle: false,
     exited: false
   }
@@ -282,12 +283,14 @@ const getOwnedSession = (
  * 读写分离：输入和尺寸调整走 send，避免每个按键都等待一次 invoke。
  */
 export const initializeTerminal = (): void => {
-  ipcMain.handle('terminal:restore', (event) => {
+  ipcMain.handle('terminal:restore', (event, cwd: unknown) => {
     const existing = getOwnerSessionInfos(event.sender.id)
 
     if (existing.length > 0) return existing
 
-    createSession(event.sender, {})
+    createSession(event.sender, {
+      cwd: typeof cwd === 'string' && cwd ? cwd : undefined
+    })
 
     return getOwnerSessionInfos(event.sender.id)
   })

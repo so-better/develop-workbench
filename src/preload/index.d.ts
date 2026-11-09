@@ -84,7 +84,9 @@ import type {
   CloneRepositoryInput,
   RepositoryBindingStatus,
   RepositoryBranchList,
+  RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
+  RepositoryMergeResult,
   RepositoryScanResult,
   RepositoryState,
   UpdateRepositoryInput
@@ -233,6 +235,7 @@ export interface ElectronAPI {
     switched: boolean
     pulled: boolean
     hasUpstream: boolean
+    conflicted: boolean
   }>
   /** 启动 IDE 打开仓库。 */
   launchRepositoryInIde: (repositoryId: string, chatPrompt?: string) => Promise<void>
@@ -242,7 +245,7 @@ export interface ElectronAPI {
     presetId?: IdePresetId
   ) => Promise<string | null>
   /** 恢复当前窗口的终端会话；没有会话时自动创建一个。 */
-  restoreTerminals: () => Promise<TerminalSessionInfo[]>
+  restoreTerminals: (cwd?: string) => Promise<TerminalSessionInfo[]>
   /** 新建一个终端会话。 */
   createTerminal: (input?: TerminalCreateInput) => Promise<TerminalSessionInfo>
   /** 向终端写入用户输入。 */
@@ -487,6 +490,16 @@ export interface ElectronAPI {
     branchName: string,
     baseBranch: string
   ) => Promise<void>
+  /** 把指定分支合并到当前分支。 */
+  mergeRepositoryBranch: (
+    repositoryId: string,
+    sourceBranch: string
+  ) => Promise<RepositoryMergeResult>
+  /** 切换仓库当前分支，并在切换后尝试拉取最新代码。 */
+  switchRepositoryBranch: (
+    repositoryId: string,
+    branchName: string
+  ) => Promise<RepositoryBranchSwitchResult>
   /** 重新扫描代码根目录。 */
   refreshRootRepositories: () => Promise<RepositoryScanResult>
   /** 设置代码根目录。 */

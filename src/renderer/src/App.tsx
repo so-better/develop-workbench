@@ -56,6 +56,10 @@ export default function App(): JSX.Element {
   const [visitedPages, setVisitedPages] = useState<Set<AppPage>>(
     () => new Set<AppPage>(['requirements'])
   )
+  const [terminalRequest, setTerminalRequest] = useState<{
+    cwd: string
+    token: number
+  } | null>(null)
 
   // 内嵌浏览器下载状态统一由应用层维护，Footer 和浏览器面板共用。
   const { downloads, activeCount } = useEmbeddedDownloads()
@@ -227,6 +231,10 @@ export default function App(): JSX.Element {
     setWorkspace(page)
   }, [])
 
+  const handleTerminalRequestHandled = useCallback((): void => {
+    setTerminalRequest(null)
+  }, [])
+
   /** 快速访问打开本地需求时切换到需求页。 */
   useEffect(() => {
     const handleOpenRequirement = (): void => {
@@ -237,6 +245,24 @@ export default function App(): JSX.Element {
 
     return () => {
       window.removeEventListener('workbench:open-requirement', handleOpenRequirement)
+    }
+  }, [handlePageChange])
+
+  /** 从代码仓库页打开终端时，携带工作目录切换到终端页。 */
+  useEffect(() => {
+    const handleOpenTerminal = (event: Event): void => {
+      const detail = (event as CustomEvent<{ cwd?: unknown }>).detail
+
+      if (!detail || typeof detail.cwd !== 'string' || !detail.cwd) return
+
+      setTerminalRequest({ cwd: detail.cwd, token: Date.now() })
+      handlePageChange('terminal')
+    }
+
+    window.addEventListener('workbench:open-terminal', handleOpenTerminal)
+
+    return () => {
+      window.removeEventListener('workbench:open-terminal', handleOpenTerminal)
     }
   }, [handlePageChange])
 
@@ -363,7 +389,12 @@ export default function App(): JSX.Element {
                 hidden={workspace !== page.key}
                 aria-hidden={workspace !== page.key}
               >
-                {page.render({ onOpenSettings: openSettings, larkUser })}
+                {page.render({
+                  onOpenSettings: openSettings,
+                  larkUser,
+                  terminalRequest,
+                  onTerminalRequestHandled: handleTerminalRequestHandled
+                })}
               </div>
             ))
           ) : (
