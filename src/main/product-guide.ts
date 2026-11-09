@@ -3,7 +3,7 @@ import { getPreferences, updatePreferences } from './preferences'
 import type { ProductGuideState } from '../types/product-guide'
 
 /** 当前内置产品手册版本；内容有明显更新时递增。 */
-const PRODUCT_GUIDE_VERSION = 9
+const PRODUCT_GUIDE_VERSION = 10
 
 /**
  * 注册产品手册状态 IPC。

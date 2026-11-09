@@ -40,6 +40,30 @@ export interface MeegleRequirementCollaborator {
   members: MeegleRequirementOwner[]
 }
 
+/** 需求关联的一个规划迭代。 */
+export interface MeegleRequirementIteration {
+  /** 迭代 ID；无 ID 时为空。 */
+  id: string | null
+
+  /** 迭代名称。 */
+  name: string
+
+  /** 从迭代名称解析出的日期，格式 YYYY-MM-DD。 */
+  date: string | null
+}
+
+/** 迭代仓库汇总使用的轻量需求。 */
+export interface IterationSummaryRequirement {
+  /** 需求 ID。 */
+  id: string
+
+  /** 需求名称。 */
+  name: string
+
+  /** 需求关联的全部规划迭代；未规划时为空数组。 */
+  iterations: MeegleRequirementIteration[]
+}
+
 /**
  * 当前用户负责的需求。
  */
@@ -160,6 +184,9 @@ export interface MeegleRequirement {
 
   /** 从迭代名称解析出的日期，格式 YYYY-MM-DD。 */
   iterationDate: string | null
+
+  /** 需求关联的全部规划迭代；未规划时为空数组。 */
+  iterations: MeegleRequirementIteration[]
 
   /** 最后更新时间，接口通常返回 YYYY-MM-DD。 */
   updatedAt: string | null

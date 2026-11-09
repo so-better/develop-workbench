@@ -2093,10 +2093,19 @@ body {
   background: var(--workbench-hover) !important;
 }
 
-.workbench-add-local {
+.workbench-sidebar-actions {
+  display: flex;
   flex-shrink: 0;
-  height: 28px;
+  gap: 8px;
+  align-items: center;
   margin: 0 6px 8px;
+}
+
+.workbench-add-local {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
   color: var(--workbench-secondary) !important;
   font-size: 12px;
   border-color: var(--workbench-divider) !important;
@@ -2106,6 +2115,22 @@ body {
 .workbench-add-local:hover {
   color: #1677ff !important;
   border-color: rgba(22, 119, 255, 0.45) !important;
+}
+
+.workbench-repository-summary {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  color: var(--workbench-secondary) !important;
+  font-size: 12px;
+  border-color: var(--workbench-divider) !important;
+  border-radius: 7px;
+}
+
+.workbench-repository-summary:hover {
+  color: var(--app-text) !important;
+  background: var(--workbench-hover) !important;
+  border-color: var(--workbench-divider) !important;
 }
 
 .local-requirement-tag {

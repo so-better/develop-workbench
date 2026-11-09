@@ -12,7 +12,11 @@ import { getRepositoryState, listRepositoryBranches } from './repositories'
 import { backupCorruptStore } from './store-backup'
 import { getQingzhouCodeTasks } from './qingzhou'
 import type { QingzhouCodeTaskDetail } from './qingzhou'
-import type { RequirementBindingState, RequirementRepoBinding } from '../types/bindings'
+import type {
+  RequirementBindingState,
+  RequirementBindingsMap,
+  RequirementRepoBinding
+} from '../types/bindings'
 
 interface StoredWorkspace {
   projectKey: string
@@ -222,6 +226,41 @@ export const getRequirementBindingState = async (
     projectKey: project.projectKey,
     bindings: workspace?.bindings ?? []
   }
+}
+
+/**
+ * 批量读取指定需求的仓库绑定。
+ * 一次读取绑定文件，供迭代仓库汇总等批量场景使用。
+ */
+export const getRequirementBindingsBatch = async (
+  requirementIds: string[]
+): Promise<RequirementBindingsMap> => {
+  const uniqueIds = Array.from(
+    new Set(requirementIds.filter(Boolean))
+  )
+
+  for (const requirementId of uniqueIds) {
+    if (!isValidRequirementId(requirementId)) {
+      throw new Error(`需求 ID 不合法：${requirementId}`)
+    }
+  }
+
+  const project = await getProject()
+  const store = await readStore()
+  const result: RequirementBindingsMap = {}
+
+  for (const requirementId of uniqueIds) {
+    result[requirementId] = []
+  }
+
+  for (const workspace of store.workspaces) {
+    if (workspace.projectKey !== project.projectKey) continue
+    if (!(workspace.requirementId in result)) continue
+
+    result[workspace.requirementId] = workspace.bindings
+  }
+
+  return result
 }
 
 let bindingWriteQueue: Promise<void> = Promise.resolve()
@@ -618,6 +657,22 @@ export const initializeRequirementBindings = (): void => {
   ipcMain.handle('bindings:get', (_event, requirementId: unknown) => {
     if (typeof requirementId !== 'string') throw new Error('需求 ID 不合法')
     return getRequirementBindingState(requirementId)
+  })
+
+  ipcMain.handle('bindings:get-batch', (_event, requirementIds: unknown) => {
+    if (!Array.isArray(requirementIds)) throw new Error('需求 ID 列表不合法')
+
+    const ids: string[] = []
+
+    for (const requirementId of requirementIds) {
+      if (typeof requirementId !== 'string') {
+        throw new Error('需求 ID 列表不合法')
+      }
+
+      ids.push(requirementId)
+    }
+
+    return getRequirementBindingsBatch(ids)
   })
 
   ipcMain.handle(

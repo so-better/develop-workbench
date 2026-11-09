@@ -46,6 +46,11 @@ export interface RequirementRepoBinding {
 }
 
 /**
+ * 需求 ID 到仓库绑定列表的映射。
+ */
+export type RequirementBindingsMap = Record<string, RequirementRepoBinding[]>
+
+/**
  * 单个需求的仓库绑定状态。
  */
 export interface RequirementBindingState {

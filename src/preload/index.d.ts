@@ -48,7 +48,10 @@ import type {
   EmbeddedBrowserState
 } from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
-import type { RequirementBindingState } from '../types/bindings'
+import type {
+  RequirementBindingState,
+  RequirementBindingsMap
+} from '../types/bindings'
 import type {
   DefectRole,
   DefectTransitionFieldValue,
@@ -74,6 +77,7 @@ import type {
 import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
+  IterationSummaryRequirement,
   MeegleMyRequirements,
   MeegleProject,
   MeegleRequirementActivity,
@@ -381,6 +385,8 @@ export interface ElectronAPI {
   ) => Promise<void>
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: (includeClosed?: boolean) => Promise<MeegleMyRequirements>
+  /** 读取迭代仓库汇总所需的轻量需求。 */
+  getIterationSummaryRequirements: () => Promise<IterationSummaryRequirement[]>
   /** 按关键词搜索当前空间内的全部需求。 */
   searchRequirements: (keyword: string) => Promise<MeegleMyRequirements>
   /** 新建本地临时需求。 */
@@ -417,6 +423,10 @@ export interface ElectronAPI {
   ) => Promise<RequirementPersonalStatusState>
   /** 读取需求的代码仓库绑定。 */
   getRequirementBindings: (requirementId: string) => Promise<RequirementBindingState>
+  /** 批量读取需求的代码仓库绑定。 */
+  getRequirementBindingsBatch: (
+    requirementIds: string[]
+  ) => Promise<RequirementBindingsMap>
   /** 新增需求仓库绑定。 */
   addRequirementBinding: (
     requirementId: string,

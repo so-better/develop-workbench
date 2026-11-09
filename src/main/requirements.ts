@@ -11,6 +11,7 @@ import {
 import { runMeegle } from './meegle'
 import { getPreferences, updatePreferences } from './preferences'
 import type {
+  IterationSummaryRequirement,
   MeegleMyRequirements,
   MeegleNodeFormItem,
   MeegleProject,
@@ -19,6 +20,7 @@ import type {
   MeegleRequirementCollaborator,
   MeegleRequirementComment,
   MeegleRequirementGroup,
+  MeegleRequirementIteration,
   MeegleRequirementOwner,
   MeegleWorkflowNode,
   UpdateNodeInfoInput
@@ -636,18 +638,33 @@ const readCollaborators = (
 }
 
 /**
- * 读取需求所属迭代。
- * 规划迭代是多选关联字段，当前需求只取第一个迭代用于分组。
+ * 读取需求关联的全部规划迭代。
+ * 规划迭代是多选关联字段；同一迭代按 ID 或名称去重。
  */
-const readIteration = (
+const readIterations = (
   fields: Map<string, MoqlValue | null>
-): { id: string | null; name: string | null } => {
-  const iteration = fields.get('planning_sprint')?.key_label_value_list?.[0]
+): MeegleRequirementIteration[] => {
+  const values = fields.get('planning_sprint')?.key_label_value_list ?? []
+  const iterations = new Map<string, MeegleRequirementIteration>()
 
-  return {
-    id: iteration?.key?.trim() || null,
-    name: iteration?.label?.trim() || null
+  for (const value of values) {
+    const name = value.label?.trim()
+
+    if (!name) continue
+
+    const id = value.key?.trim() || null
+    const key = id ?? `name:${name}`
+
+    if (iterations.has(key)) continue
+
+    iterations.set(key, {
+      id,
+      name,
+      date: parseReleaseDate(name)
+    })
   }
+
+  return Array.from(iterations.values())
 }
 
 /**
@@ -845,7 +862,8 @@ const parseRequirement = (row: MoqlRow): MeegleRequirement | null => {
 
   if (!id || !name) return null
 
-  const iteration = readIteration(fields)
+  const iterations = readIterations(fields)
+  const iteration = iterations[0] ?? { id: null, name: null, date: null }
   const owners = readUsers(fields, 'current_status_operator')
   const productManagers = readProductManagers(row)
   const productOwners = readProductOwners(row)
@@ -892,7 +910,8 @@ const parseRequirement = (row: MoqlRow): MeegleRequirement | null => {
     remark: readFieldString(row, '备注'),
     iterationId: iteration.id,
     iterationName: iteration.name,
-    iterationDate: iteration.name ? parseReleaseDate(iteration.name) : null,
+    iterationDate: iteration.date,
+    iterations,
     updatedAt: readString(fields, 'updated_at')
   }
 }
@@ -1894,6 +1913,71 @@ export const getMyRequirements = async (
   }
 }
 
+/** 将 MQL 行解析为迭代汇总所需的轻量需求。 */
+const parseIterationSummaryRequirement = (
+  row: MoqlRow
+): IterationSummaryRequirement | null => {
+  const fields = toFieldMap(row)
+  const id = readString(fields, 'work_item_id')
+  const name = readString(fields, 'name')
+
+  if (!id || !name) return null
+
+  return {
+    id,
+    name,
+    iterations: readIterations(fields)
+  }
+}
+
+/**
+ * 读取迭代仓库汇总所需的轻量需求。
+ * 只查询需求 ID、名称和全部规划迭代，不补齐头像等详情字段。
+ */
+export const getIterationSummaryRequirements = async (): Promise<
+  IterationSummaryRequirement[]
+> => {
+  const project = await getProject()
+  const [roleNames, localRequirements] = await Promise.all([
+    fetchStoryRoleNames(project),
+    listLocalRequirements(project.projectKey, true)
+  ])
+  const roleCondition = buildCurrentUserRoleCondition(roleNames)
+  const remoteRequirements = roleCondition
+    ? (
+        await fetchMqlRows(
+          project,
+          [
+            'SELECT `工作项id`, `名称`, `规划迭代`',
+            `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
+            `WHERE (${roleCondition})`
+          ].join(' ')
+        )
+      )
+        .map(parseIterationSummaryRequirement)
+        .filter(
+          (requirement): requirement is IterationSummaryRequirement =>
+            requirement !== null
+        )
+    : []
+  const localSummaryRequirements: IterationSummaryRequirement[] =
+    localRequirements.map((requirement) => ({
+      id: requirement.id,
+      name: requirement.name,
+      iterations: requirement.iterationName
+        ? [
+            {
+              id: requirement.iterationId,
+              name: requirement.iterationName,
+              date: requirement.iterationDate
+            }
+          ]
+        : []
+    }))
+
+  return [...remoteRequirements, ...localSummaryRequirements]
+}
+
 /** 周报工具返回的单条本周工作。 */
 export interface WeeklyWorkItem {
   /** 需求来源：Meegle 或本地临时需求。 */
@@ -2061,6 +2145,9 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
 export const initializeRequirements = (): void => {
   ipcMain.handle('requirements:get-my', (_event, includeClosed: unknown) =>
     getMyRequirements(includeClosed === true)
+  )
+  ipcMain.handle('requirements:get-iteration-summary', () =>
+    getIterationSummaryRequirements()
   )
   ipcMain.handle('requirements:search', (_event, query: unknown) =>
     searchRequirements(typeof query === 'string' ? query : '')

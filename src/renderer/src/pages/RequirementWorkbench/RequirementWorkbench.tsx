@@ -68,6 +68,7 @@ import type {
 } from '../../../../types/requirements'
 import type { SettingsSection } from '../../../../types/settings'
 import RobotMark from '../../components/RobotMark/RobotMark'
+import IterationRepositorySummary from '../../components/IterationRepositorySummary/IterationRepositorySummary'
 import LocalRequirementModal from '../../components/LocalRequirementModal/LocalRequirementModal'
 import type { LocalRequirementVersionOption } from '../../components/LocalRequirementModal/LocalRequirementModal'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
@@ -514,6 +515,7 @@ export default function RequirementWorkbench({
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [iterationFilter, setIterationFilter] = useState<string | null>(null)
   const [localModalOpen, setLocalModalOpen] = useState(false)
+  const [iterationSummaryOpen, setIterationSummaryOpen] = useState(false)
   const [localModalRequirement, setLocalModalRequirement] =
     useState<MeegleRequirement | null>(null)
   const [localSaving, setLocalSaving] = useState(false)
@@ -553,6 +555,18 @@ export default function RequirementWorkbench({
     data?.groups.find((group) =>
       group.requirements.some((requirement) => requirement.id === selectedRequirementId)
     ) ?? null
+
+  /** 打开仓库汇总时优先选中的迭代。 */
+  const iterationSummaryPreferredKey = useMemo(() => {
+    if (iterationFilter) return iterationFilter
+    if (selectedGroup) return selectedGroup.key
+    if (selectedRequirement?.iterationId) return selectedRequirement.iterationId
+    if (selectedRequirement?.iterationName) {
+      return `name:${selectedRequirement.iterationName}`
+    }
+
+    return null
+  }, [iterationFilter, selectedGroup, selectedRequirement])
 
   /** 当前选中的是否为本地临时需求。 */
   const selectedRequirementIsLocal = isLocalRequirementId(selectedRequirementId)
@@ -3112,17 +3126,30 @@ export default function RequirementWorkbench({
           </span>
         </div>
 
-        <Button
-          block
-          type="dashed"
-          size="small"
-          className="workbench-add-local"
-          icon={<PlusOutlined />}
-          disabled={!data}
-          onClick={handleOpenCreateLocalRequirement}
-        >
-          新建临时需求
-        </Button>
+        <div className="workbench-sidebar-actions">
+          <Button
+            type="dashed"
+            size="small"
+            className="workbench-add-local"
+            icon={<PlusOutlined />}
+            disabled={!data}
+            onClick={handleOpenCreateLocalRequirement}
+          >
+            新建临时需求
+          </Button>
+          <Tooltip title="按迭代查看仓库和分支汇总">
+            <Button
+              type="default"
+              size="small"
+              className="workbench-repository-summary"
+              icon={<BranchesOutlined />}
+              disabled={loading && !data}
+              onClick={() => setIterationSummaryOpen(true)}
+            >
+              仓库汇总
+            </Button>
+          </Tooltip>
+        </div>
 
         <div className="workbench-filter-stack">
           <Input
@@ -4869,6 +4896,12 @@ export default function RequirementWorkbench({
           />
         </div>
       </Modal>
+
+      <IterationRepositorySummary
+        open={iterationSummaryOpen}
+        preferredIterationKey={iterationSummaryPreferredKey}
+        onClose={() => setIterationSummaryOpen(false)}
+      />
 
       <LocalRequirementModal
         open={localModalOpen}

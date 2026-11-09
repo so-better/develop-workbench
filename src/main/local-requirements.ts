@@ -391,6 +391,15 @@ export const toMeegleRequirement = (
   iterationId: item.iterationId,
   iterationName: item.iterationName,
   iterationDate: item.iterationDate,
+  iterations: item.iterationName
+    ? [
+        {
+          id: item.iterationId,
+          name: item.iterationName,
+          date: item.iterationDate
+        }
+      ]
+    : [],
   updatedAt: item.updatedAt
 })
 
