@@ -26,6 +26,7 @@ export default function RequirementLinks({ projectKey, requirementId, descriptio
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
+  const [documentLinks, setDocumentLinks] = useState<RequirementLinkInput[]>([])
   const [editing, setEditing] = useState<RequirementLink | 'new' | null>(null)
   const [form] = Form.useForm<RequirementLinkInput>()
   // 扫描与人工操作共享序号，仅让最新请求更新列表，防止旧响应覆盖新结果。
@@ -36,8 +37,17 @@ export default function RequirementLinks({ projectKey, requirementId, descriptio
   // 仅显式点击扫描时恢复排除的地址；后续自动刷新和错误重试不沿用此标记。
   const restoreOnScan = useRef(false)
   const scope = useMemo(() => ({ projectKey, requirementId }), [projectKey, requirementId])
-  // 手动扫描与失败重试也重新解析当前内容，不请求远端需求或链接目标。
-  const discovered = useMemo(() => extractRequirementLinks(description, documentUrl, requirementUrl), [description, documentUrl, requirementUrl, retry])
+  // 手动扫描与失败重试会重新读取需求文档字段，但不请求链接目标页面。
+  const discovered = useMemo(
+    () =>
+      extractRequirementLinks(
+        description,
+        documentUrl,
+        requirementUrl,
+        documentLinks
+      ),
+    [description, documentLinks, documentUrl, requirementUrl, retry]
+  )
   // 兼容此前已入库的自身地址，避免重新进入详情后又出现在列表中。
   const visibleLinks = links.filter((link) => !isCurrentRequirementUrl(link.url, requirementUrl))
 
@@ -46,6 +56,28 @@ export default function RequirementLinks({ projectKey, requirementId, descriptio
     // IPC 可能在切换需求后才完成；卸载时同时失效请求序号和组件存活标记。
     return () => { alive.current = false; revision.current++ }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (!/^\d+$/.test(requirementId)) {
+      setDocumentLinks([])
+      return
+    }
+
+    window.electron
+      .getRequirementDocumentLinks(requirementId)
+      .then((links) => {
+        if (!cancelled) setDocumentLinks(links)
+      })
+      .catch(() => {
+        if (!cancelled) setDocumentLinks([])
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [requirementId, retry])
 
   useEffect(() => {
     const request = ++revision.current

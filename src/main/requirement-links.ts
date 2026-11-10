@@ -9,7 +9,12 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import { backupCorruptStore } from './store-backup'
 import { normalizeRequirementLinkUrl } from '../types/requirement-links'
-import type { RequirementLink, RequirementLinkScope } from '../types/requirement-links'
+import type {
+  RequirementLink,
+  RequirementLinkInput,
+  RequirementLinkScope
+} from '../types/requirement-links'
+import { getRequirementDetail } from './requirement-detail'
 
 const linkSchema = z.object({ name: z.string().trim().min(1).max(200), url: z.string().max(8192).transform(normalizeRequirementLinkUrl) })
 const scopeSchema = z.object({ projectKey: z.string().min(1).max(500), requirementId: z.string().min(1).max(500) })
@@ -152,10 +157,128 @@ export const removeRequirementLink = (scopeValue: unknown, idValue: unknown): Pr
   })
 }
 
+/** 只读取「文档」类字段，避免把描述正文或图片当成独立链接入口。 */
+const DOCUMENT_FIELD_PATTERN = /文档|妙记|用例|纪要|申请单|评审/
+
+interface DocumentLinkCandidate {
+  url: string
+  title: string | null
+}
+
+const getObjectTitle = (value: Record<string, unknown>): string | null => {
+  for (const key of ['label', 'name', 'title', 'text']) {
+    const item = value[key]
+
+    if (
+      typeof item === 'string' &&
+      item.trim() &&
+      !/^https?:\/\//i.test(item.trim())
+    ) {
+      return item.trim()
+    }
+  }
+
+  return null
+}
+
+const collectDocumentUrls = (
+  value: unknown,
+  candidates: DocumentLinkCandidate[]
+): void => {
+  if (typeof value === 'string') {
+    for (const match of value.matchAll(/https?:\/\/[^\s<>"'，。；！？]+/gi)) {
+      candidates.push({ url: match[0], title: null })
+    }
+    return
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) collectDocumentUrls(item, candidates)
+    return
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    const directUrl = ['url', 'link', 'href']
+      .map((key) => record[key])
+      .find(
+        (item): item is string =>
+          typeof item === 'string' && /^https?:\/\//i.test(item.trim())
+      )
+
+    if (directUrl) {
+      candidates.push({
+        url: directUrl,
+        title: getObjectTitle(record)
+      })
+      return
+    }
+
+    for (const item of Object.values(record)) {
+      collectDocumentUrls(item, candidates)
+    }
+  }
+}
+
+/** 从需求详情所有文档类字段中提取链接，交给本地链接列表合并去重。 */
+export const getRequirementDocumentLinks = async (
+  workItemIdValue: unknown
+): Promise<RequirementLinkInput[]> => {
+  const workItemId = z.string().min(1).max(500).parse(workItemIdValue)
+  const detail = await getRequirementDetail(workItemId)
+  const links = new Map<string, string>()
+
+  for (const [fieldName, value] of Object.entries(detail.fields)) {
+    if (fieldName === '需求描述' || !DOCUMENT_FIELD_PATTERN.test(fieldName)) {
+      continue
+    }
+
+    const candidates: DocumentLinkCandidate[] = []
+    collectDocumentUrls(value, candidates)
+
+    const uniqueCandidates = new Map<string, DocumentLinkCandidate>()
+    for (const candidate of candidates) {
+      try {
+        const url = normalizeRequirementLinkUrl(candidate.url)
+        if (!uniqueCandidates.has(url)) uniqueCandidates.set(url, candidate)
+      } catch {
+        // 非完整网页地址不纳入相关链接。
+      }
+    }
+
+    let index = 0
+    for (const [url, candidate] of uniqueCandidates) {
+      if (links.has(url)) continue
+      index += 1
+      const fallbackName = candidate.title ?? fieldName
+      links.set(
+        url,
+        uniqueCandidates.size > 1 && !candidate.title
+          ? `${fallbackName} ${index}`
+          : fallbackName
+      )
+    }
+  }
+
+  if (detail.documentUrl) {
+    try {
+      const url = normalizeRequirementLinkUrl(detail.documentUrl)
+      if (!links.has(url)) links.set(url, '需求文档')
+    } catch {
+      // 需求文档地址异常时忽略。
+    }
+  }
+
+  return [...links].map(([url, name]) => ({ name, url }))
+}
+
 /** 注册独立的扫描、新增、编辑、删除 IPC，参数校验由对应业务函数负责。 */
 export const initializeRequirementLinks = (): void => {
   ipcMain.handle('requirement-links:scan', (_event, scope: unknown, links: unknown, restoreDeleted: unknown) => scanRequirementLinks(scope, links, restoreDeleted))
   ipcMain.handle('requirement-links:add', (_event, scope: unknown, link: unknown) => addRequirementLink(scope, link))
   ipcMain.handle('requirement-links:update', (_event, scope: unknown, id: unknown, link: unknown) => updateRequirementLink(scope, id, link))
   ipcMain.handle('requirement-links:remove', (_event, scope: unknown, id: unknown) => removeRequirementLink(scope, id))
+  ipcMain.handle('requirement-links:document-links', (_event, workItemId: unknown) =>
+    getRequirementDocumentLinks(workItemId)
+  )
 }

@@ -142,6 +142,9 @@ const electronAPI = {
   /** 删除需求链接，并防止自动扫描重新添加。 */
   removeRequirementLink: (scope: RequirementLinkScope, id: string): Promise<RequirementLink[]> =>
     ipcRenderer.invoke('requirement-links:remove', scope, id),
+  /** 读取需求详情中所有文档类字段的链接。 */
+  getRequirementDocumentLinks: (workItemId: string): Promise<RequirementLinkInput[]> =>
+    ipcRenderer.invoke('requirement-links:document-links', workItemId),
   /** 导出本机应用数据为压缩包。 */
   exportMigrationData: (): Promise<MigrationExportResult> =>
     ipcRenderer.invoke('migration:export'),

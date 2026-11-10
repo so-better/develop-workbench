@@ -138,6 +138,8 @@ export interface ElectronAPI {
   updateRequirementLink: (scope: RequirementLinkScope, id: string, link: RequirementLinkInput) => Promise<RequirementLink[]>
   /** 删除需求链接，并防止自动扫描重新添加。 */
   removeRequirementLink: (scope: RequirementLinkScope, id: string) => Promise<RequirementLink[]>
+  /** 读取需求详情中所有文档类字段的链接。 */
+  getRequirementDocumentLinks: (workItemId: string) => Promise<RequirementLinkInput[]>
   /** 导出本机应用数据为压缩包。 */
   exportMigrationData: () => Promise<MigrationExportResult>
   /** 导入迁移压缩包，自动备份当前数据。 */

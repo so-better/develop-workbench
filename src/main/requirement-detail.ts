@@ -144,6 +144,23 @@ const simplifyFieldValue = (value: unknown): unknown => {
 
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>
+    const url = ['url', 'link', 'href']
+      .map((key) => record[key])
+      .find(
+        (item): item is string =>
+          typeof item === 'string' && /^https?:\/\//i.test(item.trim())
+      )
+
+    if (url) {
+      const title = ['label', 'name', 'title', 'text']
+        .map((key) => record[key])
+        .find(
+          (item): item is string =>
+            typeof item === 'string' && item.trim().length > 0
+        )
+
+      return title ? { title, url } : { url }
+    }
 
     for (const key of ['label', 'name', 'title', 'text', 'iso_time']) {
       if (isScalar(record[key]) && record[key] !== '') return record[key]

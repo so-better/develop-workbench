@@ -58,7 +58,12 @@ export const isCurrentRequirementUrl = (url: string, requirementUrl: string | nu
 }
 
 /** 解析 Markdown 语法树及原始富文本，不请求链接目标，也不执行 HTML。 */
-export const extractRequirementLinks = (description: string | null, documentUrl: string | null, requirementUrl: string | null = null): RequirementLinkInput[] => {
+export const extractRequirementLinks = (
+  description: string | null,
+  documentUrl: string | null,
+  requirementUrl: string | null = null,
+  documentLinks: RequirementLinkInput[] = []
+): RequirementLinkInput[] => {
   // 按规范化后的完整 URL 去重并保留首次名称，查询参数和锚点不同仍是不同入口。
   const links = new Map<string, RequirementLinkInput>()
   const add = (raw: string, title = ''): void => {
@@ -75,6 +80,7 @@ export const extractRequirementLinks = (description: string | null, documentUrl:
     } catch { /* 非网页链接不加入列表。 */ }
   }
   // 文档字段优先，避免同一地址在描述中出现时被无意义的链接文字命名。
+  for (const link of documentLinks) add(link.url, link.name)
   if (documentUrl) add(documentUrl, '需求文档')
   const source = description ?? ''
   const tree = parser.parse(source) as LinkNode
