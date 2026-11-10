@@ -1,0 +1,129 @@
+.power-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.power-settings-card {
+  overflow: hidden;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 12px;
+}
+
+.power-settings-card-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--workbench-soft);
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.power-settings-card-head h4 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.power-settings-card-head p {
+  margin: 4px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.power-settings-badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 4px;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  color: #1677ff;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  background: rgba(22, 119, 255, 0.08);
+  border-radius: 999px;
+}
+
+.power-settings-badge.is-warning {
+  color: #b26b00;
+  background: rgba(245, 179, 1, 0.12);
+}
+
+.power-settings-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 15px 16px;
+}
+
+.power-settings-row + .power-settings-row {
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.power-settings-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--app-muted);
+  font-size: 15px;
+  background: var(--workbench-soft);
+  border-radius: 8px;
+}
+
+.power-settings-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.power-settings-row-copy strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.power-settings-row-copy p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.power-settings-row-control {
+  display: flex;
+  flex-shrink: 0;
+  gap: 10px;
+  align-items: center;
+}
+
+.power-settings-state {
+  color: var(--app-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.power-settings-state.is-on {
+  color: #1677ff;
+}
+
+@media (max-width: 760px) {
+  .power-settings-row {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .power-settings-row-control {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}

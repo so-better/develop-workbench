@@ -48,6 +48,7 @@ import type {
   AdbScreenRecordStartResult,
   AdbScreenshotResult
 } from '../types/adb'
+import type { PowerSettingKey, PowerSettingsState } from '../types/power'
 import type {
   TerminalCreateInput,
   TerminalDataEvent,
@@ -552,6 +553,17 @@ const electronAPI = {
    */
   selectTerminalShell: (): Promise<string | null> =>
     ipcRenderer.invoke('terminal:select-shell'),
+
+  /** 读取电源设置。 */
+  getPowerSettings: (): Promise<PowerSettingsState> =>
+    ipcRenderer.invoke('power:get-settings'),
+
+  /** 更新运行期间或系统电源设置。 */
+  setPowerSetting: (
+    key: PowerSettingKey,
+    enabled: boolean
+  ): Promise<PowerSettingsState> =>
+    ipcRenderer.invoke('power:set-setting', key, enabled),
 
   /**
    * 订阅终端设置变化。

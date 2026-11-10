@@ -36,11 +36,13 @@ export interface AppPreferences {
   ide?: IdeConfig
   skillDirectories?: string[]
   productGuideSeenVersion?: number
+  powerRuntimeKeepAwake?: boolean
   terminal: TerminalSettings
 }
 
 const DEFAULT_PREFERENCES: AppPreferences = {
   theme: 'system',
+  powerRuntimeKeepAwake: false,
   terminal: { ...DEFAULT_TERMINAL_SETTINGS }
 }
 
@@ -182,6 +184,7 @@ const readPreferences = (): AppPreferences => {
     ide?: unknown
     skillDirectories?: unknown
     productGuideSeenVersion?: unknown
+    powerRuntimeKeepAwake?: unknown
     terminal?: unknown
   }
 
@@ -206,6 +209,10 @@ const readPreferences = (): AppPreferences => {
       value.productGuideSeenVersion >= 0
         ? value.productGuideSeenVersion
         : undefined,
+    powerRuntimeKeepAwake:
+      typeof value.powerRuntimeKeepAwake === 'boolean'
+        ? value.powerRuntimeKeepAwake
+        : false,
     terminal: normalizeTerminalSettings(value.terminal)
   }
 

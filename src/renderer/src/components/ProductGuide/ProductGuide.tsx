@@ -19,6 +19,7 @@ import {
   SearchOutlined,
   SettingOutlined,
   SnippetsOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons'
 import { Button, Modal } from 'antd'
 import RobotMark from '../RobotMark/RobotMark'
@@ -136,6 +137,15 @@ const CAPABILITIES: GuideCapability[] = [
       '可开启选中即复制；多行粘贴前会二次确认',
       'macOS 使用 Cmd+K 清屏，Windows 使用 cls 命令清屏',
       '重启应用后不恢复历史终端，只打开一个全新的默认终端'
+    ]
+  },
+  {
+    title: '防休眠',
+    icon: <ThunderboltOutlined />,
+    items: [
+      '设置「防休眠」中可开启运行期间保持唤醒，应用退出后自动释放，不需要管理员权限',
+      '合盖后不睡眠、锁屏后不睡眠通过系统电源策略实现，需要管理员授权，退出应用后仍然生效',
+      '系统电源策略和运行时保持唤醒可以分别控制，按需组合使用'
     ]
   },
   {

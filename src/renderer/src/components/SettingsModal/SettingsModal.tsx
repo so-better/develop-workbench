@@ -21,6 +21,7 @@ import StorageCleanup from '../StorageCleanup/StorageCleanup'
 import TerminalSettings from '../TerminalSettings/TerminalSettings'
 import MigrationSettings from '../MigrationSettings/MigrationSettings'
 import ClipboardSettings from '../ClipboardSettings/ClipboardSettings'
+import PowerSettings from '../PowerSettings/PowerSettings'
 
 const CodeEditor = lazy(() => import('../CodeEditor/CodeEditor'))
 
@@ -97,6 +98,7 @@ export default function SettingsModal({
   const [aiSettingsTab, setAiSettingsTab] = useState('model')
   const lastSavedDraftRef = useRef('')
   const aiSaveTimerRef = useRef<number | null>(null)
+  const settingsNavRef = useRef<HTMLElement | null>(null)
   const [larkInfo, setLarkInfo] = useState<LarkCliInfo | null>(null)
   const [larkPathDraft, setLarkPathDraft] = useState('')
   const [larkSaving, setLarkSaving] = useState(false)
@@ -154,6 +156,28 @@ export default function SettingsModal({
       mounted = false
     }
   }, [initialSection, open])
+
+  useEffect(() => {
+    if (!open) return
+
+    const frame = window.requestAnimationFrame(() => {
+      const nav = settingsNavRef.current
+      const active = nav?.querySelector<HTMLElement>('.settings-nav-item.is-active')
+
+      if (!nav || !active) return
+
+      const navRect = nav.getBoundingClientRect()
+      const itemRect = active.getBoundingClientRect()
+
+      if (itemRect.top < navRect.top) {
+        nav.scrollTop -= navRect.top - itemRect.top
+      } else if (itemRect.bottom > navRect.bottom) {
+        nav.scrollTop += itemRect.bottom - navRect.bottom
+      }
+    })
+
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeSection, open])
 
   /**
    * 模型配置 JSON 合法时防抖自动保存。
@@ -368,7 +392,7 @@ export default function SettingsModal({
       footer={null}
     >
       <div className="settings-dialog">
-        <nav className="settings-nav" aria-label="设置分类">
+        <nav className="settings-nav" aria-label="设置分类" ref={settingsNavRef}>
           <button
             type="button"
             className={`settings-nav-item${activeSection === 'lark-cli' ? ' is-active' : ''}`}
@@ -416,6 +440,14 @@ export default function SettingsModal({
             onClick={() => setActiveSection('terminal')}
           >
             <span className="settings-nav-label">终端</span>
+          </button>
+          <button
+            type="button"
+            className={`settings-nav-item${activeSection === 'power' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'power' ? 'page' : undefined}
+            onClick={() => setActiveSection('power')}
+          >
+            <span className="settings-nav-label">防休眠</span>
           </button>
           <button
             type="button"
@@ -675,6 +707,8 @@ export default function SettingsModal({
           ) : null}
 
           {activeSection === 'terminal' ? <TerminalSettings /> : null}
+
+          {activeSection === 'power' ? <PowerSettings /> : null}
 
           {activeSection === 'cleanup' ? <StorageCleanup /> : null}
           {activeSection === 'clipboard' ? <ClipboardSettings /> : null}

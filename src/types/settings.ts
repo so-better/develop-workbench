@@ -8,6 +8,7 @@ export type SettingsSection =
   | 'adb'
   | 'ide'
   | 'terminal'
+  | 'power'
   | 'repositories'
   | 'ai'
   | 'skills'

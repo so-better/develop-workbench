@@ -714,14 +714,15 @@ body {
   display: grid;
   grid-template-columns: 176px minmax(0, 1fr);
   gap: 24px;
-  min-height: 420px;
+  height: min(760px, calc(100vh - 160px));
 }
 
 .settings-nav {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  max-height: 64vh;
+  gap: 4px;
+  height: 100%;
+  min-height: 0;
   padding-right: 16px;
   overflow-y: auto;
   border-right: 1px solid var(--control-border);
@@ -730,33 +731,33 @@ body {
 }
 
 .settings-nav-item {
-  position: relative;
   display: flex;
+  gap: 10px;
   align-items: center;
+  justify-content: space-between;
   width: 100%;
-  padding: 9px 12px 9px 14px;
+  padding: 9px 12px;
   color: var(--app-muted);
   font-family: inherit;
   font-size: 13px;
   line-height: 20px;
   text-align: left;
   background: transparent;
-  border: 0;
-  border-radius: 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
   cursor: pointer;
   transition:
     color 0.15s ease,
-    background-color 0.15s ease;
+    background-color 0.15s ease,
+    border-color 0.15s ease;
 }
 
-.settings-nav-item::before {
-  position: absolute;
-  top: 7px;
-  bottom: 7px;
-  left: 0;
-  width: 2px;
+.settings-nav-item::after {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
   background: transparent;
-  border-radius: 2px;
+  border-radius: 50%;
   content: '';
 }
 
@@ -775,15 +776,40 @@ body {
 .settings-nav-item.is-active {
   color: #1677ff;
   font-weight: 600;
-  background: transparent;
+  background: rgba(22, 119, 255, 0.08);
+  border-color: rgba(22, 119, 255, 0.18);
 }
 
-.settings-nav-item.is-active::before {
+.settings-nav-item.is-active::after {
   background: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+}
+
+:root[data-theme="dark"] .settings-nav-item.is-active {
+  background: rgba(22, 119, 255, 0.16);
+  border-color: rgba(22, 119, 255, 0.3);
 }
 
 .settings-panel {
   min-width: 0;
+  height: 100%;
+  min-height: 0;
+  padding-right: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--control-border) transparent;
+  scrollbar-width: thin;
+}
+
+.settings-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settings-panel::-webkit-scrollbar-thumb {
+  background: var(--control-border);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
 }
 
 .settings-panel-header {

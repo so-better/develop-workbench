@@ -46,6 +46,7 @@ import type {
   AdbScreenRecordStartResult,
   AdbScreenshotResult
 } from '../types/adb'
+import type { PowerSettingKey, PowerSettingsState } from '../types/power'
 import type {
   TerminalCreateInput,
   TerminalDataEvent,
@@ -315,6 +316,13 @@ export interface ElectronAPI {
   ) => Promise<TerminalSettings>
   /** 选择自定义 shell 可执行文件。 */
   selectTerminalShell: () => Promise<string | null>
+  /** 读取电源设置。 */
+  getPowerSettings: () => Promise<PowerSettingsState>
+  /** 更新运行期间或系统电源设置。 */
+  setPowerSetting: (
+    key: PowerSettingKey,
+    enabled: boolean
+  ) => Promise<PowerSettingsState>
   /** 订阅终端设置变化。 */
   onTerminalSettingsChange: (
     listener: (settings: TerminalSettings) => void
