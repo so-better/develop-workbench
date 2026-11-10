@@ -10,6 +10,7 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  StarFilled,
   StarOutlined
 } from '@ant-design/icons'
 import {
@@ -40,6 +41,7 @@ import {
   Popconfirm,
   Select,
   Spin,
+  Switch,
   Tag,
   Tooltip
 } from 'antd'
@@ -54,19 +56,7 @@ interface SiteFormValues {
   url: string
   tags?: string[]
   env?: SiteEnv | null
-}
-
-const SITE_TAG_COLORS: Record<string, string> = {
-  飞书文档: '#2f54eb',
-  飞书表格: '#13c2c2',
-  业务系统: '#079455',
-  技术平台: '#d48806',
-  开发工具: '#1677ff',
-  调试工具: '#722ed1',
-  'CI/CD': '#d4380d',
-  监控告警: '#d92d20',
-  数据平台: '#d46b08',
-  外部工具: '#c41d7f'
+  important?: boolean
 }
 
 const SITE_ENV_OPTIONS: Array<{ value: SiteEnv; label: string }> = [
@@ -98,17 +88,7 @@ const DEFAULT_SITE_TAGS = [
   '外部工具'
 ]
 
-const DEFAULT_SITE_THEME_COLOR = '#1677ff'
-
-const getSiteThemeColor = (site: SiteLink): string => {
-  for (const tag of site.tags) {
-    const color = SITE_TAG_COLORS[tag]
-
-    if (color) return color
-  }
-
-  return DEFAULT_SITE_THEME_COLOR
-}
+type SiteCardVariant = 'important' | 'frequent' | 'all'
 
 const FREQUENT_CLICK_THRESHOLD = 2
 const FREQUENT_SITE_LIMIT = 8
@@ -120,9 +100,12 @@ const getSiteDisplayUrl = (url: string): string =>
 
 interface SiteCardProps {
   site: SiteLink
+  variant?: SiteCardVariant
   onOpen: () => void
   onEdit: () => void
   onRemove: () => void
+  onToggleImportant: () => void
+  importantUpdating?: boolean
   dragHandle?: ReactNode
 }
 
@@ -131,18 +114,16 @@ interface SiteCardProps {
  */
 function SiteCard({
   site,
+  variant = 'all',
   onOpen,
   onEdit,
   onRemove,
+  onToggleImportant,
+  importantUpdating = false,
   dragHandle
 }: SiteCardProps): JSX.Element {
-  const accent = getSiteThemeColor(site)
-
   return (
-    <article
-      className="site-card"
-      style={{ '--site-accent': accent } as CSSProperties}
-    >
+    <article className={`site-card is-${variant}`}>
       <span className="site-card-accent" aria-hidden="true" />
       <button
         type="button"
@@ -176,7 +157,7 @@ function SiteCard({
           {site.tags.length > 0 ? (
             <span className="site-card-tags">
               {site.tags.map((tag) => (
-                <Tag key={tag} color={SITE_TAG_COLORS[tag]}>
+                <Tag key={tag} className="site-card-tag">
                   {tag}
                 </Tag>
               ))}
@@ -194,6 +175,18 @@ function SiteCard({
         </button>
         <div className="site-card-actions">
           {dragHandle}
+          <Tooltip title={site.important ? '取消重要站点' : '设为重要站点'}>
+            <Button
+              type="text"
+              size="small"
+              className={site.important ? 'is-important' : undefined}
+              icon={site.important ? <StarFilled /> : <StarOutlined />}
+              loading={importantUpdating}
+              disabled={importantUpdating}
+              aria-label={site.important ? `取消重要站点 ${site.name}` : `设为重要站点 ${site.name}`}
+              onClick={onToggleImportant}
+            />
+          </Tooltip>
           <Button
             type="text"
             size="small"
@@ -228,9 +221,12 @@ interface SortableSiteCardProps extends Omit<SiteCardProps, 'dragHandle'> { }
  */
 function SortableSiteCard({
   site,
+  variant = 'all',
   onOpen,
   onEdit,
-  onRemove
+  onRemove,
+  onToggleImportant,
+  importantUpdating
 }: SortableSiteCardProps): JSX.Element {
   const {
     attributes,
@@ -254,9 +250,12 @@ function SortableSiteCard({
     >
       <SiteCard
         site={site}
+        variant={variant}
         onOpen={onOpen}
         onEdit={onEdit}
         onRemove={onRemove}
+        onToggleImportant={onToggleImportant}
+        importantUpdating={importantUpdating}
         dragHandle={
           <Tooltip title="拖拽排序">
             <button
@@ -295,6 +294,10 @@ export default function SitesPage(): JSX.Element {
   const searchInputRef = useRef<InputRef>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [activeWidth, setActiveWidth] = useState<number | undefined>()
+  const [importantUpdatingIds, setImportantUpdatingIds] = useState<Set<string>>(
+    () => new Set()
+  )
+  const importantUpdatingRef = useRef(new Set<string>())
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 6 }
@@ -409,7 +412,9 @@ export default function SitesPage(): JSX.Element {
   const frequentSites = useMemo(
     () =>
       filteredSites
-        .filter((site) => site.clickCount >= FREQUENT_CLICK_THRESHOLD)
+        .filter(
+          (site) => !site.important && site.clickCount >= FREQUENT_CLICK_THRESHOLD
+        )
         .sort((left, right) => {
           const countDiff = right.clickCount - left.clickCount
 
@@ -424,13 +429,19 @@ export default function SitesPage(): JSX.Element {
     [filteredSites]
   )
 
+  const importantSites = useMemo(
+    () => filteredSites.filter((site) => site.important),
+    [filteredSites]
+  )
+
   const openCreate = (): void => {
     setEditingSite(null)
     form.setFieldsValue({
       name: '',
       url: '',
       tags: [],
-      env: null
+      env: null,
+      important: false
     })
     setModalOpen(true)
   }
@@ -441,7 +452,8 @@ export default function SitesPage(): JSX.Element {
       name: site.name,
       url: site.url,
       tags: site.tags,
-      env: site.env
+      env: site.env,
+      important: site.important
     })
     setModalOpen(true)
   }
@@ -465,7 +477,8 @@ export default function SitesPage(): JSX.Element {
       name: values.name.trim(),
       url: normalizeHttpUrl(values.url, '站点 URL'),
       tags: values.tags ?? [],
-      env: values.env ?? null
+      env: values.env ?? null,
+      important: values.important === true
     }
 
     setSaving(true)
@@ -482,6 +495,31 @@ export default function SitesPage(): JSX.Element {
       message.error(getErrorMessage(saveError, '保存站点失败'))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleToggleImportant = async (site: SiteLink): Promise<void> => {
+    if (importantUpdatingRef.current.has(site.id)) return
+
+    importantUpdatingRef.current.add(site.id)
+    setImportantUpdatingIds(new Set(importantUpdatingRef.current))
+
+    try {
+      const next = await window.electron.updateSite(site.id, {
+        name: site.name,
+        url: site.url,
+        tags: site.tags,
+        env: site.env,
+        important: !site.important
+      })
+
+      setSites(next.sites)
+      message.success(site.important ? '已取消重要站点' : '已设为重要站点')
+    } catch (toggleError) {
+      message.error(getErrorMessage(toggleError, '更新重要站点失败'))
+    } finally {
+      importantUpdatingRef.current.delete(site.id)
+      setImportantUpdatingIds(new Set(importantUpdatingRef.current))
     }
   }
 
@@ -634,8 +672,36 @@ export default function SitesPage(): JSX.Element {
               </div>
             ) : (
               <div className="sites-sections">
+                {importantSites.length > 0 ? (
+                  <section className="sites-section is-important">
+                    <div className="sites-section-heading">
+                      <h2>
+                        <StarFilled className="sites-section-icon is-important" />
+                        重要站点
+                      </h2>
+                      <span className="sites-section-count">
+                        共 {importantSites.length} 个
+                      </span>
+                    </div>
+                    <div className="sites-grid">
+                      {importantSites.map((site) => (
+                        <SiteCard
+                          key={`important-${site.id}`}
+                          site={site}
+                          variant="important"
+                          onOpen={() => handleOpenSite(site)}
+                          onEdit={() => openEdit(site)}
+                          onRemove={() => handleRemove(site)}
+                          onToggleImportant={() => void handleToggleImportant(site)}
+                          importantUpdating={importantUpdatingIds.has(site.id)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
                 {frequentSites.length > 0 ? (
-                  <section className="sites-section">
+                  <section className="sites-section is-frequent">
                     <div className="sites-section-heading">
                       <h2>
                         <StarOutlined className="sites-section-icon is-favorite" />
@@ -650,27 +716,28 @@ export default function SitesPage(): JSX.Element {
                         <SiteCard
                           key={`frequent-${site.id}`}
                           site={site}
+                          variant="frequent"
                           onOpen={() => handleOpenSite(site)}
                           onEdit={() => openEdit(site)}
                           onRemove={() => handleRemove(site)}
+                          onToggleImportant={() => void handleToggleImportant(site)}
+                          importantUpdating={importantUpdatingIds.has(site.id)}
                         />
                       ))}
                     </div>
                   </section>
                 ) : null}
 
-                <section className="sites-section">
-                  {frequentSites.length > 0 ? (
-                    <div className="sites-section-heading">
-                      <h2>
-                        <AppstoreOutlined className="sites-section-icon" />
-                        全部站点
-                      </h2>
-                      <span className="sites-section-count">
-                        共 {filteredSites.length} 个
-                      </span>
-                    </div>
-                  ) : null}
+                <section className="sites-section is-all">
+                  <div className="sites-section-heading">
+                    <h2>
+                      <AppstoreOutlined className="sites-section-icon" />
+                      全部站点
+                    </h2>
+                    <span className="sites-section-count">
+                      共 {filteredSites.length} 个
+                    </span>
+                  </div>
                   {canReorder ? (
                     <DndContext
                       sensors={sensors}
@@ -691,6 +758,8 @@ export default function SitesPage(): JSX.Element {
                               onOpen={() => handleOpenSite(site)}
                               onEdit={() => openEdit(site)}
                               onRemove={() => handleRemove(site)}
+                              onToggleImportant={() => void handleToggleImportant(site)}
+                              importantUpdating={importantUpdatingIds.has(site.id)}
                             />
                           ))}
                         </div>
@@ -706,6 +775,8 @@ export default function SitesPage(): JSX.Element {
                               onOpen={() => undefined}
                               onEdit={() => undefined}
                               onRemove={() => undefined}
+                              onToggleImportant={() => undefined}
+                              importantUpdating={false}
                             />
                           </div>
                         ) : null}
@@ -720,6 +791,8 @@ export default function SitesPage(): JSX.Element {
                           onOpen={() => handleOpenSite(site)}
                           onEdit={() => openEdit(site)}
                           onRemove={() => handleRemove(site)}
+                          onToggleImportant={() => void handleToggleImportant(site)}
+                          importantUpdating={importantUpdatingIds.has(site.id)}
                         />
                       ))}
                     </div>
@@ -782,6 +855,14 @@ export default function SitesPage(): JSX.Element {
               placeholder="不区分环境"
               options={SITE_ENV_OPTIONS}
             />
+          </Form.Item>
+          <Form.Item
+            label="重要站点"
+            name="important"
+            valuePropName="checked"
+            extra="重要站点会显示在常用站点上方，最多 4 个"
+          >
+            <Switch />
           </Form.Item>
           <Form.Item label="标签" name="tags">
             <Select

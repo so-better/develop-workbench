@@ -16,7 +16,7 @@ import {
 export const siteTools: ToolSet = {
   listSites: tool({
     description:
-      '读取用户在本机保存的所有站点，返回 id、名称、URL、标签、环境、打开次数和最近打开时间。分析、更新或删除站点前先调用。',
+      '读取用户在本机保存的所有站点，返回 id、名称、URL、标签、环境、重要标记、打开次数和最近打开时间。分析、更新或删除站点前先调用。',
     metadata: { label: '查询站点' },
     inputSchema: z.object({}),
     execute: async () => getSiteState()

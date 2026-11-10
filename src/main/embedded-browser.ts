@@ -1215,6 +1215,40 @@ export const initializeEmbeddedBrowser = (): void => {
     closeEmbeddedBrowserTab(window, id)
   })
 
+  ipcMain.handle('embedded-browser:reorder-tabs', (event, ids: unknown) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+
+    if (!window || !Array.isArray(ids)) return
+
+    const retained = pages.get(window.id)
+
+    if (!retained) return
+
+    const byId = new Map(retained.map((page) => [page.id, page]))
+    const ordered: BrowserEntry[] = []
+    const seen = new Set<string>()
+
+    for (const id of ids) {
+      if (typeof id !== 'string' || seen.has(id)) continue
+
+      const page = byId.get(id)
+
+      if (!page) continue
+
+      seen.add(id)
+      ordered.push(page)
+    }
+
+    for (const page of retained) {
+      if (!seen.has(page.id)) ordered.push(page)
+    }
+
+    pages.set(window.id, ordered)
+    const active = entries.get(window.id)
+
+    if (active) broadcastState(active)
+  })
+
   ipcMain.handle('embedded-browser:open', (event, rawUrl: unknown) => {
     if (typeof rawUrl !== 'string') throw new Error('链接格式不合法')
 

@@ -34,6 +34,9 @@
   --workbench-shadow: 0 18px 50px -38px rgba(15, 23, 42, 0.35);
   /* 站点卡片需要更明确的边界，避免和页面背景融在一起。 */
   --site-card-border: #dfe6f0;
+  --site-important: #f59e0b;
+  --site-frequent: #1677ff;
+  --site-all: #5e6ad2;
   --site-card-footer-border: rgba(15, 23, 42, 0.08);
   --site-card-shadow:
     0 1px 2px rgba(15, 23, 42, 0.05),
@@ -111,6 +114,35 @@
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+}
+
+.embedded-browser-tab-handle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 18px;
+  padding: 0;
+  margin-left: 3px;
+  color: var(--workbench-secondary);
+  background: transparent;
+  border: 0;
+  opacity: 0.55;
+  cursor: grab;
+}
+
+.embedded-browser-tab-handle:hover {
+  color: var(--app-text);
+  opacity: 1;
+}
+
+.embedded-browser-tab.is-dragging {
+  z-index: 1;
+}
+
+.embedded-browser-tab.is-dragging .embedded-browser-tab-handle {
+  cursor: grabbing;
 }
 
 .embedded-browser-tab.is-active > button[role="tab"] {
@@ -6052,16 +6084,77 @@ body {
 .sites-sections {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
   max-width: 1200px;
   margin: 0 auto;
+}
+
+.sites-section {
+  position: relative;
+  padding: 16px 16px 18px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 14px;
+}
+
+.sites-section.is-important {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--site-important) 6%, transparent),
+      transparent 120px
+    ),
+    var(--workbench-soft);
+  border-color: color-mix(in srgb, var(--site-important) 20%, transparent);
+}
+
+.sites-section.is-frequent {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--site-frequent) 4%, transparent),
+      transparent 120px
+    ),
+    var(--workbench-soft);
+  border-color: color-mix(in srgb, var(--site-frequent) 16%, transparent);
 }
 
 .sites-section-heading {
   display: flex;
   gap: 9px;
   align-items: center;
-  margin-bottom: 12px;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.sites-section-heading::before {
+  width: 3px;
+  height: 15px;
+  background: var(--workbench-secondary);
+  border-radius: 999px;
+  opacity: 0.35;
+  content: '';
+}
+
+.sites-section.is-important .sites-section-heading::before {
+  background: var(--site-important);
+  opacity: 1;
+}
+
+.sites-section.is-frequent .sites-section-heading::before {
+  background: var(--site-frequent);
+  opacity: 0.9;
+}
+
+.sites-section.is-all .sites-section-heading::before {
+  background: var(--site-all);
+  opacity: 0.9;
+}
+
+.sites-section.is-all .sites-section-icon {
+  color: var(--site-all);
+  opacity: 0.9;
 }
 
 .sites-section-heading h2 {
@@ -6081,8 +6174,9 @@ body {
   opacity: 0.75;
 }
 
-.sites-section-icon.is-favorite {
-  color: #f59e0b;
+.sites-section-icon.is-favorite,
+.sites-section-icon.is-important {
+  color: var(--site-important);
   opacity: 1;
 }
 
@@ -6109,13 +6203,40 @@ body {
   height: 100%;
   overflow: hidden;
   background: var(--workbench-panel);
-  border: 1px solid var(--site-card-border);
+  border: 1px solid var(--site-card-border-color, var(--site-card-border));
   border-radius: 14px;
   box-shadow: var(--site-card-shadow);
   transition:
     border-color 0.18s ease,
     box-shadow 0.18s ease,
     transform 0.18s ease;
+}
+
+.site-card.is-important {
+  --site-accent: var(--site-important);
+  --site-card-border-color: color-mix(
+    in srgb,
+    var(--site-important) 28%,
+    transparent
+  );
+}
+
+.site-card.is-frequent {
+  --site-accent: var(--site-frequent);
+  --site-card-border-color: color-mix(
+    in srgb,
+    var(--site-frequent) 26%,
+    transparent
+  );
+}
+
+.site-card.is-all {
+  --site-accent: var(--site-all);
+  --site-card-border-color: color-mix(
+    in srgb,
+    var(--site-all) 26%,
+    transparent
+  );
 }
 
 .site-card-accent {
@@ -6242,6 +6363,16 @@ body {
   margin-inline-end: 0;
   font-size: 10px;
   line-height: 18px;
+}
+
+.site-card-tags .site-card-tag.ant-tag {
+  color: var(--site-accent) !important;
+  background: color-mix(in srgb, var(--site-accent) 13%, transparent) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--site-accent) 32%,
+    transparent
+  ) !important;
 }
 
 .site-card-copy strong {
@@ -6380,6 +6511,10 @@ body {
 .site-card-actions .ant-btn:hover {
   color: var(--app-text) !important;
   background: var(--workbench-hover) !important;
+}
+
+.site-card-actions .ant-btn.is-important {
+  color: var(--site-important) !important;
 }
 
 .site-form {

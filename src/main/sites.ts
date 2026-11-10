@@ -15,6 +15,7 @@ const STORE_FILE = 'sites.json'
 const MAX_NAME_LENGTH = 60
 const MAX_TAGS = 10
 const MAX_TAG_LENGTH = 20
+const MAX_IMPORTANT_SITES = 4
 
 const getStorePath = (): string => join(app.getPath('userData'), STORE_FILE)
 
@@ -60,6 +61,7 @@ const normalizeStoredSite = (value: unknown): SiteLink | null => {
       url: normalizeHttpUrl(site.url, '站点 URL'),
       tags: normalizeTags(site.tags),
       env: normalizeSiteEnv(site.env),
+      important: site.important === true,
       clickCount: Math.max(0, Math.floor(Number(site.clickCount) || 0)),
       lastOpenedAt:
         typeof site.lastOpenedAt === 'string' ? site.lastOpenedAt : null,
@@ -110,6 +112,7 @@ const toInput = (
   url: string
   tags: string[]
   env: SiteEnv | null
+  important: boolean
 } => {
   if (!input || typeof input !== 'object') throw new Error('站点参数不合法')
 
@@ -121,7 +124,24 @@ const toInput = (
     name,
     url: normalizeHttpUrl(input.url, '站点 URL'),
     tags: normalizeTags(input.tags),
-    env: normalizeSiteEnv(input.env)
+    env: normalizeSiteEnv(input.env),
+    important: input.important === true
+  }
+}
+
+const assertImportantSiteLimit = (
+  sites: SiteLink[],
+  important: boolean,
+  excludeId?: string
+): void => {
+  if (!important) return
+
+  const count = sites.filter(
+    (site) => site.id !== excludeId && site.important
+  ).length
+
+  if (count >= MAX_IMPORTANT_SITES) {
+    throw new Error(`重要站点最多 ${MAX_IMPORTANT_SITES} 个`)
   }
 }
 
@@ -139,11 +159,12 @@ const assertUniqueSiteUrl = (
   }
 }
 
-export const addSite = async (input: SiteInput): Promise<SiteState> => {
+const addSiteUnlocked = async (input: SiteInput): Promise<SiteState> => {
   const normalized = toInput(input)
   const sites = await readSites()
 
   assertUniqueSiteUrl(sites, normalized.url)
+  assertImportantSiteLimit(sites, normalized.important)
 
   const now = new Date().toISOString()
 
@@ -162,7 +183,7 @@ export const addSite = async (input: SiteInput): Promise<SiteState> => {
   return getSiteState()
 }
 
-export const updateSite = async (id: string, input: SiteInput): Promise<SiteState> => {
+const updateSiteUnlocked = async (id: string, input: SiteInput): Promise<SiteState> => {
   if (!id.trim()) throw new Error('站点 ID 不合法')
 
   const normalized = toInput(input)
@@ -173,12 +194,18 @@ export const updateSite = async (id: string, input: SiteInput): Promise<SiteStat
 
   assertUniqueSiteUrl(sites, normalized.url, id)
 
+  // AI 工具等未传 important 时保留原值，避免普通更新意外取消重要标记。
+  const important =
+    input.important === undefined ? existing.important : normalized.important
+  assertImportantSiteLimit(sites, important, id)
+
   await writeSites(
     sites.map((site) =>
       site.id === id
         ? {
             ...site,
             ...normalized,
+            important,
             updatedAt: new Date().toISOString()
           }
         : site
@@ -188,7 +215,7 @@ export const updateSite = async (id: string, input: SiteInput): Promise<SiteStat
   return getSiteState()
 }
 
-export const recordSiteOpen = async (id: string): Promise<SiteState> => {
+const recordSiteOpenUnlocked = async (id: string): Promise<SiteState> => {
   if (!id.trim()) throw new Error('站点 ID 不合法')
 
   const sites = await readSites()
@@ -211,7 +238,7 @@ export const recordSiteOpen = async (id: string): Promise<SiteState> => {
   return getSiteState()
 }
 
-export const reorderSites = async (ids: string[]): Promise<SiteState> => {
+const reorderSitesUnlocked = async (ids: string[]): Promise<SiteState> => {
   if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string')) {
     throw new Error('站点排序参数不合法')
   }
@@ -233,13 +260,44 @@ export const reorderSites = async (ids: string[]): Promise<SiteState> => {
   return getSiteState()
 }
 
-export const removeSite = async (id: string): Promise<SiteState> => {
+const removeSiteUnlocked = async (id: string): Promise<SiteState> => {
   if (!id.trim()) throw new Error('站点 ID 不合法')
 
   await writeSites((await readSites()).filter((site) => site.id !== id))
 
   return getSiteState()
 }
+
+let siteWriteQueue: Promise<unknown> = Promise.resolve()
+
+/** 串行化站点写操作，避免并发读改写互相覆盖。 */
+const withSiteWriteLock = <T>(operation: () => Promise<T>): Promise<T> => {
+  const result = siteWriteQueue.then(operation, operation)
+
+  siteWriteQueue = result.then(
+    () => undefined,
+    () => undefined
+  )
+
+  return result
+}
+
+export const addSite = (input: SiteInput): Promise<SiteState> =>
+  withSiteWriteLock(() => addSiteUnlocked(input))
+
+export const updateSite = (
+  id: string,
+  input: SiteInput
+): Promise<SiteState> => withSiteWriteLock(() => updateSiteUnlocked(id, input))
+
+export const recordSiteOpen = (id: string): Promise<SiteState> =>
+  withSiteWriteLock(() => recordSiteOpenUnlocked(id))
+
+export const reorderSites = (ids: string[]): Promise<SiteState> =>
+  withSiteWriteLock(() => reorderSitesUnlocked(ids))
+
+export const removeSite = (id: string): Promise<SiteState> =>
+  withSiteWriteLock(() => removeSiteUnlocked(id))
 
 export const initializeSites = (): void => {
   ipcMain.handle('sites:get-state', () => getSiteState())

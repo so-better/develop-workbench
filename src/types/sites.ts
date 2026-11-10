@@ -12,6 +12,8 @@ export interface SiteLink {
   url: string
   tags: string[]
   env: SiteEnv | null
+  /** 是否标记为重要站点。 */
+  important: boolean
   clickCount: number
   lastOpenedAt: string | null
   createdAt: string
@@ -27,4 +29,5 @@ export interface SiteInput {
   url: string
   tags?: string[]
   env?: SiteEnv | null
+  important?: boolean
 }

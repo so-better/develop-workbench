@@ -11,6 +11,7 @@ import {
   ExpandOutlined,
   ExportOutlined,
   GlobalOutlined,
+  HolderOutlined,
   LinkOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -18,6 +19,23 @@ import {
 } from '@ant-design/icons'
 import { App as AntdApp, Button, Input } from 'antd'
 import type { InputRef } from 'antd'
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors
+} from '@dnd-kit/core'
+import type { DragEndEvent, Modifier } from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  useSortable
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import EmbeddedBrowserDownloads from '../EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
 import type {
   EmbeddedBrowserBounds,
@@ -37,6 +55,82 @@ const clampPanelWidth = (value: number): number =>
     MIN_PANEL_WIDTH,
     Math.min(value, window.innerWidth * 0.9)
   )
+
+type EmbeddedBrowserTab = EmbeddedBrowserState['tabs'][number]
+
+/** 只允许标签在横向移动，避免上下拖动时跑出标签栏。 */
+const restrictToHorizontalAxis: Modifier = ({ transform }) => ({
+  ...transform,
+  y: 0
+})
+
+interface SortableBrowserTabProps {
+  tab: EmbeddedBrowserTab
+  active: boolean
+  onSelect: () => void
+  onClose: () => void
+}
+
+/** 可拖拽排序的内置浏览器标签。 */
+const SortableBrowserTab = ({
+  tab,
+  active,
+  onSelect,
+  onClose
+}: SortableBrowserTabProps): JSX.Element => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: tab.id })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.55 : undefined
+      }}
+      className={`embedded-browser-tab${active ? ' is-active' : ''}${
+        isDragging ? ' is-dragging' : ''
+      }`}
+    >
+      <button
+        ref={setActivatorNodeRef}
+        type="button"
+        className="embedded-browser-tab-handle"
+        aria-label={`拖拽排序 ${tab.title}`}
+        {...attributes}
+        {...listeners}
+      >
+        <HolderOutlined />
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active}
+        title={tab.url ?? tab.title}
+        onClick={onSelect}
+      >
+        {tab.loading ? <ReloadOutlined spin /> : <GlobalOutlined />}
+        <span>{tab.title}</span>
+      </button>
+      <Button
+        type="text"
+        size="small"
+        icon={<CloseOutlined />}
+        aria-label={`关闭页面 ${tab.title}`}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={onClose}
+      />
+    </div>
+  )
+}
 
 interface EmbeddedBrowserPanelProps {
   /** 应用层维护的下载列表。 */
@@ -79,6 +173,12 @@ export default function EmbeddedBrowserPanel({
   const openingBoundsRef = useRef<EmbeddedBrowserBounds | null>(null)
   const lastBoundsRef = useRef('')
   const closingRef = useRef(false)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates
+    })
+  )
 
   useEffect(() => {
     // 兼容旧版本留下的抑制状态；新逻辑下浏览器始终显示在最上层。
@@ -262,6 +362,29 @@ export default function EmbeddedBrowserPanel({
     setFindResult(null)
     window.electron.stopEmbeddedBrowserFind('clearSelection').catch(() => undefined)
   }, [state?.visible])
+
+  const handleTabDragEnd = useCallback(
+    (event: DragEndEvent): void => {
+      const { active, over, delta } = event
+
+      if (!over || active.id === over.id || !state) return
+      // 过滤点击时产生的极小位移，避免普通点击被误判为拖拽排序。
+      if (Math.abs(delta.x) < 8) return
+
+      const oldIndex = state.tabs.findIndex((tab) => tab.id === active.id)
+      const newIndex = state.tabs.findIndex((tab) => tab.id === over.id)
+
+      if (oldIndex < 0 || newIndex < 0) return
+
+      const nextTabs = arrayMove(state.tabs, oldIndex, newIndex)
+
+      setState((current) => (current ? { ...current, tabs: nextTabs } : current))
+      window.electron
+        .reorderEmbeddedBrowserTabs(nextTabs.map((tab) => tab.id))
+        .catch(() => undefined)
+    },
+    [state]
+  )
 
   /** 复制当前页面链接。 */
   const handleCopyUrl = async (): Promise<void> => {
@@ -568,15 +691,27 @@ export default function EmbeddedBrowserPanel({
 
       <div className="embedded-browser-tabbar">
         <div ref={tabsRef} className="embedded-browser-tabs" role="tablist" aria-label="已打开页面">
-          {state.tabs.map((tab) => (
-            <div className={`embedded-browser-tab${tab.id === state.activeTabId ? ' is-active' : ''}`} key={tab.id}>
-              <button type="button" role="tab" aria-selected={tab.id === state.activeTabId} title={tab.url ?? tab.title} onClick={() => window.electron.selectEmbeddedBrowserTab(tab.id)}>
-                {tab.loading ? <ReloadOutlined spin /> : <GlobalOutlined />}
-                <span>{tab.title}</span>
-              </button>
-              <Button type="text" size="small" icon={<CloseOutlined />} aria-label={`关闭页面 ${tab.title}`} onClick={() => window.electron.closeEmbeddedBrowserTab(tab.id)} />
-            </div>
-          ))}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToHorizontalAxis]}
+            onDragEnd={handleTabDragEnd}
+          >
+            <SortableContext
+              items={state.tabs.map((tab) => tab.id)}
+              strategy={horizontalListSortingStrategy}
+            >
+              {state.tabs.map((tab) => (
+                <SortableBrowserTab
+                  key={tab.id}
+                  tab={tab}
+                  active={tab.id === state.activeTabId}
+                  onSelect={() => window.electron.selectEmbeddedBrowserTab(tab.id)}
+                  onClose={() => window.electron.closeEmbeddedBrowserTab(tab.id)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         </div>
         <Button
           className="embedded-browser-close-all"
