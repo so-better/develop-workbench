@@ -329,8 +329,11 @@ export interface UpdateNodeInfoInput {
   /** 显式清空总排期，与 startAt/endAt 互斥。 */
   clearSchedule?: boolean
 
-  /** 总估分。 */
-  points?: number
+  /** 总估分；传 null 表示清空（后端按飞书接口写 0）。 */
+  points?: number | null
+
+  /** 实际工时（人天）；传 null 表示清空。 */
+  actualWorkTime?: number | null
 
   /** 节点负责人 user_key 列表；传空数组表示清空负责人。 */
   ownerUserKeys?: string[]

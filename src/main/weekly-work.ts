@@ -1,6 +1,6 @@
 /**
  * 周报工作上下文。
- * 汇总本周 Meegle/本地需求、已解决缺陷和代码提交，供 AI 一次读取。
+ * 汇总指定周（当前周或上一周）的 Meegle/本地需求、已解决缺陷和代码提交，供 AI 一次读取。
  */
 import { getWeeklyResolvedDefects } from './defects'
 import {
@@ -22,12 +22,15 @@ const compactText = (value: string | null, maxLength: number): string => {
   return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
 }
 
-/** 返回当前本地周的周一和周日。 */
-const getWeekRange = (): { start: string; end: string } => {
+/** 返回本地周（当前周或上一周）的周一和周日。 */
+const getWeekRange = (
+  week: 'current' | 'last' = 'current'
+): { start: string; end: string } => {
   const start = new Date()
   const day = start.getDay() || 7
 
   start.setDate(start.getDate() - day + 1)
+  if (week === 'last') start.setDate(start.getDate() - 7)
   start.setHours(0, 0, 0, 0)
 
   const end = new Date(start)
@@ -83,15 +86,15 @@ export interface WeeklyFixedDefect {
   description: string
 }
 
-/** 周报 AI 工具返回的完整本周上下文。 */
+/** 周报 AI 工具返回的完整周上下文。 */
 export interface WeeklyWorkContext {
-  /** 本周周一。 */
+  /** 周报周期开始日期。 */
   weekStart: string
 
-  /** 本周周日。 */
+  /** 周报周期结束日期。 */
   weekEnd: string
 
-  /** 本周 Meegle 和本地临时需求。 */
+  /** 周报周期内 Meegle 和本地临时需求。 */
   requirements: WeeklyWorkItem[]
 
   /** 需求总数，items 可能被截断。 */
@@ -100,13 +103,13 @@ export interface WeeklyWorkContext {
   /** 需求读取说明。 */
   requirementsNote: string
 
-  /** 本周解决的缺陷。 */
+  /** 周报周期内解决的缺陷。 */
   fixedDefects: WeeklyFixedDefect[]
 
   /** 缺陷总数，fixedDefects 可能被截断。 */
   fixedDefectTotal: number
 
-  /** 本周代码提交。 */
+  /** 周报周期内代码提交。 */
   commits: RepositoryCommitSummary[]
 
   /** 提交总数，commits 可能被截断。 */
@@ -117,17 +120,19 @@ export interface WeeklyWorkContext {
 }
 
 /**
- * 一次读取本周需求、已解决缺陷和代码提交。
+ * 一次读取指定周的需求、已解决缺陷和代码提交。
  * 单个数据源失败时不阻断其他来源，将失败原因放入 warnings。
  */
-export const getWeeklyWorkContext = async (): Promise<WeeklyWorkContext> => {
-  const week = getWeekRange()
+export const getWeeklyWorkContext = async (
+  weekType: 'current' | 'last' = 'current'
+): Promise<WeeklyWorkContext> => {
+  const week = getWeekRange(weekType)
   const since = new Date(`${week.start}T00:00:00`).toISOString()
   const until = new Date(`${week.end}T23:59:59.999`).toISOString()
   const [requirementsResult, defectsResult, commitsResult] =
     await Promise.allSettled([
-      getWeeklyWorkItems(),
-      getWeeklyResolvedDefects(),
+      getWeeklyWorkItems(weekType),
+      getWeeklyResolvedDefects(weekType),
       getWeeklyRepositoryCommits(since, until)
     ])
   const warnings: string[] = []
@@ -146,7 +151,7 @@ export const getWeeklyWorkContext = async (): Promise<WeeklyWorkContext> => {
 
   if (requirementsResult.status === 'rejected') {
     warnings.push(
-      `本周需求读取失败：${getErrorMessage(requirementsResult.reason)}`
+      `周报周期内需求读取失败：${getErrorMessage(requirementsResult.reason)}`
     )
   }
 
@@ -173,7 +178,7 @@ export const getWeeklyWorkContext = async (): Promise<WeeklyWorkContext> => {
 
   if (defectsResult.status === 'rejected') {
     warnings.push(
-      `本周已解决缺陷读取失败：${getErrorMessage(defectsResult.reason)}`
+      `周报周期内已解决缺陷读取失败：${getErrorMessage(defectsResult.reason)}`
     )
   }
 
@@ -186,7 +191,7 @@ export const getWeeklyWorkContext = async (): Promise<WeeklyWorkContext> => {
     warnings.push(...commitsResult.value.warnings)
   } else {
     warnings.push(
-      `本周代码提交读取失败：${getErrorMessage(commitsResult.reason)}`
+      `周报周期内代码提交读取失败：${getErrorMessage(commitsResult.reason)}`
     )
   }
 

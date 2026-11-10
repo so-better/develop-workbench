@@ -87,6 +87,14 @@ interface ReportContext {
 }
 
 let cachedCsrfToken: string | null = null
+let weeklyReportDraftDirty = false
+
+/** 渲染层周报编辑草稿是否有未提交修改。 */
+export const setWeeklyReportDraftDirty = (dirty: boolean): void => {
+  weeklyReportDraftDirty = dirty
+}
+
+export const isWeeklyReportDraftDirty = (): boolean => weeklyReportDraftDirty
 
 class WeeklyReportAuthRequiredError extends Error {}
 
@@ -99,21 +107,27 @@ const getCookieHeader = async (url: string): Promise<string> => {
   return cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join('; ')
 }
 
-const getWeekStart = (): number => {
+const getWeekStart = (weekOffset = 0): number => {
   const date = new Date()
   date.setHours(0, 0, 0, 0)
   const day = (date.getDay() + 6) % 7
-  date.setDate(date.getDate() - day)
+  date.setDate(date.getDate() - day + weekOffset * 7)
   return date.getTime()
 }
 
-const isCurrentWeek = (timestampSeconds?: number): boolean => {
+/** 当前正在填写的周报周期；周一 08:00 前仍属于上一周。 */
+const getReportWeekStart = (): number => {
+  const now = new Date()
+  const beforeMondayDeadline = now.getDay() === 1 && now.getHours() < 8
+  return getWeekStart(beforeMondayDeadline ? -1 : 0)
+}
+
+const isInWeek = (timestampSeconds: number | undefined, weekStart: number): boolean => {
   if (!timestampSeconds) return false
 
   const timestamp = timestampSeconds * 1000
-  const start = getWeekStart()
 
-  return timestamp >= start && timestamp < start + 7 * 24 * 60 * 60 * 1000
+  return timestamp >= weekStart && timestamp < weekStart + 7 * 24 * 60 * 60 * 1000
 }
 
 const escapeHtml = (value: string): string =>
@@ -551,13 +565,15 @@ const getCommittedDetail = async (reportId: string): Promise<ReportDetail> => {
   return data.reportDetail
 }
 
-const loadReportContext = async (): Promise<ReportContext> => {
+const loadReportContext = async (
+  weekStart = getWeekStart()
+): Promise<ReportContext> => {
   const rule = await getWeeklyRule()
   const writeView = await getWriteView(rule.ruleId)
   const lastCommitInfo = writeView.lastCommitInfo
   const submitted =
-    isCurrentWeek(lastCommitInfo?.commitTime) ||
-    isCurrentWeek(rule.lastCommitTime)
+    isInWeek(lastCommitInfo?.commitTime, weekStart) ||
+    isInWeek(rule.lastCommitTime, weekStart)
   let detail: ReportDetail = writeView
   let reportId: string | null = null
 
@@ -633,6 +649,10 @@ const withWeeklyReportAuth = <T>(
     isAuthError: (error) => error instanceof WeeklyReportAuthRequiredError
   })
 
+/** 自动提交使用：读取上一周周报状态，但不启动登录授权流程。 */
+export const getWeeklyReportForAuto = async (): Promise<WeeklyReportState> =>
+  toState(await loadReportContext(getWeekStart(-1)))
+
 /**
  * 读取当前用户的本周周报。
  */
@@ -640,13 +660,13 @@ export const getWeeklyReport = async (
   window: BrowserWindow
 ): Promise<WeeklyReportState> =>
   withWeeklyReportAuth(window, async () => {
-    const context = await loadReportContext()
+    const context = await loadReportContext(getReportWeekStart())
 
     return toState(context)
   })
 
 /**
- * 提交本周周报。
+ * 提交周报。
  * 内部接口不是飞书开放平台 API，提交前会保留页面二次确认。
  */
 const isReportRecord = (value: unknown): value is Record<string, unknown> =>
@@ -690,7 +710,8 @@ const validateWeeklyReportInput = (value: unknown): SubmitWeeklyReportInput => {
 }
 
 const submitWeeklyReportInternal = async (
-  input: SubmitWeeklyReportInput
+  input: SubmitWeeklyReportInput,
+  weekStart = getWeekStart()
 ): Promise<WeeklyReportState> => {
   if (!input || typeof input !== 'object') {
     throw new Error('周报参数不合法')
@@ -704,7 +725,7 @@ const submitWeeklyReportInternal = async (
     throw new Error('周报内容不合法')
   }
 
-  const context = await loadReportContext()
+  const context = await loadReportContext(weekStart)
 
   if (context.rule.ruleId !== input.ruleId) {
     throw new Error('周报规则已变化，请刷新后重试')
@@ -790,7 +811,7 @@ const submitWeeklyReportInternal = async (
   )
 
   try {
-    return toState(await loadReportContext())
+    return toState(await loadReportContext(weekStart))
   } catch (error) {
     if (!(error instanceof WeeklyReportAuthRequiredError)) throw error
 
@@ -804,7 +825,7 @@ const submitWeeklyReportInternal = async (
 }
 
 /**
- * 提交本周周报。
+ * 提交周报。
  * 内部接口不是飞书开放平台 API，提交前会保留页面二次确认。
  */
 export const submitWeeklyReport = async (
@@ -812,7 +833,20 @@ export const submitWeeklyReport = async (
   value: unknown
 ): Promise<WeeklyReportState> => {
   const input = validateWeeklyReportInput(value)
-  return withWeeklyReportAuth(window, () => submitWeeklyReportInternal(input))
+  return withWeeklyReportAuth(window, () =>
+    submitWeeklyReportInternal(input, getReportWeekStart())
+  )
+}
+
+/** 自动提交使用：按上一周周报周期校验并提交。 */
+export const submitWeeklyReportForAuto = async (
+  window: BrowserWindow,
+  value: unknown
+): Promise<WeeklyReportState> => {
+  const input = validateWeeklyReportInput(value)
+  return withWeeklyReportAuth(window, () =>
+    submitWeeklyReportInternal(input, getWeekStart(-1))
+  )
 }
 
 export const initializeWeeklyReport = (): void => {
@@ -829,5 +863,8 @@ export const initializeWeeklyReport = (): void => {
     if (!window) throw new Error('无法获取当前窗口')
 
     return submitWeeklyReport(window, input)
+  })
+  ipcMain.on('weekly-report:set-draft-dirty', (_event, dirty: unknown) => {
+    weeklyReportDraftDirty = dirty === true
   })
 }

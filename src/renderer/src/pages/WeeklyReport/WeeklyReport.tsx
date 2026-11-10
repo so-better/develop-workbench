@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import {
   LinkOutlined,
@@ -8,6 +8,7 @@ import {
 import { Alert, App, Button, Empty, Skeleton, Tag, Tooltip } from 'antd'
 import type { RichTextContent } from '../../../../types/rich-text'
 import type {
+  WeeklyReportAutoStatus,
   WeeklyReportField,
   WeeklyReportState
 } from '../../../../types/weekly-report'
@@ -15,6 +16,20 @@ import { getErrorMessage, isRecord } from '../../../../utils'
 import RichTextEditor from '../../components/RichTextEditor/RichTextEditor'
 import RobotMark from '../../components/RobotMark/RobotMark'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
+
+/** 当前正在填写的周报周期；周一 08:00 前仍属于上一周。 */
+const getActiveReportWeekStart = (): number => {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const day = (now.getDay() + 6) % 7
+  now.setDate(now.getDate() - day)
+
+  if (new Date().getDay() === 1 && new Date().getHours() < 8) {
+    now.setDate(now.getDate() - 7)
+  }
+
+  return now.getTime()
+}
 
 const toDraft = (field: WeeklyReportField): RichTextContent => ({
   html: field.html,
@@ -175,6 +190,10 @@ export default function WeeklyReport(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [autoStatus, setAutoStatus] = useState<WeeklyReportAutoStatus | null>(
+    null
+  )
+  const editorTouchedRef = useRef(false)
 
   const load = useCallback(async (showLoading = true): Promise<void> => {
     if (showLoading) setLoading(true)
@@ -182,8 +201,12 @@ export default function WeeklyReport(): JSX.Element {
     setError(null)
 
     try {
-      const next = await window.electron.getWeeklyReport()
+      const [next, auto] = await Promise.all([
+        window.electron.getWeeklyReport(),
+        window.electron.getWeeklyReportAutoStatus().catch(() => null)
+      ])
       setState(next)
+      setAutoStatus(auto)
       setDrafts(
         Object.fromEntries(
           next.fields
@@ -191,6 +214,8 @@ export default function WeeklyReport(): JSX.Element {
             .map((field) => [field.id, toDraft(field)])
         )
       )
+      editorTouchedRef.current = false
+      window.electron.setWeeklyReportDraftDirty(false)
     } catch (loadError) {
       setError(getErrorMessage(loadError, '周报加载失败'))
     } finally {
@@ -201,6 +226,23 @@ export default function WeeklyReport(): JSX.Element {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (!editorTouchedRef.current) return
+
+    const dirty = Object.values(drafts).some(
+      (draft) => draft.text.trim().length > 0
+    )
+
+    window.electron.setWeeklyReportDraftDirty(dirty)
+  }, [drafts])
+
+  useEffect(
+    () => () => {
+      window.electron.setWeeklyReportDraftDirty(false)
+    },
+    []
+  )
 
   const textFields =
     state?.fields.filter((field) => field.component === 'text') ?? []
@@ -258,6 +300,8 @@ export default function WeeklyReport(): JSX.Element {
                 .map((field) => [field.id, toDraft(field)])
             )
           )
+          editorTouchedRef.current = false
+          window.electron.setWeeklyReportDraftDirty(false)
           message.success('周报已提交到飞书')
         } catch (submitError) {
           message.error(getErrorMessage(submitError, '提交周报失败'))
@@ -353,6 +397,7 @@ export default function WeeklyReport(): JSX.Element {
       throw new Error('AI 返回内容没有匹配到周报字段')
     }
 
+    window.electron.setWeeklyReportDraftDirty(true)
     setDrafts((current) => {
       const next = { ...current }
 
@@ -497,6 +542,30 @@ export default function WeeklyReport(): JSX.Element {
           />
         ) : null}
 
+        {autoStatus?.weekStart === getActiveReportWeekStart() &&
+        autoStatus.state === 'failed' &&
+        autoStatus.message &&
+        !state?.submitted ? (
+          <Alert
+            className="weekly-report-error"
+            type="warning"
+            showIcon
+            message="上次周报自动提交失败"
+            description={autoStatus.message}
+          />
+        ) : null}
+
+        {autoStatus?.weekStart === getActiveReportWeekStart() &&
+        autoStatus.notificationError ? (
+          <Alert
+            className="weekly-report-error"
+            type="warning"
+            showIcon
+            message="周报已提交，但飞书通知发送失败"
+            description={autoStatus.notificationError}
+          />
+        ) : null}
+
         {loading && !state ? (
           <div className="weekly-report-loading">
             <Skeleton active paragraph={{ rows: 8 }} />
@@ -525,17 +594,26 @@ export default function WeeklyReport(): JSX.Element {
                         {(drafts[field.id]?.text ?? '').length} 字
                       </span>
                     </div>
-                    <RichTextEditor
-                      minHeight={field.title.includes('计划') ? 150 : 190}
-                      value={drafts[field.id]?.html ?? ''}
-                      placeholder={`填写${field.title}`}
-                      onChange={(content) =>
-                        setDrafts((current) => ({
-                          ...current,
-                          [field.id]: content
-                        }))
-                      }
-                    />
+                    <div
+                      onPointerDown={() => {
+                        editorTouchedRef.current = true
+                      }}
+                      onKeyDown={() => {
+                        editorTouchedRef.current = true
+                      }}
+                    >
+                      <RichTextEditor
+                        minHeight={field.title.includes('计划') ? 150 : 190}
+                        value={drafts[field.id]?.html ?? ''}
+                        placeholder={`填写${field.title}`}
+                        onChange={(content) => {
+                          setDrafts((current) => ({
+                            ...current,
+                            [field.id]: content
+                          }))
+                        }}
+                      />
+                    </div>
                   </section>
                 ))}
               </div>

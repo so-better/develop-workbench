@@ -705,6 +705,40 @@ export const getLarkUser = async (): Promise<LarkUser | null> => {
   }
 }
 
+/** 给当前登录用户本人发送一条飞书文本消息。 */
+export const sendLarkMessageToSelf = async (text: string): Promise<void> => {
+  const normalized = text.trim().slice(0, 2_000)
+
+  if (!normalized) return
+
+  const user = await getLarkUser()
+
+  if (!user?.openId) {
+    throw new Error('飞书未登录，无法发送提醒')
+  }
+
+  const buildArgs = (identity: 'bot' | 'user'): string[] => [
+    'im',
+    '+messages-send',
+    '--as',
+    identity,
+    '--user-id',
+    user.openId,
+    '--text',
+    normalized
+  ]
+
+  try {
+    await runLarkCli(buildArgs('bot'), { timeoutMs: 15_000 })
+  } catch (botError) {
+    try {
+      await runLarkCli(buildArgs('user'), { timeoutMs: 15_000 })
+    } catch {
+      throw botError
+    }
+  }
+}
+
 /**
  * 注册 lark-cli 相关的 IPC。
  * 登录状态、路径查询和路径设置都归属 lark 业务模块。

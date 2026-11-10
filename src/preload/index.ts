@@ -116,6 +116,7 @@ import type { SiteInput, SiteState } from '../types/sites'
 import type { SkillSettingsState } from '../types/skills'
 import type {
   SubmitWeeklyReportInput,
+  WeeklyReportAutoStatus,
   WeeklyReportState
 } from '../types/weekly-report'
 
@@ -1024,6 +1025,15 @@ const electronAPI = {
    */
   submitWeeklyReport: (input: SubmitWeeklyReportInput): Promise<WeeklyReportState> =>
     ipcRenderer.invoke('weekly-report:submit', input),
+
+  /** 标记周报编辑草稿是否有未提交修改。 */
+  setWeeklyReportDraftDirty: (dirty: boolean): void => {
+    ipcRenderer.send('weekly-report:set-draft-dirty', dirty)
+  },
+
+  /** 读取最近一次周报自动提交状态。 */
+  getWeeklyReportAutoStatus: (): Promise<WeeklyReportAutoStatus> =>
+    ipcRenderer.invoke('weekly-report:auto-status'),
 
   /**
    * 读取当前 Meegle 用户负责的需求，并按迭代分组。

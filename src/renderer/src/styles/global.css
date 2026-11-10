@@ -4079,10 +4079,184 @@ body {
   align-items: center;
 }
 
+.requirement-node-complete-button,
 .requirement-node-rollback-button {
   height: 24px;
   padding: 0 7px;
   font-size: 11px;
+}
+
+.requirement-node-complete-button {
+  color: #1677ff !important;
+}
+
+.requirement-node-complete-button:hover {
+  color: #0958d9 !important;
+  background: rgba(22, 119, 255, 0.08) !important;
+}
+
+.requirement-complete-title {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.requirement-complete-title .anticon {
+  color: #1677ff;
+  font-size: 18px;
+}
+
+.requirement-complete-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.requirement-complete-node {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.requirement-complete-node-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.requirement-complete-node span {
+  color: var(--workbench-secondary);
+  font-size: 10px;
+}
+
+.requirement-complete-node strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-complete-node .requirement-node-status-tag {
+  flex-shrink: 0;
+}
+
+.requirement-complete-desc {
+  margin: 0;
+  color: var(--workbench-secondary) !important;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.requirement-complete-worktime {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.requirement-complete-worktime-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.requirement-complete-worktime-head .anticon {
+  color: var(--workbench-secondary);
+  font-size: 13px;
+}
+
+.requirement-complete-worktime-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.requirement-complete-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.requirement-complete-field > span,
+.requirement-complete-field label {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.requirement-complete-field label em {
+  margin-left: 2px;
+  color: #d92d20;
+  font-style: normal;
+}
+
+.requirement-complete-field > strong {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 11px;
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 6px;
+}
+
+.requirement-complete-field > strong,
+.requirement-complete-field .ant-input-number-group-wrapper,
+.requirement-complete-field .ant-input-number {
+  height: 32px;
+}
+
+.requirement-complete-field .ant-input-number-group-wrapper {
+  width: 100%;
+}
+
+.requirement-complete-field .ant-input-number,
+.requirement-complete-field .ant-input-number-group-addon {
+  height: 100%;
+}
+
+.requirement-complete-field .ant-input-number-input {
+  height: 100%;
+}
+
+.requirement-complete-field .ant-input-number {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.requirement-complete-field .ant-input-number-group-addon {
+  padding: 0 10px;
+  color: var(--app-text);
+  text-align: center;
+  vertical-align: middle;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+}
+
+.requirement-complete-hint {
+  margin: 0;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .requirement-node-summary-card {
@@ -4270,6 +4444,16 @@ body {
   font-weight: 500;
 }
 
+.requirement-node-workhour-input {
+  width: 150px;
+}
+
+.requirement-node-workhour-note {
+  margin: 8px 0 0 148px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
 .requirement-node-workhour-summary {
   display: flex;
   flex-wrap: wrap;
@@ -4279,11 +4463,6 @@ body {
   font-size: 12px;
 }
 
-.requirement-node-workhour-actual {
-  margin: 8px 0 0 148px;
-  color: var(--workbench-secondary);
-  font-size: 11px;
-}
 
 .requirement-info-section {
   width: 100%;
@@ -5251,6 +5430,15 @@ body {
   line-height: 1.6;
 }
 
+.requirement-rollback-form .ant-input-data-count {
+  right: 12px;
+  bottom: 8px;
+}
+
+.requirement-rollback-form textarea.ant-input {
+  padding-bottom: 26px;
+}
+
 .requirement-rollback-form label {
   color: var(--workbench-secondary);
   font-size: 11px;
@@ -5429,7 +5617,7 @@ body {
 .requirement-header-tag,
 .workbench-heading-meta .ant-tag,
 .requirement-info-tag,
-.requirement-node-workhour-actual,
+.requirement-node-workhour-note,
 .requirement-comment-head span,
 .requirement-comment-note,
 .requirement-comment-editor-footer span {

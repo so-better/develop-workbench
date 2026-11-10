@@ -559,9 +559,12 @@ export const getMyDefects = async (
   }
 }
 
-/** 读取当前用户本周解决或关闭的缺陷。 */
-export const getWeeklyResolvedDefects = async (): Promise<MeegleMyDefects> => {
+/** 读取当前用户在指定周解决或关闭的缺陷。 */
+export const getWeeklyResolvedDefects = async (
+  week: 'current' | 'last' = 'current'
+): Promise<MeegleMyDefects> => {
   const project = await getProject()
+  const relativeWeek = week === 'last' ? 'last_week' : 'current_week'
   const roleFields = DEFECT_ROLES.map((item) => `\`__${item}\``).join(', ')
   const rows = await fetchMqlRows(
     project,
@@ -570,7 +573,7 @@ export const getWeeklyResolvedDefects = async (): Promise<MeegleMyDefects> => {
       `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
       `WHERE \`状态\` in (${DEFECT_FIXED_STATUSES.map(
         (status) => `'${status.replace(/'/g, "''")}'`
-      ).join(', ')}) AND RELATIVE_DATETIME_EQ(\`完成日期\`, 'current_week') AND \`BUG解决人\` = current_login_user()`,
+      ).join(', ')}) AND RELATIVE_DATETIME_EQ(\`完成日期\`, '${relativeWeek}') AND \`BUG解决人\` = current_login_user()`,
       'ORDER BY `完成日期` DESC',
       'LIMIT 50'
     ].join(' ')

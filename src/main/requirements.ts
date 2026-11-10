@@ -1473,8 +1473,13 @@ const fetchWorkflowNodes = async (
       actualStart: normalizeTime(schedule.actual_begin_time),
       actualEnd: normalizeTime(schedule.actual_finish_time),
       actualWorkTime:
-        typeof schedule.actual_work_time === 'number' ? schedule.actual_work_time : null,
-      points: typeof schedule.points === 'number' ? schedule.points : null,
+        typeof schedule.actual_work_time === 'number' && schedule.actual_work_time > 0
+          ? schedule.actual_work_time
+          : null,
+      points:
+        typeof schedule.points === 'number' && schedule.points > 0
+          ? schedule.points
+          : null,
       formItems: readNodeFormItems(node),
       supportsSchedule:
         nodeFieldKeys.has('schedule') ||
@@ -1691,6 +1696,7 @@ export const updateRequirementNode = async (
     : []
   const hasSchedule = input.startAt !== undefined || input.endAt !== undefined
   const hasPoints = input.points !== undefined
+  const hasActualWorkTime = input.actualWorkTime !== undefined
   const clearSchedule = input.clearSchedule === true
 
   if (input.clearSchedule !== undefined && typeof input.clearSchedule !== 'boolean') {
@@ -1699,8 +1705,23 @@ export const updateRequirementNode = async (
   if (clearSchedule && hasSchedule) {
     throw new Error('清空排期时不能同时设置起止时间')
   }
-  if (hasPoints && (typeof input.points !== 'number' || !Number.isFinite(input.points) || input.points < 0)) {
-    throw new Error('估分必须为非负有限数值')
+  if (
+    hasPoints &&
+    input.points !== null &&
+    (typeof input.points !== 'number' ||
+      !Number.isFinite(input.points) ||
+      input.points < 0)
+  ) {
+    throw new Error('估分必须为非负有限数值或 null')
+  }
+  if (
+    hasActualWorkTime &&
+    input.actualWorkTime !== null &&
+    (typeof input.actualWorkTime !== 'number' ||
+      !Number.isFinite(input.actualWorkTime) ||
+      input.actualWorkTime < 0)
+  ) {
+    throw new Error('实际工时必须为非负有限数值或 null')
   }
 
   if (hasSchedule) {
@@ -1712,15 +1733,15 @@ export const updateRequirementNode = async (
     }
   }
 
-  if (!hasSchedule && !clearSchedule && !hasPoints && !hasOwners) {
+  if (!hasSchedule && !clearSchedule && !hasPoints && !hasActualWorkTime && !hasOwners) {
     throw new Error('没有需要更新的节点信息')
   }
 
   const project = await getProject()
 
   // 估分与总排期共享 node-schedule，但只发送本次修改的字段。
-  if (hasSchedule || clearSchedule || hasPoints) {
-    const nodeSchedule: Record<string, number | boolean> = {}
+  if (hasSchedule || clearSchedule || hasPoints || hasActualWorkTime) {
+    const nodeSchedule: Record<string, number | boolean | null> = {}
 
     if (clearSchedule) nodeSchedule.clear_schedule = true
     if (hasSchedule) {
@@ -1728,8 +1749,24 @@ export const updateRequirementNode = async (
       nodeSchedule.estimate_end_date = input.endAt as number
     }
 
-    if (typeof input.points === 'number' && Number.isFinite(input.points)) {
+    if (input.points === null) {
+      // 飞书对 points: null 不会清空，和实际工时一样用 0 表示未设置。
+      nodeSchedule.points = 0
+    } else if (
+      typeof input.points === 'number' &&
+      Number.isFinite(input.points)
+    ) {
       nodeSchedule.points = input.points
+    }
+
+    if (input.actualWorkTime === null) {
+      // 飞书用 0 表示未登记实际工时；直接传 null 会导致节点估分被清空。
+      nodeSchedule.actual_work_time = 0
+    } else if (
+      typeof input.actualWorkTime === 'number' &&
+      Number.isFinite(input.actualWorkTime)
+    ) {
+      nodeSchedule.actual_work_time = input.actualWorkTime
     }
 
     const scheduleResult = await runMeegle(
@@ -1750,7 +1787,7 @@ export const updateRequirementNode = async (
       MEEGLE_QUERY_TIMEOUT_MS
     )
 
-    ensureWriteSuccess(scheduleResult, '更新节点排期和估分')
+    ensureWriteSuccess(scheduleResult, '更新节点排期、估分和实际工时')
   }
 
   if (hasOwners) {
@@ -1978,7 +2015,7 @@ export const getIterationSummaryRequirements = async (): Promise<
   return [...remoteRequirements, ...localSummaryRequirements]
 }
 
-/** 周报工具返回的单条本周工作。 */
+/** 周报工具返回的单条周工作。 */
 export interface WeeklyWorkItem {
   /** 需求来源：Meegle 或本地临时需求。 */
   source: 'meegle' | 'local'
@@ -1998,7 +2035,7 @@ export interface WeeklyWorkItem {
   documentUrl: string | null
 }
 
-/** 周报工具返回的本周工作集合。 */
+/** 周报工具返回的周工作集合。 */
 export interface WeeklyWorkItemsResult {
   project: string
   weekStart: string
@@ -2022,12 +2059,15 @@ const compactText = (value: string | null, maxLength: number): string => {
   return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text
 }
 
-/** 返回当前本地周的周一和周日，格式 YYYY-MM-DD。 */
-const getCurrentWeekRange = (): { start: string; end: string } => {
+/** 返回本地周（当前周或上一周）的周一和周日，格式 YYYY-MM-DD。 */
+const getCurrentWeekRange = (
+  week: 'current' | 'last' = 'current'
+): { start: string; end: string } => {
   const start = new Date()
   const day = start.getDay() || 7
 
   start.setDate(start.getDate() - day + 1)
+  if (week === 'last') start.setDate(start.getDate() - 7)
   start.setHours(0, 0, 0, 0)
 
   const end = new Date(start)
@@ -2044,10 +2084,12 @@ const getCurrentWeekRange = (): { start: string; end: string } => {
 }
 
 /**
- * 一次读取当前用户本周更新或完成的需求。
+ * 一次读取当前用户在指定周更新或完成的需求。
  * 周报生成优先使用该函数，避免模型按需求逐条调用 CLI。
  */
-export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
+export const getWeeklyWorkItems = async (
+  weekType: 'current' | 'last' = 'current'
+): Promise<WeeklyWorkItemsResult> => {
   const project = await getProject()
   const [roleNames, localRequirements] = await Promise.all([
     // 角色读取失败须交给周报汇总层生成 warnings，不能用空角色伪装成远程需求为零。
@@ -2055,8 +2097,9 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
     listLocalRequirements(project.projectKey, true)
   ])
   const roleCondition = buildCurrentUserRoleCondition(roleNames)
-  const week = getCurrentWeekRange()
-  /** 本地时间的日期字符串是否落在本周范围内。 */
+  const week = getCurrentWeekRange(weekType)
+  const relativeWeek = weekType === 'last' ? 'last_week' : 'current_week'
+  /** 本地时间的日期字符串是否落在目标周范围内。 */
   const inCurrentWeek = (value: string | null): boolean => {
     if (!value) return false
 
@@ -2074,7 +2117,7 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
           [
             'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `完成日期`, `技术方案`, `标签`, `risk_label()`',
             `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
-            `WHERE (${roleCondition}) AND (RELATIVE_DATETIME_EQ(\`更新时间\`, 'current_week') OR RELATIVE_DATETIME_EQ(\`完成日期\`, 'current_week'))`,
+            `WHERE (${roleCondition}) AND (RELATIVE_DATETIME_EQ(\`更新时间\`, '${relativeWeek}') OR RELATIVE_DATETIME_EQ(\`完成日期\`, '${relativeWeek}'))`,
             'ORDER BY `更新时间` DESC'
           ].join(' ')
         )
@@ -2134,8 +2177,8 @@ export const getWeeklyWorkItems = async (): Promise<WeeklyWorkItemsResult> => {
     hasMore: requirements.length > items.length,
     items,
     note: requirements.length
-      ? '包含本周有更新或完成的 Meegle 需求和本地临时需求；需要更多详情时再按需补充'
-      : '本周没有查询到更新或完成的需求'
+      ? '包含该周有更新或完成的 Meegle 需求和本地临时需求；需要更多详情时再按需补充'
+      : '该周没有查询到更新或完成的需求'
   }
 }
 

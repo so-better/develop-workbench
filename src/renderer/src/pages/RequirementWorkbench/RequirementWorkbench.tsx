@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { pinyin } from 'pinyin-pro'
 import {
   CheckCircleFilled,
+  CheckOutlined,
   ClockCircleFilled,
   CloseOutlined,
   BranchesOutlined,
@@ -26,7 +27,8 @@ import {
   RightOutlined,
   RollbackOutlined,
   SearchOutlined,
-  TagOutlined
+  TagOutlined,
+  WarningFilled
 } from '@ant-design/icons'
 import {
   Alert,
@@ -344,6 +346,14 @@ const formatNodeRange = (start: string | null, end: string | null): string => {
 const formatWorkTime = (value: number | null): string =>
   value !== null ? `${value} 人天` : '未设置'
 
+/** 实际工时未登记时与飞书保持一致，显示“暂无”。 */
+const formatActualWorkTime = (value: number | null): string =>
+  value !== null ? `${value} 人天` : '暂无'
+
+/** 剩余工时缺少实际工时时显示“- 人天”，而不是未填写。 */
+const formatRemainingWorkTime = (value: number | null): string =>
+  value !== null ? `${value} 人天` : '- 人天'
+
 /**
  * 清理飞书内部 HTML 标记。
  * 不能直接删除注释，否则裸 URL 会和后面的中文标点连在一起被自动链接吞掉。
@@ -463,25 +473,6 @@ const getBooleanTagTone = (value: string): string => {
   if (value === '否') return 'green'
 
   return 'gray'
-}
-
-/**
- * 格式化节点实际时间。
- */
-const formatNodeActualTime = (
-  start: string | null,
-  end: string | null,
-  status: string
-): string => {
-  if (start && end) {
-    return `${dayjs(start).format('MM-DD HH:mm')} - ${dayjs(end).format('MM-DD HH:mm')}`
-  }
-
-  if (start) return `${dayjs(start).format('MM-DD HH:mm')} 开始`
-  if (status === 'doing') return '进行中'
-  if (status === 'finished' || status === 'done') return '未记录'
-
-  return '未开始'
 }
 
 /**
@@ -629,6 +620,7 @@ export default function RequirementWorkbench({
   const [nodeEditing, setNodeEditing] = useState(false)
   const [nodeEditRange, setNodeEditRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [nodeEditPoints, setNodeEditPoints] = useState<number | null>(null)
+  const [nodeEditActualWorkTime, setNodeEditActualWorkTime] = useState<number | null>(null)
   const [nodeEditOwnerKeys, setNodeEditOwnerKeys] = useState<string[]>([])
   const [nodeOwnerOptions, setNodeOwnerOptions] = useState<MeegleRequirementOwner[]>([])
   const [nodeOwnerSearching, setNodeOwnerSearching] = useState(false)
@@ -640,6 +632,13 @@ export default function RequirementWorkbench({
   const [rollbackOpen, setRollbackOpen] = useState(false)
   const [rollbackReason, setRollbackReason] = useState('')
   const [rollbackSubmitting, setRollbackSubmitting] = useState(false)
+
+  // 完成节点弹窗。
+  const [completeOpen, setCompleteOpen] = useState(false)
+  const [completeSubmitting, setCompleteSubmitting] = useState(false)
+  const [completeActualWorkTime, setCompleteActualWorkTime] = useState<
+    number | null
+  >(null)
 
   // 评论输入。
   const [commentDraft, setCommentDraft] = useState('')
@@ -2261,6 +2260,9 @@ export default function RequirementWorkbench({
 
     setNodeEditRange(start?.isValid() && end?.isValid() ? [start, end] : null)
     setNodeEditPoints(selectedNode.supportsPoints ? selectedNode.points : null)
+    setNodeEditActualWorkTime(
+      selectedNode.supportsActualWorkTime ? selectedNode.actualWorkTime : null
+    )
     setNodeEditOwnerKeys(
       selectedNode.owners.flatMap((owner) => (owner.userKey ? [owner.userKey] : []))
     )
@@ -2358,7 +2360,7 @@ export default function RequirementWorkbench({
   }
 
   /**
-   * 保存节点排期、估分和负责人。
+   * 保存节点排期、估分、实际工时和负责人。
    */
   const handleSaveNodeInfo = async (): Promise<void> => {
     if (!selectedRequirementId || !selectedNode) return
@@ -2366,8 +2368,25 @@ export default function RequirementWorkbench({
     const pointsChanged =
       selectedNode.supportsPoints && nodeEditPoints !== selectedNode.points
 
-    if (pointsChanged && (nodeEditPoints === null || !Number.isFinite(nodeEditPoints) || nodeEditPoints < 0)) {
-      message.warning('请填写非负估分；如需归零请填写 0')
+    if (
+      pointsChanged &&
+      nodeEditPoints !== null &&
+      (!Number.isFinite(nodeEditPoints) || nodeEditPoints < 0)
+    ) {
+      message.warning('估分必须为非负数值；留空表示不设置')
+      return
+    }
+
+    const actualWorkTimeChanged =
+      selectedNode.supportsActualWorkTime &&
+      nodeEditActualWorkTime !== selectedNode.actualWorkTime
+
+    if (
+      actualWorkTimeChanged &&
+      nodeEditActualWorkTime !== null &&
+      (!Number.isFinite(nodeEditActualWorkTime) || nodeEditActualWorkTime < 0)
+    ) {
+      message.warning('实际工时必须为非负数值；留空表示不设置')
       return
     }
 
@@ -2411,14 +2430,34 @@ export default function RequirementWorkbench({
             startAt !== originalStart?.valueOf()) ||
             (endAt !== undefined && endAt !== originalEnd?.valueOf())))
 
-      if (!scheduleChanged && !pointsChanged && !ownersChanged) {
+      if (!scheduleChanged && !pointsChanged && !actualWorkTimeChanged && !ownersChanged) {
         setNodeEditing(false)
         return
       }
 
+      const schedulePayloadChanged =
+        scheduleChanged || pointsChanged || actualWorkTimeChanged
+
       await window.electron.updateRequirementNode(selectedRequirementId, selectedNode.key, {
-        ...(scheduleChanged ? (clearSchedule ? { clearSchedule: true } : { startAt, endAt }) : {}),
-        ...(pointsChanged ? { points: nodeEditPoints as number } : {}),
+        ...(schedulePayloadChanged
+          ? {
+              ...(clearSchedule
+                ? { clearSchedule: true }
+                : startAt !== undefined && endAt !== undefined
+                  ? { startAt, endAt }
+                  : {}),
+              ...(selectedNode.supportsPoints
+                ? { points: pointsChanged ? nodeEditPoints : selectedNode.points }
+                : {}),
+              ...(selectedNode.supportsActualWorkTime
+                ? {
+                    actualWorkTime: actualWorkTimeChanged
+                      ? nodeEditActualWorkTime
+                      : selectedNode.actualWorkTime
+                  }
+                : {})
+            }
+          : {}),
         ...(ownersChanged ? { ownerUserKeys: nextOwnerKeys } : {})
       })
 
@@ -2438,7 +2477,10 @@ export default function RequirementWorkbench({
                         clearSchedule ? null : endAt === undefined
                           ? node.scheduleEnd
                           : new Date(endAt).toISOString(),
-                      points: pointsChanged ? nodeEditPoints : node.points
+                      points: pointsChanged ? nodeEditPoints : node.points,
+                      actualWorkTime: actualWorkTimeChanged
+                        ? nodeEditActualWorkTime
+                        : node.actualWorkTime
                     }
                   : node
               )
@@ -2479,6 +2521,76 @@ export default function RequirementWorkbench({
       message.error(getErrorMessage(rollbackError))
     } finally {
       setRollbackSubmitting(false)
+    }
+  }
+
+  /**
+   * 完成当前节点，会推进需求流程。
+   */
+  const handleCompleteNode = async (actualWorkTimeOverride?: number): Promise<void> => {
+    if (!selectedRequirementId || !selectedNode) return
+
+    const actualWorkTime = actualWorkTimeOverride ?? completeActualWorkTime
+
+    if (
+      selectedNode.supportsActualWorkTime &&
+      (actualWorkTime === null ||
+        !Number.isFinite(actualWorkTime) ||
+        actualWorkTime <= 0)
+    ) {
+      message.warning('请填写实际工时')
+      return
+    }
+
+    setCompleteSubmitting(true)
+
+    try {
+      if (
+        selectedNode.supportsActualWorkTime &&
+        actualWorkTime !== selectedNode.actualWorkTime
+      ) {
+        const scheduleStart = selectedNode.scheduleStart
+          ? dayjs(selectedNode.scheduleStart)
+          : null
+        const scheduleEnd = selectedNode.scheduleEnd
+          ? dayjs(selectedNode.scheduleEnd)
+          : null
+        const hasCompleteSchedule =
+          selectedNode.supportsSchedule &&
+          scheduleStart?.isValid() &&
+          scheduleEnd?.isValid()
+
+        await window.electron.updateRequirementNode(
+          selectedRequirementId,
+          selectedNode.key,
+          {
+            ...(hasCompleteSchedule
+              ? {
+                  startAt: (scheduleStart as Dayjs).valueOf(),
+                  endAt: (scheduleEnd as Dayjs).valueOf()
+                }
+              : {}),
+            ...(selectedNode.supportsPoints
+              ? { points: selectedNode.points }
+              : {}),
+            actualWorkTime: actualWorkTime as number
+          }
+        )
+      }
+
+      await window.electron.transitionRequirementNode(
+        selectedRequirementId,
+        selectedNode.key,
+        'confirm'
+      )
+      message.success(`节点「${selectedNode.name}」已完成`)
+      setCompleteOpen(false)
+      setNodeEditing(false)
+      await refreshWorkbench()
+    } catch (completeError) {
+      message.error(getErrorMessage(completeError))
+    } finally {
+      setCompleteSubmitting(false)
     }
   }
 
@@ -4011,6 +4123,37 @@ export default function RequirementWorkbench({
                               {selectedNode.status === 'doing' ? (
                                 <Button
                                   type="text"
+                                  size="small"
+                                  className="requirement-node-complete-button"
+                                  icon={<CheckOutlined />}
+                                  loading={completeSubmitting}
+                                  onClick={() => {
+                                    if (
+                                      selectedNode.supportsActualWorkTime &&
+                                      selectedNode.actualWorkTime !== null &&
+                                      selectedNode.actualWorkTime > 0
+                                    ) {
+                                      void handleCompleteNode(selectedNode.actualWorkTime)
+                                      return
+                                    }
+
+                                    setCompleteActualWorkTime(
+                                      selectedNode.supportsActualWorkTime
+                                        ? selectedNode.actualWorkTime ??
+                                            selectedNode.points ??
+                                            null
+                                        : null
+                                    )
+                                    setCompleteOpen(true)
+                                  }}
+                                >
+                                  完成
+                                </Button>
+                              ) : null}
+                              {selectedNode.status === 'finished' ||
+                              selectedNode.status === 'done' ? (
+                                <Button
+                                  type="text"
                                   danger
                                   size="small"
                                   className="requirement-node-rollback-button"
@@ -4218,9 +4361,25 @@ export default function RequirementWorkbench({
                                   <span>
                                     总实际工时 <em>*</em>
                                   </span>
-                                  <strong>
-                                    {formatWorkTime(selectedNode.actualWorkTime)}
-                                  </strong>
+                                  {nodeEditing ? (
+                                    <InputNumber
+                                      min={0}
+                                      step={0.1}
+                                      className="requirement-node-workhour-input"
+                                      addonAfter="人天"
+                                      value={nodeEditActualWorkTime}
+                                      placeholder="待填"
+                                      onChange={(value) =>
+                                        setNodeEditActualWorkTime(
+                                          typeof value === 'number' ? value : null
+                                        )
+                                      }
+                                    />
+                                  ) : (
+                                    <strong>
+                                      {formatActualWorkTime(selectedNode.actualWorkTime)}
+                                    </strong>
+                                  )}
                                 </div>
                               ) : null}
                               {selectedNode.supportsPoints ? (
@@ -4229,24 +4388,14 @@ export default function RequirementWorkbench({
                                     总估分：{formatWorkTime(selectedNode.points)}
                                   </span>
                                   <span>
-                                    总剩余工时：{formatWorkTime(nodeRemainingWorkTime)}
+                                    总剩余工时：{formatRemainingWorkTime(nodeRemainingWorkTime)}
                                   </span>
                                 </div>
                               ) : null}
                               {selectedNode.supportsActualWorkTime ? (
-                                <>
-                                  <div className="requirement-node-workhour-actual">
-                                    实际工时需在飞书项目页面登记。
-                                  </div>
-                                  <div className="requirement-node-workhour-actual">
-                                    实际时间：
-                                    {formatNodeActualTime(
-                                      selectedNode.actualStart,
-                                      selectedNode.actualEnd,
-                                      selectedNode.status
-                                    )}
-                                  </div>
-                                </>
+                                <div className="requirement-node-workhour-note">
+                                  如需要详细的填写，到飞书详情页去写
+                                </div>
                               ) : null}
                             </div>
                           </details>
@@ -4870,7 +5019,95 @@ export default function RequirementWorkbench({
       </Modal>
 
       <Modal
-        title="回滚节点"
+        title={
+          <span className="requirement-complete-title">
+            <CheckCircleFilled />
+            完成节点
+          </span>
+        }
+        width={480}
+        open={completeOpen}
+        okText="完成节点"
+        cancelText="取消"
+        confirmLoading={completeSubmitting}
+        okButtonProps={{
+          disabled:
+            Boolean(selectedNode?.supportsActualWorkTime) &&
+            (completeActualWorkTime === null ||
+              !Number.isFinite(completeActualWorkTime) ||
+              completeActualWorkTime <= 0)
+        }}
+        destroyOnHidden
+        onOk={() => void handleCompleteNode()}
+        onCancel={() => {
+          setCompleteOpen(false)
+          setCompleteActualWorkTime(null)
+        }}
+      >
+        <div className="requirement-complete-form">
+          <div className="requirement-complete-node">
+            <div className="requirement-complete-node-copy">
+              <span>当前节点</span>
+              <strong>{selectedNode?.name ?? ''}</strong>
+            </div>
+            {selectedNode ? (
+              <span
+                className={`requirement-node-status-tag is-${getNodeTone(
+                  selectedNode.status
+                )}`}
+              >
+                {getNodeStatusLabel(selectedNode.status)}
+              </span>
+            ) : null}
+          </div>
+
+          <p className="requirement-complete-desc">
+            完成后会推进需求流程，并按飞书项目规则通知相关人。
+          </p>
+
+          {selectedNode?.supportsActualWorkTime ? (
+            <div className="requirement-complete-worktime">
+              <div className="requirement-complete-worktime-head">
+                <ClockCircleFilled />
+                <span>工时确认</span>
+              </div>
+              <div className="requirement-complete-worktime-row">
+                <div className="requirement-complete-field">
+                  <span>总估分</span>
+                  <strong>{formatWorkTime(selectedNode.points)}</strong>
+                </div>
+                <div className="requirement-complete-field">
+                  <label>
+                    实际工时 <em>*</em>
+                  </label>
+                  <InputNumber
+                    min={0}
+                    step={0.5}
+                    precision={2}
+                    value={completeActualWorkTime}
+                    placeholder="请填写实际工时"
+                    addonAfter="人天"
+                    onChange={(value) => setCompleteActualWorkTime(value)}
+                  />
+                </div>
+              </div>
+              <p className="requirement-complete-hint">
+                飞书要求完成前填写实际工时，系统会先更新工时，再完成节点。
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </Modal>
+
+      <Modal
+        title={
+          <span className="requirement-rollback-title">
+            <WarningFilled
+              style={{ color: '#faad14', marginRight: 8 }}
+            />
+            确认回滚该节点么？
+          </span>
+        }
         open={rollbackOpen}
         okText="回滚"
         cancelText="取消"
@@ -4884,14 +5121,13 @@ export default function RequirementWorkbench({
         }}
       >
         <div className="requirement-rollback-form">
-          <p>
-            将节点「{selectedNode?.name ?? ''}」回滚到上一节点。操作会直接写入飞书项目。
-          </p>
-          <label>回滚原因 *</label>
+          <p>回滚后，节点状态整体重新计算</p>
           <Input.TextArea
-            rows={3}
+            rows={5}
+            maxLength={140}
+            showCount
             value={rollbackReason}
-            placeholder="填写回滚原因"
+            placeholder="请填写节点回滚原因"
             onChange={(event) => setRollbackReason(event.target.value)}
           />
         </div>

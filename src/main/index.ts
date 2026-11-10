@@ -37,6 +37,7 @@ import { initializeSkillSettings } from './skill-settings'
 import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
 import { initializeWeeklyReport } from './weekly-report'
+import { initializeWeeklyReportAutoSubmit } from './weekly-report-auto'
 import { createMainWindow, focusMainWindow, getMainWindow } from './window'
 
 // 保留原有数据路径，避免修改应用名后丢失偏好、站点、登录态和浏览器会话。
@@ -104,6 +105,7 @@ if (!hasSingleInstanceLock) {
     initializeAiArtifacts()
     initializeAiChat()
     createMainWindow()
+    initializeWeeklyReportAutoSubmit()
 
     // macOS 点击 Dock 图标时恢复或聚焦窗口，这是用户主动操作，需要正常聚焦。
     app.on('activate', () => {

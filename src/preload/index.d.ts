@@ -114,6 +114,7 @@ import type { SiteInput, SiteState } from '../types/sites'
 import type { SkillSettingsState } from '../types/skills'
 import type {
   SubmitWeeklyReportInput,
+  WeeklyReportAutoStatus,
   WeeklyReportState
 } from '../types/weekly-report'
 
@@ -473,6 +474,10 @@ export interface ElectronAPI {
   getWeeklyReport: () => Promise<WeeklyReportState>
   /** 提交飞书个人工作周报。 */
   submitWeeklyReport: (input: SubmitWeeklyReportInput) => Promise<WeeklyReportState>
+  /** 标记周报编辑草稿是否有未提交修改。 */
+  setWeeklyReportDraftDirty: (dirty: boolean) => void
+  /** 读取最近一次周报自动提交状态。 */
+  getWeeklyReportAutoStatus: () => Promise<WeeklyReportAutoStatus>
   /** 读取当前 Meegle 用户参与的缺陷，可按缺陷角色过滤。 */
   getMyDefects: (role?: DefectRole | null, includeClosed?: boolean) => Promise<MeegleMyDefects>
   /** 按关键词搜索当前空间内的全部缺陷。 */
