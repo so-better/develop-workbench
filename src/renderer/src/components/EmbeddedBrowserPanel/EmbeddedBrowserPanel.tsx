@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import {
   ArrowLeftOutlined,
@@ -7,17 +7,22 @@ import {
   CloseOutlined,
   CompressOutlined,
   DownloadOutlined,
+  DownOutlined,
   ExpandOutlined,
   ExportOutlined,
   GlobalOutlined,
   LinkOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  SearchOutlined,
+  UpOutlined
 } from '@ant-design/icons'
-import { App as AntdApp, Button } from 'antd'
+import { App as AntdApp, Button, Input } from 'antd'
+import type { InputRef } from 'antd'
 import EmbeddedBrowserDownloads from '../EmbeddedBrowserDownloads/EmbeddedBrowserDownloads'
 import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserDownload,
+  EmbeddedBrowserFindResult,
   EmbeddedBrowserState
 } from '../../../../types/embedded-browser'
 
@@ -58,6 +63,9 @@ export default function EmbeddedBrowserPanel({
   const [expanded, setExpanded] = useState(false)
   const [opening, setOpening] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [findOpen, setFindOpen] = useState(false)
+  const [findTerm, setFindTerm] = useState('')
+  const [findResult, setFindResult] = useState<EmbeddedBrowserFindResult | null>(null)
   const [panelWidth, setPanelWidth] = useState<number | null>(() => {
     const stored = Number(localStorage.getItem(PANEL_WIDTH_KEY))
 
@@ -66,6 +74,7 @@ export default function EmbeddedBrowserPanel({
   const panelRef = useRef<HTMLElement>(null)
   const tabsRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
+  const findInputRef = useRef<InputRef>(null)
   const previousVisibleRef = useRef<boolean | null>(null)
   const openingBoundsRef = useRef<EmbeddedBrowserBounds | null>(null)
   const lastBoundsRef = useRef('')
@@ -160,6 +169,98 @@ export default function EmbeddedBrowserPanel({
     return () => {
       window.clearTimeout(timer)
     }
+  }, [state?.visible])
+
+  /** 打开页面查找栏。 */
+  const openFind = useCallback((): void => {
+    setFindOpen(true)
+    requestAnimationFrame(() => {
+      findInputRef.current?.focus()
+      findInputRef.current?.select()
+    })
+  }, [])
+
+  const closeFind = useCallback((): void => {
+    setFindOpen(false)
+    setFindTerm('')
+    setFindResult(null)
+    window.electron.stopEmbeddedBrowserFind('clearSelection').catch(() => undefined)
+    window.electron.focusEmbeddedBrowserPage().catch(() => undefined)
+  }, [])
+
+  const runFind = useCallback(
+    (forward = true, findNext = false): void => {
+      const term = findTerm
+
+      if (!term) {
+        setFindResult(null)
+        window.electron.stopEmbeddedBrowserFind('clearSelection').catch(() => undefined)
+        return
+      }
+
+      window.electron
+        .findEmbeddedBrowser(term, forward, findNext)
+        .catch(() => undefined)
+    },
+    [findTerm]
+  )
+
+  useEffect(() => {
+    if (!findOpen) return
+
+    if (!findTerm) {
+      setFindResult(null)
+      window.electron.stopEmbeddedBrowserFind('clearSelection').catch(() => undefined)
+      return
+    }
+
+    const timer = window.setTimeout(() => runFind(true, false), 150)
+
+    return () => window.clearTimeout(timer)
+  }, [findOpen, findTerm, runFind, state?.activeTabId])
+
+  useEffect(() => {
+    const unsubscribeResult = window.electron.onEmbeddedBrowserFindResult(
+      (result) => setFindResult(result)
+    )
+    const unsubscribeOpen = window.electron.onEmbeddedBrowserOpenFind(openFind)
+
+    return () => {
+      unsubscribeResult()
+      unsubscribeOpen()
+    }
+  }, [openFind])
+
+  useEffect(() => {
+    if (!state?.visible) return
+
+    const handleFindShortcut = (event: KeyboardEvent): void => {
+      const isFindShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === 'f'
+
+      if (!isFindShortcut) return
+
+      event.preventDefault()
+      openFind()
+    }
+
+    window.addEventListener('keydown', handleFindShortcut, true)
+
+    return () => {
+      window.removeEventListener('keydown', handleFindShortcut, true)
+    }
+  }, [openFind, state?.visible])
+
+  useEffect(() => {
+    if (state?.visible) return
+
+    setFindOpen(false)
+    setFindTerm('')
+    setFindResult(null)
+    window.electron.stopEmbeddedBrowserFind('clearSelection').catch(() => undefined)
   }, [state?.visible])
 
   /** 复制当前页面链接。 */
@@ -420,6 +521,13 @@ export default function EmbeddedBrowserPanel({
           <Button
             type="text"
             size="small"
+            icon={<SearchOutlined />}
+            aria-label="在页面中查找"
+            onClick={openFind}
+          />
+          <Button
+            type="text"
+            size="small"
             icon={<BugOutlined />}
             aria-label="开发者工具"
             onClick={() => window.electron.toggleEmbeddedBrowserDevTools()}
@@ -485,6 +593,57 @@ export default function EmbeddedBrowserPanel({
           关闭全部
         </Button>
       </div>
+
+      {findOpen ? (
+        <div className="embedded-browser-findbar">
+          <Input
+            ref={findInputRef}
+            size="small"
+            value={findTerm}
+            placeholder="在页面中查找"
+            prefix={<SearchOutlined />}
+            onChange={(event) => setFindTerm(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Escape') {
+                event.preventDefault()
+                closeFind()
+                return
+              }
+
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                runFind(!event.shiftKey, true)
+              }
+            }}
+          />
+          <span className="embedded-browser-find-count">
+            {findResult
+              ? `${findResult.activeMatchOrdinal}/${findResult.matches}`
+              : '0/0'}
+          </span>
+          <Button
+            type="text"
+            size="small"
+            icon={<UpOutlined />}
+            aria-label="上一个匹配"
+            onClick={() => runFind(false, true)}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<DownOutlined />}
+            aria-label="下一个匹配"
+            onClick={() => runFind(true, true)}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<CloseOutlined />}
+            aria-label="关闭查找"
+            onClick={closeFind}
+          />
+        </div>
+      ) : null}
 
       {state.error ? (
         <div className="embedded-browser-error">

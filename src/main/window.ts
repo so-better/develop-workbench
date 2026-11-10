@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, nativeImage, screen, Tray } from 'electron'
+import type { MenuItemConstructorOptions } from 'electron'
 import { join } from 'node:path'
 import { openEmbeddedBrowser } from './embedded-browser'
 import {
@@ -10,6 +11,7 @@ import {
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let isQuitting = false
+let applicationMenuInstalled = false
 
 // 用户通过菜单、托盘或 Cmd+Q 退出时，允许窗口真正关闭。
 app.on('before-quit', () => {
@@ -81,10 +83,30 @@ const createWindowsTray = (): void => {
   tray.on('double-click', focusMainWindow)
 }
 
+/** 安装标准编辑菜单，让渲染页和内置浏览器都能使用系统复制粘贴等操作。 */
+const installApplicationMenu = (): void => {
+  if (applicationMenuInstalled) return
+
+  const template: MenuItemConstructorOptions[] = []
+
+  if (process.platform === 'darwin') {
+    template.push({ role: 'appMenu' })
+  }
+
+  template.push({ role: 'editMenu' })
+
+  if (process.platform === 'darwin') {
+    template.push({ role: 'windowMenu' })
+  }
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+  applicationMenuInstalled = true
+}
+
 /**
  * 创建主窗口，并加载开发环境或生产环境对应的渲染页面。
  */
 export const createMainWindow = (): void => {
+  installApplicationMenu()
   // 使用主显示器可用区域（已排除菜单栏、Dock 等），按 95% 计算初始窗口尺寸。
   const { width: workAreaWidth, height: workAreaHeight } = screen.getPrimaryDisplay().workAreaSize
   const initialWidth = Math.round(workAreaWidth * 0.95)

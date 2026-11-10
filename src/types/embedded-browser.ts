@@ -39,6 +39,24 @@ export interface EmbeddedBrowserState {
   canGoForward: boolean
 }
 
+/** 内嵌页面查找操作。 */
+export type EmbeddedBrowserFindAction =
+  | 'clearSelection'
+  | 'keepSelection'
+  | 'activateSelection'
+
+/** 内嵌页面查找结果。 */
+export interface EmbeddedBrowserFindResult {
+  /** 当前匹配序号，从 1 开始。 */
+  activeMatchOrdinal: number
+
+  /** 匹配总数。 */
+  matches: number
+
+  /** 是否是本次查找的最终结果。 */
+  finalUpdate: boolean
+}
+
 /**
  * 内嵌浏览器下载状态。
  */

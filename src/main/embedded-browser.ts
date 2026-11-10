@@ -1,5 +1,5 @@
-import { app, BrowserWindow, ipcMain, session, shell, WebContentsView } from 'electron'
-import type { DownloadItem, Rectangle, LoadURLOptions } from 'electron'
+import { app, BrowserWindow, clipboard, ipcMain, Menu, session, shell, WebContentsView } from 'electron'
+import type { MenuItemConstructorOptions, DownloadItem, Rectangle, LoadURLOptions } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { open, rename, rm } from 'node:fs/promises'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -36,6 +36,7 @@ interface BrowserEntry {
   animateInOnNextBounds: boolean
   animationTimer: NodeJS.Timeout | null
   closing: boolean
+  findRequestId: number | null
 }
 
 interface DownloadEntry {
@@ -657,7 +658,8 @@ const createEntry = (window: BrowserWindow): BrowserEntry => {
     requestedUrl: null,
     animateInOnNextBounds: false,
     animationTimer: null,
-    closing: false
+    closing: false,
+    findRequestId: null
   }
 
   view.setBackgroundColor('#ffffff')
@@ -685,8 +687,123 @@ const createEntry = (window: BrowserWindow): BrowserEntry => {
     return { action: 'deny' }
   })
 
+  webContents.on('found-in-page', (_event, result) => {
+    if (entry.window.isDestroyed()) return
+    if (entries.get(entry.window.id) !== entry) return
+    if (result.requestId !== entry.findRequestId) return
+
+    entry.window.webContents.send('embedded-browser:find-result', {
+      activeMatchOrdinal: result.activeMatchOrdinal,
+      matches: result.matches,
+      finalUpdate: result.finalUpdate
+    })
+  })
+
+  webContents.on('context-menu', (_event, params) => {
+    const template: MenuItemConstructorOptions[] = []
+    const addSeparator = (): void => {
+      if (template.length > 0 && template[template.length - 1]?.type !== 'separator') {
+        template.push({ type: 'separator' })
+      }
+    }
+
+    if (params.isEditable) {
+      template.push(
+        {
+          label: '撤销',
+          enabled: params.editFlags.canUndo,
+          click: () => webContents.undo()
+        },
+        {
+          label: '重做',
+          enabled: params.editFlags.canRedo,
+          click: () => webContents.redo()
+        }
+      )
+      addSeparator()
+      template.push(
+        {
+          label: '剪切',
+          enabled: params.editFlags.canCut,
+          click: () => webContents.cut()
+        },
+        {
+          label: '复制',
+          enabled: params.editFlags.canCopy,
+          click: () => webContents.copy()
+        },
+        {
+          label: '粘贴',
+          enabled: params.editFlags.canPaste,
+          click: () => webContents.paste()
+        },
+        {
+          label: '全选',
+          enabled: params.editFlags.canSelectAll,
+          click: () => webContents.selectAll()
+        }
+      )
+    } else if (params.selectionText.trim()) {
+      template.push(
+        {
+          label: '复制',
+          click: () => webContents.copy()
+        },
+        {
+          label: '全选',
+          click: () => webContents.selectAll()
+        }
+      )
+    }
+
+    const linkUrl = tryNormalizeHttpUrl(params.linkURL)
+
+    if (linkUrl) {
+      addSeparator()
+      template.push(
+        {
+          label: '在新标签页打开链接',
+          click: () => openEmbeddedBrowser(entry.window, linkUrl)
+        },
+        {
+          label: '复制链接地址',
+          click: () => clipboard.writeText(linkUrl)
+        },
+        {
+          label: '在默认浏览器打开链接',
+          click: () => shell.openExternal(linkUrl).catch(() => undefined)
+        }
+      )
+    }
+
+    addSeparator()
+    template.push(
+      {
+        label: '后退',
+        enabled: webContents.navigationHistory.canGoBack(),
+        click: () => webContents.navigationHistory.goBack()
+      },
+      {
+        label: '前进',
+        enabled: webContents.navigationHistory.canGoForward(),
+        click: () => webContents.navigationHistory.goForward()
+      },
+      {
+        label: '刷新',
+        click: () => webContents.reload()
+      }
+    )
+
+    Menu.buildFromTemplate(template).popup({ window: entry.window })
+  })
+
   webContents.on('before-input-event', (event, input) => {
     const key = input.key.toLowerCase()
+    const isKeyDown = input.type === 'keyDown' && !input.isAutoRepeat
+    const primaryModifier =
+      process.platform === 'darwin'
+        ? input.meta && !input.control
+        : input.control && !input.meta
     const openQuickNotesShortcut =
       (input.meta || input.control) && !input.alt && input.shift && key === 'k'
     const toggleDevToolsShortcut =
@@ -694,22 +811,98 @@ const createEntry = (window: BrowserWindow): BrowserEntry => {
       ((input.meta || input.control) && input.alt && key === 'i') ||
       (input.control && input.shift && key === 'i')
 
-    if (openQuickNotesShortcut && !input.isAutoRepeat) {
+    if (openQuickNotesShortcut && isKeyDown) {
       event.preventDefault()
       entry.window.webContents.focus()
       entry.window.webContents.send('quick-notes:open')
       return
     }
 
-    if (toggleDevToolsShortcut && !input.isAutoRepeat) {
+    if (toggleDevToolsShortcut && isKeyDown) {
       event.preventDefault()
       toggleEntryDevTools(entry)
       return
     }
 
-    if (input.key === 'Escape' && !input.isAutoRepeat) {
+    if (isKeyDown && primaryModifier && !input.alt && !input.shift && key === 'f') {
       event.preventDefault()
-      entry.window.webContents.send('embedded-browser:request-close')
+      entry.window.webContents.focus()
+      entry.window.webContents.send('embedded-browser:open-find')
+      return
+    }
+
+    if (isKeyDown && primaryModifier && !input.alt && key === 'r') {
+      event.preventDefault()
+      if (input.shift) webContents.reloadIgnoringCache()
+      else webContents.reload()
+      return
+    }
+
+    const backShortcut =
+      process.platform === 'darwin'
+        ? primaryModifier && !input.alt && key === '['
+        : input.alt && !input.control && !input.meta && key === 'arrowleft'
+    const forwardShortcut =
+      process.platform === 'darwin'
+        ? primaryModifier && !input.alt && key === ']'
+        : input.alt && !input.control && !input.meta && key === 'arrowright'
+
+    if (isKeyDown && backShortcut) {
+      event.preventDefault()
+      if (webContents.navigationHistory.canGoBack()) {
+        webContents.navigationHistory.goBack()
+      }
+      return
+    }
+
+    if (isKeyDown && forwardShortcut) {
+      event.preventDefault()
+      if (webContents.navigationHistory.canGoForward()) {
+        webContents.navigationHistory.goForward()
+      }
+      return
+    }
+
+    if (isKeyDown && primaryModifier && !input.alt) {
+      const zoomIn = key === '+' || key === '='
+      const zoomOut = key === '-'
+      const zoomReset = key === '0'
+
+      if (zoomIn || zoomOut || zoomReset) {
+        event.preventDefault()
+        const current = webContents.getZoomLevel()
+        const next = zoomReset
+          ? 0
+          : Math.max(-5, Math.min(5, current + (zoomIn ? 0.5 : -0.5)))
+        webContents.setZoomLevel(next)
+        return
+      }
+    }
+
+    if (isKeyDown && input.key === 'Escape') {
+      // 不阻止页面自身的 Esc 行为；仅在非输入控件、非全屏时收起浏览器。
+      webContents
+        .executeJavaScript(
+          `(() => {
+            const element = document.activeElement;
+            const tag = element?.tagName?.toLowerCase() ?? '';
+            return {
+              editable:
+                Boolean(element?.isContentEditable) ||
+                tag === 'input' ||
+                tag === 'textarea' ||
+                tag === 'select' ||
+                tag === 'iframe',
+              fullscreen: Boolean(document.fullscreenElement)
+            };
+          })()`
+        )
+        .then(({ editable, fullscreen }: { editable: boolean; fullscreen: boolean }) => {
+          if (!editable && !fullscreen && !entry.window.isDestroyed()) {
+            entry.window.webContents.send('embedded-browser:request-close')
+          }
+        })
+        .catch(() => undefined)
     }
   })
 
@@ -1201,6 +1394,50 @@ export const initializeEmbeddedBrowser = (): void => {
     }
 
     applyVisibility(entry)
+  })
+
+  ipcMain.handle(
+    'embedded-browser:find',
+    (event, text: unknown, forward: unknown, findNext: unknown) => {
+      if (typeof text !== 'string') throw new Error('查找内容不合法')
+
+      const window = BrowserWindow.fromWebContents(event.sender)
+      const entry = window ? entries.get(window.id) : null
+
+      if (!entry) return
+
+      if (!text) {
+        entry.findRequestId = null
+        entry.view.webContents.stopFindInPage('clearSelection')
+        return
+      }
+
+      entry.findRequestId = entry.view.webContents.findInPage(text, {
+        forward: forward !== false,
+        findNext: findNext === true
+      })
+    }
+  )
+
+  ipcMain.handle('embedded-browser:stop-find', (event, action: unknown) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const entry = window ? entries.get(window.id) : null
+    const value =
+      action === 'keepSelection' || action === 'activateSelection'
+        ? action
+        : 'clearSelection'
+
+    if (!entry) return
+
+    entry.findRequestId = null
+    entry.view.webContents.stopFindInPage(value)
+  })
+
+  ipcMain.handle('embedded-browser:focus-page', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const entry = window ? entries.get(window.id) : null
+
+    entry?.view.webContents.focus()
   })
 
   ipcMain.handle('embedded-browser:get-downloads', () => getDownloadStates())

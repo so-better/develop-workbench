@@ -59,6 +59,8 @@ import type {
 import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserDownload,
+  EmbeddedBrowserFindAction,
+  EmbeddedBrowserFindResult,
   EmbeddedBrowserState
 } from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
@@ -293,6 +295,50 @@ const electronAPI = {
 
   setEmbeddedBrowserSuppressed: (suppressed: boolean): Promise<void> =>
     ipcRenderer.invoke('embedded-browser:set-suppressed', suppressed),
+
+  findEmbeddedBrowser: (
+    text: string,
+    forward = true,
+    findNext = false
+  ): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:find', text, forward, findNext),
+
+  stopEmbeddedBrowserFind: (
+    action: EmbeddedBrowserFindAction
+  ): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:stop-find', action),
+
+  focusEmbeddedBrowserPage: (): Promise<void> =>
+    ipcRenderer.invoke('embedded-browser:focus-page'),
+
+  onEmbeddedBrowserFindResult: (
+    listener: (result: EmbeddedBrowserFindResult) => void
+  ): (() => void) => {
+    const handler = (
+      _event: IpcRendererEvent,
+      result: EmbeddedBrowserFindResult
+    ): void => {
+      listener(result)
+    }
+
+    ipcRenderer.on('embedded-browser:find-result', handler)
+
+    return () => {
+      ipcRenderer.removeListener('embedded-browser:find-result', handler)
+    }
+  },
+
+  onEmbeddedBrowserOpenFind: (listener: () => void): (() => void) => {
+    const handler = (): void => {
+      listener()
+    }
+
+    ipcRenderer.on('embedded-browser:open-find', handler)
+
+    return () => {
+      ipcRenderer.removeListener('embedded-browser:open-find', handler)
+    }
+  },
 
   getEmbeddedBrowserDownloads: (): Promise<EmbeddedBrowserDownload[]> =>
     ipcRenderer.invoke('embedded-browser:get-downloads'),

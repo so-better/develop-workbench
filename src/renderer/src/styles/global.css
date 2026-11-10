@@ -64,7 +64,7 @@
   gap: 6px;
   overflow-x: auto;
   padding: 7px 10px;
-  background: var(--workbench-soft);
+  /* 背景由父级 tabbar 统一提供，避免深色半透明背景叠加后颜色不一致。 */
   /* 保留横向滚动能力，隐藏滚动条，避免标签栏高度随溢出变化。 */
   scrollbar-width: none;
 }
@@ -1633,6 +1633,30 @@ body {
 .embedded-browser-resize-handle:hover::after {
   background: var(--workbench-secondary);
   opacity: 1;
+}
+
+.embedded-browser-findbar {
+  display: flex;
+  flex: 0 0 40px;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 10px;
+  background: var(--workbench-soft);
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.embedded-browser-findbar .ant-input-affix-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.embedded-browser-find-count {
+  flex-shrink: 0;
+  min-width: 44px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  text-align: right;
 }
 
 .embedded-browser-toolbar {

@@ -57,6 +57,8 @@ import type {
 import type {
   EmbeddedBrowserBounds,
   EmbeddedBrowserDownload,
+  EmbeddedBrowserFindAction,
+  EmbeddedBrowserFindResult,
   EmbeddedBrowserState
 } from '../types/embedded-browser'
 import type { IdeConfig, IdeConfigState, IdePresetId } from '../types/ide'
@@ -211,6 +213,24 @@ export interface ElectronAPI {
   setEmbeddedBrowserBounds: (bounds: EmbeddedBrowserBounds) => Promise<void>
   /** 临时隐藏/恢复内嵌浏览器，用于覆盖层和弹窗。 */
   setEmbeddedBrowserSuppressed: (suppressed: boolean) => Promise<void>
+  /** 在当前内嵌页面中查找文本。 */
+  findEmbeddedBrowser: (
+    text: string,
+    forward?: boolean,
+    findNext?: boolean
+  ) => Promise<void>
+  /** 停止内嵌页面查找。 */
+  stopEmbeddedBrowserFind: (
+    action: EmbeddedBrowserFindAction
+  ) => Promise<void>
+  /** 将焦点还给内嵌页面。 */
+  focusEmbeddedBrowserPage: () => Promise<void>
+  /** 订阅内嵌页面查找结果。 */
+  onEmbeddedBrowserFindResult: (
+    listener: (result: EmbeddedBrowserFindResult) => void
+  ) => () => void
+  /** 订阅 Cmd/Ctrl+F 打开查找栏请求。 */
+  onEmbeddedBrowserOpenFind: (listener: () => void) => () => void
   /** 读取内嵌浏览器下载列表。 */
   getEmbeddedBrowserDownloads: () => Promise<EmbeddedBrowserDownload[]>
   /** 取消下载。 */
