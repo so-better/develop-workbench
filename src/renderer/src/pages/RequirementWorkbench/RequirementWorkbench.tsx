@@ -77,6 +77,7 @@ import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import MarkdownContent from '../../components/MarkdownContent/MarkdownContent'
 import MarkdownEditor from '../../components/MarkdownEditor/MarkdownEditor'
 import RequirementFlowchart from '../../components/RequirementFlowchart/RequirementFlowchart'
+import { findScheduleConflicts } from '../../utils/schedule-conflicts'
 import RequirementLinks from '../../components/RequirementLinks/RequirementLinks'
 
 interface RequirementWorkbenchProps {
@@ -354,6 +355,10 @@ const formatActualWorkTime = (value: number | null): string =>
 const formatRemainingWorkTime = (value: number | null): string =>
   value !== null ? `${value} 人天` : '- 人天'
 
+/** 格式化单个排期日期，用于流程图冲突提示。 */
+const formatScheduleDate = (value: string | null): string =>
+  value ? dayjs(value).format('MM-DD') : '未设置'
+
 /**
  * 清理飞书内部 HTML 标记。
  * 不能直接删除注释，否则裸 URL 会和后面的中文标点连在一起被自动链接吞掉。
@@ -595,6 +600,24 @@ export default function RequirementWorkbench({
 
   /** 当前选中的流程节点。 */
   const selectedNode = activity?.nodes.find((node) => node.key === selectedNodeKey) ?? null
+
+  /** 流程图中排期顺序异常的边。 */
+  const scheduleConflicts = useMemo(
+    () => findScheduleConflicts(activity?.nodes ?? []),
+    [activity?.nodes]
+  )
+
+  /** 当前节点相关的排期顺序异常。 */
+  const selectedNodeScheduleConflicts = useMemo(
+    () =>
+      selectedNodeKey
+        ? scheduleConflicts.filter(
+            (conflict) =>
+              conflict.fromKey === selectedNodeKey || conflict.toKey === selectedNodeKey
+          )
+        : [],
+    [scheduleConflicts, selectedNodeKey]
+  )
 
   /** 选中流程图节点后，将节点详情滚动到可视区域。 */
   const handleSelectNode = (nodeKey: string): void => {
@@ -4178,6 +4201,22 @@ export default function RequirementWorkbench({
                             </span>
                           )}
                         </div>
+
+                        {selectedNodeScheduleConflicts.length > 0 ? (
+                          <div className="requirement-node-schedule-warning" role="alert">
+                            <WarningFilled />
+                            <div>
+                              <strong>排期顺序异常</strong>
+                              {selectedNodeScheduleConflicts.map((conflict) => (
+                                <span key={`${conflict.fromKey}-${conflict.toKey}`}>
+                                  {conflict.fromKey === selectedNode.key
+                                    ? `本节点排期结束（${formatScheduleDate(conflict.fromDate)}）晚于后续节点「${conflict.toName}」的开始（${formatScheduleDate(conflict.toDate)}）`
+                                    : `前置节点「${conflict.fromName}」的排期结束（${formatScheduleDate(conflict.fromDate)}）晚于本节点开始（${formatScheduleDate(conflict.toDate)}）`}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
 
                         <div className={`requirement-node-summary-card${nodeEditing ? ' is-editing' : ''}`}>
                           <div className="requirement-node-summary-block is-owner">

@@ -1,7 +1,9 @@
 import { useMemo } from 'react'
+import { WarningFilled } from '@ant-design/icons'
 import dagre from '@dagrejs/dagre'
 import type { Point } from '@dagrejs/dagre'
 import type { MeegleWorkflowNode } from '../../../../types/requirements'
+import { findScheduleConflicts } from '../../utils/schedule-conflicts'
 
 interface RequirementFlowchartProps {
   /** 流程节点。 */
@@ -35,6 +37,7 @@ interface FlowLayout {
 
 const NODE_MIN_WIDTH = 126
 const NODE_MAX_WIDTH = 280
+const NODE_WARNING_WIDTH = 20
 const NODE_HEIGHT = 40
 const HORIZONTAL_GAP = 56
 const VERTICAL_GAP = 34
@@ -45,16 +48,20 @@ const NODE_CONTENT_PADDING = 45
  * 根据节点名称估算宽度。
  * 中文字符按 13px、其他字符按 8px 估算，并限制在合理范围内。
  */
-const measureNodeWidth = (name: string): number => {
+const measureNodeWidth = (name: string, hasWarning = false): number => {
   const textWidth = Array.from(name).reduce((width, character) => {
     const isCjk = /[\u2e80-\u9fff\uff00-\uffef]/.test(character)
 
     return width + (isCjk ? 13 : 8)
   }, 0)
+  const warningWidth = hasWarning ? NODE_WARNING_WIDTH : 0
 
   return Math.min(
-    NODE_MAX_WIDTH,
-    Math.max(NODE_MIN_WIDTH, Math.ceil(textWidth) + NODE_CONTENT_PADDING)
+    NODE_MAX_WIDTH + warningWidth,
+    Math.max(
+      NODE_MIN_WIDTH,
+      Math.ceil(textWidth) + NODE_CONTENT_PADDING + warningWidth
+    )
   )
 }
 
@@ -92,7 +99,10 @@ const createSmoothPath = (points: Point[]): string => {
  * 使用 Dagre 做分层布局。
  * 跨层边会通过虚拟控制点绕开中间节点。
  */
-const buildLayout = (nodes: MeegleWorkflowNode[]): FlowLayout => {
+const buildLayout = (
+  nodes: MeegleWorkflowNode[],
+  conflictNodeKeys: ReadonlySet<string>
+): FlowLayout => {
   const graph = new dagre.graphlib.Graph()
 
   graph.setGraph({
@@ -106,7 +116,7 @@ const buildLayout = (nodes: MeegleWorkflowNode[]): FlowLayout => {
 
   for (const node of nodes) {
     graph.setNode(node.key, {
-      width: measureNodeWidth(node.name),
+      width: measureNodeWidth(node.name, conflictNodeKeys.has(node.key)),
       height: NODE_HEIGHT
     })
   }
@@ -124,7 +134,9 @@ const buildLayout = (nodes: MeegleWorkflowNode[]): FlowLayout => {
   const graphInfo = graph.graph()
   const positionedNodes: PositionedNode[] = nodes.map((node) => {
     const position = graph.node(node.key)
-    const width = position?.width ?? measureNodeWidth(node.name)
+    const width =
+      position?.width ??
+      measureNodeWidth(node.name, conflictNodeKeys.has(node.key))
 
     return {
       node,
@@ -174,7 +186,24 @@ export default function RequirementFlowchart({
   selectedNodeKey,
   onSelectNode
 }: RequirementFlowchartProps): JSX.Element {
-  const layout = useMemo(() => buildLayout(nodes), [nodes])
+  const scheduleConflicts = useMemo(() => findScheduleConflicts(nodes), [nodes])
+  const conflictNodeKeys = useMemo(
+    () => new Set(scheduleConflicts.map((conflict) => conflict.fromKey)),
+    [scheduleConflicts]
+  )
+  const conflictEdgeKeys = useMemo(
+    () =>
+      new Set(
+        scheduleConflicts.map(
+          (conflict) => `${conflict.fromKey}-${conflict.toKey}`
+        )
+      ),
+    [scheduleConflicts]
+  )
+  const layout = useMemo(
+    () => buildLayout(nodes, conflictNodeKeys),
+    [conflictNodeKeys, nodes]
+  )
 
   return (
     <div className="requirement-flowchart-scroll">
@@ -189,7 +218,13 @@ export default function RequirementFlowchart({
           aria-hidden="true"
         >
           {layout.edges.map((edge) => (
-            <path key={edge.key} d={edge.path} />
+            <path
+              key={edge.key}
+              d={edge.path}
+              className={
+                conflictEdgeKeys.has(edge.key) ? 'is-schedule-conflict' : undefined
+              }
+            />
           ))}
         </svg>
 
@@ -198,14 +233,17 @@ export default function RequirementFlowchart({
             key={node.key}
             type="button"
             className={`requirement-flow-node is-${getNodeTone(node.status)}${
-              node.key === selectedNodeKey ? ' is-selected' : ''
-            }`}
+              conflictNodeKeys.has(node.key) ? ' is-schedule-conflict' : ''
+            }${node.key === selectedNodeKey ? ' is-selected' : ''}`}
             style={{ left: x, top: y, width, height: NODE_HEIGHT }}
             title={node.name}
             onClick={() => onSelectNode(node.key)}
           >
             <span className="requirement-flow-node-dot" />
             <span className="requirement-flow-node-name">{node.name}</span>
+            {conflictNodeKeys.has(node.key) ? (
+              <WarningFilled className="requirement-flow-node-warning" />
+            ) : null}
           </button>
         ))}
       </div>

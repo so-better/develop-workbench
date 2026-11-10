@@ -3912,8 +3912,61 @@ body {
   stroke-width: 1.2;
 }
 
+.requirement-flowchart-edges path.is-schedule-conflict {
+  stroke: #f04438;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+.requirement-node-schedule-warning {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.55;
+  background: rgba(240, 68, 56, 0.08);
+  border: 1px solid rgba(240, 68, 56, 0.35);
+  border-radius: 8px;
+}
+
+.requirement-node-schedule-warning > .anticon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #f04438;
+  font-size: 14px;
+}
+
+.requirement-node-schedule-warning > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.requirement-node-schedule-warning strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 :root[data-theme="dark"] .requirement-flowchart-edges path {
   stroke: #3b3d43;
+}
+
+:root[data-theme="dark"] .requirement-flowchart-edges path.is-schedule-conflict {
+  stroke: #ff7b72;
+}
+
+:root[data-theme="dark"] .requirement-node-schedule-warning {
+  color: #ffb4ab;
+  background: rgba(240, 68, 56, 0.14);
+  border-color: rgba(255, 123, 114, 0.42);
+}
+
+:root[data-theme="dark"] .requirement-node-schedule-warning > .anticon {
+  color: #ff8a80;
 }
 
 .requirement-flow-node {
@@ -3951,6 +4004,24 @@ body {
 .requirement-flow-node.is-done {
   background: rgba(18, 183, 106, 0.06);
   border-color: rgba(18, 183, 106, 0.38);
+}
+
+.requirement-flow-node.is-schedule-conflict {
+  background: rgba(240, 68, 56, 0.06);
+  border-color: #f04438;
+  box-shadow: 0 0 0 3px rgba(240, 68, 56, 0.14);
+}
+
+.requirement-flow-node.is-schedule-conflict .requirement-flow-node-dot {
+  background: #f04438;
+  box-shadow: 0 0 0 3px rgba(240, 68, 56, 0.16);
+}
+
+.requirement-flow-node-warning {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: #f04438;
+  font-size: 12px;
 }
 
 .requirement-flow-node-dot {
