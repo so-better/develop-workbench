@@ -4,16 +4,19 @@
 
 ## 发布助手强制规则
 
-每次发布必须由发布助手自动完成版本号推荐，并等待用户确认：
+每次发布必须使用 **ask question 模式**（`question` 工具）询问版本号，并等待用户选择：
 
 1. 自动读取当前版本号
-2. 根据本次变更生成一个推荐版本号
-3. 给出推荐理由
-4. 暂停并明确询问用户是否确认
-5. 用户确认前，禁止修改版本号、执行构建或上传安装包
-6. 用户确认后，再自动更新 `package.json` 和 `package-lock.json`
+2. 计算 patch、minor、major 三个候选版本
+3. 使用 `question` 工具让用户选择，选项顺序固定为：
+   - patch（小版本）
+   - minor（大版本）
+   - major（最大版本）
+   - 自定义输入（由 `question` 工具自动提供，不要重复添加「其他」选项）
+4. 用户选择前，禁止修改版本号、执行构建或上传安装包
+5. 用户选择后，按用户确认的版本号执行发布
 
-不要默认直接执行 `npm version patch`，也不要自行跳过确认。
+不要只用普通文本询问版本号，也不要默认执行 `npm version patch`。
 
 ## 发布前确认
 
@@ -26,7 +29,7 @@
   - `develop-workbench-<版本>-win.exe`
   - `develop-workbench-<版本>-win.zip`
 
-## 1. 版本号推荐与确认
+## 1. 版本号选择与确认
 
 版本变更是每次发布的强制步骤，不可跳过。
 
@@ -37,45 +40,45 @@ CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo "当前版本：${CURRENT_VERSION}"
 ```
 
-### 1.2 生成推荐版本
+### 1.2 生成候选版本
 
-发布助手必须根据本次实际变更推荐一个明确版本号，并在询问前说明理由。
+发布助手先根据当前版本计算三个候选：
 
-推荐规则：
+- patch：小版本，例如 `0.2.3 -> 0.2.4`
+- minor：大版本，例如 `0.2.3 -> 0.3.0`
+- major：最大版本，例如 `0.2.3 -> 1.0.0`
 
-| 变更类型 | 推荐版本 | 示例 |
-| --- | --- | --- |
-| Bug 修复、样式调整、文案、内部重构、小优化 | patch | `0.1.1 -> 0.1.2` |
-| 新增功能、新页面、新工具、新集成，向后兼容 | minor | `0.1.1 -> 0.2.0` |
-| 破坏性变更、数据不兼容、重大结构调整 | major | `0.1.1 -> 1.0.0` |
+版本选项按 **patch → minor → major** 的顺序展示，优先小版本。可以说明本次变更对各候选版本的影响，但必须由用户选择，不能自行决定或跳过询问。
 
-推荐输出格式：
+### 1.3 必须使用 question 工具询问
+
+发布助手必须调用 `question` 工具，提供如下选项（版本号按当前版本计算）：
 
 ```text
-当前版本：0.2.3
-推荐版本：0.3.0（minor）
-推荐理由：本次新增了 XXX 功能，属于向后兼容的新能力。
-是否确认发布 0.3.0？
+问题：选择本次发布版本
+选项：
+1. 0.2.4（patch / 小版本）
+2. 0.3.0（minor / 大版本）
+3. 1.0.0（major / 最大版本）
 ```
 
-### 1.3 必须询问用户
+`question` 工具默认会提供「自定义输入」入口，不要额外添加「其他」或「自定义」选项。
 
-发布助手必须暂停并等待用户明确确认。
-
-用户确认前禁止：
+用户选择前禁止：
 
 - 执行 `npm version`
 - 修改 `package.json` / `package-lock.json`
+- 修改 `CHANGELOG.md`
 - 执行构建
 - 上传安装包
 
-### 1.4 确认后自动更新版本号
+### 1.4 用户选择后自动更新版本号
 
-只有用户确认推荐版本后，才执行：
+只有用户通过 `question` 工具选择版本后，才执行：
 
 ```bash
-RECOMMENDED_VERSION="0.3.0" # 替换为用户确认后的版本号
-node scripts/set-version.cjs "${RECOMMENDED_VERSION}"
+RELEASE_VERSION="0.2.4" # 替换为用户选择的版本号
+node scripts/set-version.cjs "${RELEASE_VERSION}"
 ```
 
 确认 `package.json` 和 `package-lock.json` 中的版本一致：
@@ -341,12 +344,14 @@ npm run clean:release
 ## 每次发布最短流程
 
 ```bash
-# 1. 读取当前版本并生成推荐版本
+# 1. 读取当前版本并计算 patch / minor / major
 CURRENT_VERSION=$(node -p "require('./package.json').version")
 echo "当前版本：${CURRENT_VERSION}"
-# 必须等待用户确认推荐版本后再执行：
-# RECOMMENDED_VERSION="<用户确认后的版本号>"
-# node scripts/set-version.cjs "${RECOMMENDED_VERSION}"
+# 必须使用 question 工具让用户选择版本，选项顺序为 patch / minor / major，
+# 自定义输入由 question 工具自动提供。
+# 用户选择后再执行：
+# RELEASE_VERSION="<用户选择的版本号>"
+# node scripts/set-version.cjs "${RELEASE_VERSION}"
 # VERSION=$(node -p "require('./package.json').version")
 # 同时在根目录 CHANGELOG.md 顶部添加该版本的更新内容
 
