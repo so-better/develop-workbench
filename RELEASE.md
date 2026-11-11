@@ -149,6 +149,7 @@ npm run dist:win
 - 构建完成后产物在 `release/`
 - `release/` 是构建产物，不要上传到源码仓库
 - 每个版本必须同时提供 macOS 和 Windows 包，否则另一平台的更新检查可能无法拿到安装包
+- 未配置 Developer ID 时，mac 构建会通过 `afterPack` 做整包 ad-hoc 签名，避免 Gatekeeper 报「已损坏」；首次打开仍可能需要右键打开或在系统设置中允许。
 
 ## 4. 检查产物
 

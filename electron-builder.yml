@@ -3,6 +3,8 @@ productName: Develop Workbench
 directories:
   buildResources: build
   output: release
+
+afterPack: ./scripts/after-pack.cjs
 files:
   - out/**/*
   - package.json
