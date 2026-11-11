@@ -188,7 +188,13 @@ export default function RequirementFlowchart({
 }: RequirementFlowchartProps): JSX.Element {
   const scheduleConflicts = useMemo(() => findScheduleConflicts(nodes), [nodes])
   const conflictNodeKeys = useMemo(
-    () => new Set(scheduleConflicts.map((conflict) => conflict.fromKey)),
+    () =>
+      new Set(
+        scheduleConflicts.flatMap((conflict) => [
+          conflict.fromKey,
+          conflict.toKey
+        ])
+      ),
     [scheduleConflicts]
   )
   const conflictEdgeKeys = useMemo(

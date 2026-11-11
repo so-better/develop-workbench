@@ -14,10 +14,10 @@ export interface ScheduleConflict {
   /** 后续节点名称。 */
   toName: string
 
-  /** 前置节点用于比较的结束日期，缺失时为开始日期。 */
+  /** 前置节点用于比较的开始日期，缺失时为结束日期。 */
   fromDate: string | null
 
-  /** 后续节点用于比较的开始日期，缺失时为结束日期。 */
+  /** 后续节点用于比较的结束日期，缺失时为开始日期。 */
   toDate: string | null
 }
 
@@ -46,21 +46,21 @@ const parseScheduleDate = (value: string | null): ScheduleDate | null => {
 }
 
 /**
- * 前置节点使用排期结束日，缺失时回退开始日。
+ * 前置节点使用排期开始日，缺失时回退结束日。
  */
 const getPredecessorSchedule = (
   node: MeegleWorkflowNode
 ): ScheduleDate | null =>
-  parseScheduleDate(node.scheduleEnd) ?? parseScheduleDate(node.scheduleStart)
-
-/**
- * 后续节点使用排期开始日，缺失时回退结束日。
- */
-const getSuccessorSchedule = (node: MeegleWorkflowNode): ScheduleDate | null =>
   parseScheduleDate(node.scheduleStart) ?? parseScheduleDate(node.scheduleEnd)
 
 /**
- * 找出前置节点排期结束日晚于后续节点开始日的流程边。
+ * 后续节点使用排期结束日，缺失时回退开始日。
+ */
+const getSuccessorSchedule = (node: MeegleWorkflowNode): ScheduleDate | null =>
+  parseScheduleDate(node.scheduleEnd) ?? parseScheduleDate(node.scheduleStart)
+
+/**
+ * 找出后续节点排期结束日早于前置节点开始日的流程边。
  */
 export const findScheduleConflicts = (
   nodes: MeegleWorkflowNode[]
@@ -78,7 +78,7 @@ export const findScheduleConflicts = (
       const nextNode = nodeMap.get(nextKey)
       const toSchedule = nextNode ? getSuccessorSchedule(nextNode) : null
 
-      if (!nextNode || !toSchedule || fromSchedule.day <= toSchedule.day) {
+      if (!nextNode || !toSchedule || toSchedule.day >= fromSchedule.day) {
         continue
       }
 

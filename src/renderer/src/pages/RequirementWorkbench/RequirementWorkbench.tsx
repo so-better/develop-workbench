@@ -4383,8 +4383,8 @@ export default function RequirementWorkbench({
                               {selectedNodeScheduleConflicts.map((conflict) => (
                                 <span key={`${conflict.fromKey}-${conflict.toKey}`}>
                                   {conflict.fromKey === selectedNode.key
-                                    ? `本节点排期结束（${formatScheduleDate(conflict.fromDate)}）晚于后续节点「${conflict.toName}」的开始（${formatScheduleDate(conflict.toDate)}）`
-                                    : `前置节点「${conflict.fromName}」的排期结束（${formatScheduleDate(conflict.fromDate)}）晚于本节点开始（${formatScheduleDate(conflict.toDate)}）`}
+                                    ? `后续节点「${conflict.toName}」的排期结束（${formatScheduleDate(conflict.toDate)}）早于本节点开始（${formatScheduleDate(conflict.fromDate)}）`
+                                    : `本节点排期结束（${formatScheduleDate(conflict.toDate)}）早于前置节点「${conflict.fromName}」的开始（${formatScheduleDate(conflict.fromDate)}）`}
                                 </span>
                               ))}
                             </div>
