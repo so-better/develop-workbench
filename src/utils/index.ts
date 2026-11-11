@@ -119,3 +119,16 @@ export const getErrorMessage = (
 /** 等待指定毫秒数，供轮询和重试流程复用。 */
 export const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms))
+
+/** 去掉常见 Markdown 标记，生成待办提醒和 aria-label 使用的短摘要。 */
+export const getQuickNoteSummary = (text: string, maxLength = 120): string => {
+  const summary = text
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/[#>*_`~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return summary.slice(0, maxLength) || '待办'
+}

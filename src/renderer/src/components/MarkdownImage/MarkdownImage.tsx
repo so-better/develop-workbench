@@ -121,7 +121,8 @@ export default function MarkdownImage({
       decoding="async"
       preview={{
         mask: '查看图片',
-        destroyOnHidden: true
+        destroyOnHidden: true,
+        zIndex: 1300
       }}
       onError={() => setFailed(true)}
     />

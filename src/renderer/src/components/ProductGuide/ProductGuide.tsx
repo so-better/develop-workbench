@@ -183,7 +183,11 @@ const CAPABILITIES: GuideCapability[] = [
     icon: <SearchOutlined />,
     items: [
       'Cmd/Ctrl+K 搜索需求、缺陷、站点、飞书文档、消息和群聊',
-      'Cmd/Ctrl+Shift+K 打开待办简记，随手记录、完成和删除',
+      'Cmd/Ctrl+Shift+K 打开待办简记；Enter 添加，Shift+Enter 换行',
+      '待办输入框支持 Markdown、富文本和图片粘贴，列表按 Markdown 渲染',
+      '可设置或修改截止时间，截止前 5 分钟提醒；系统通知不可用时自动显示应用内通知',
+      '点击提醒可打开待办简记；待办完成后自动停止提醒',
+      '未设置截止时可点击悬停出现的日历图标，已设置的待办显示日期胶囊',
       '消息与群聊交给飞书 App，其他结果可在应用内打开',
       '搜索结果支持上下键选择、回车打开'
     ]
@@ -230,6 +234,7 @@ const CAPABILITIES: GuideCapability[] = [
     icon: <HistoryOutlined />,
     items: [
       '底部“更新日志”可查看历史版本更新内容',
+      '每次窗口重新显示时静默检查版本更新；立即更新会在下载后打开安装程序，稍后更新会跳过该版本并停止自动提示，可在设置 → 应用信息中手动检查',
       'macOS 和 Windows 点击关闭按钮默认最小化，应用保持运行',
       'Windows 可通过托盘菜单重新打开主窗口或退出应用'
     ]

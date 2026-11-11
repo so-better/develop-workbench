@@ -36,6 +36,7 @@ export interface AppPreferences {
   ide?: IdeConfig
   skillDirectories?: string[]
   productGuideSeenVersion?: number
+  skippedUpdateVersion?: string
   powerRuntimeKeepAwake?: boolean
   terminal: TerminalSettings
 }
@@ -131,6 +132,14 @@ const normalizePath = (value: unknown): string | undefined => {
   return normalized || undefined
 }
 
+/** 只接受 x.y.z 形式的版本号。 */
+const normalizeVersion = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined
+
+  const normalized = value.trim()
+  return /^\d+\.\d+\.\d+$/.test(normalized) ? normalized : undefined
+}
+
 /**
  * 偏好文件路径。
  * 位于 Electron userData 目录，跟随用户环境隔离。
@@ -184,6 +193,7 @@ const readPreferences = (): AppPreferences => {
     ide?: unknown
     skillDirectories?: unknown
     productGuideSeenVersion?: unknown
+    skippedUpdateVersion?: unknown
     powerRuntimeKeepAwake?: unknown
     terminal?: unknown
   }
@@ -209,6 +219,7 @@ const readPreferences = (): AppPreferences => {
       value.productGuideSeenVersion >= 0
         ? value.productGuideSeenVersion
         : undefined,
+    skippedUpdateVersion: normalizeVersion(value.skippedUpdateVersion),
     powerRuntimeKeepAwake:
       typeof value.powerRuntimeKeepAwake === 'boolean'
         ? value.powerRuntimeKeepAwake
@@ -254,6 +265,7 @@ export const updatePreferences = (patch: Partial<AppPreferences>): AppPreference
     next.productGuideSeenVersion >= 0
       ? next.productGuideSeenVersion
       : undefined
+  next.skippedUpdateVersion = normalizeVersion(next.skippedUpdateVersion)
   next.terminal = normalizeTerminalSettings(next.terminal)
   const targetPath = getPreferencesPath()
   const temporaryPath = `${targetPath}.${randomUUID()}.tmp`

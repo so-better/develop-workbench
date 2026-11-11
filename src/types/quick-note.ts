@@ -8,6 +8,8 @@ export interface QuickNote {
   createdAt: string
   updatedAt: string
   completedAt: string | null
+  dueAt: string | null
+  reminderSentAt: string | null
 }
 
 /**
@@ -15,4 +17,13 @@ export interface QuickNote {
  */
 export interface QuickNoteState {
   notes: QuickNote[]
+}
+
+/**
+ * 主进程无法发送系统通知时转发的应用内提醒。
+ */
+export interface QuickNoteReminder {
+  id: string
+  text: string
+  dueAt: string
 }

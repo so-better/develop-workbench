@@ -27,6 +27,7 @@ export interface UpdateCheckResult {
   hasUpdate: boolean
   package: UpdatePackage | null
   folderUrl: string
+  skippedVersion: string | null
 }
 
 /**
@@ -35,4 +36,5 @@ export interface UpdateCheckResult {
 export interface UpdateDownloadResult {
   path: string
   name: string
+  downloadId: string
 }

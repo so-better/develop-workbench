@@ -140,6 +140,13 @@ const importPreferences = (content: string): void => {
     patch.productGuideSeenVersion = parsed.productGuideSeenVersion
   }
 
+  if (
+    typeof parsed.skippedUpdateVersion === 'string' &&
+    /^\d+\.\d+\.\d+$/.test(parsed.skippedUpdateVersion.trim())
+  ) {
+    patch.skippedUpdateVersion = parsed.skippedUpdateVersion.trim()
+  }
+
   updatePreferences(patch)
 }
 

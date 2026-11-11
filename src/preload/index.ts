@@ -14,7 +14,7 @@ import type {
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
-import type { QuickNoteState } from '../types/quick-note'
+import type { QuickNoteReminder, QuickNoteState } from '../types/quick-note'
 import type {
   MigrationExportResult,
   MigrationImportResult
@@ -232,8 +232,12 @@ const electronAPI = {
     ipcRenderer.invoke('quick-notes:get-state'),
 
   /** 新增一条待办简记。 */
-  addQuickNote: (text: string): Promise<QuickNoteState> =>
-    ipcRenderer.invoke('quick-notes:add', text),
+  addQuickNote: (text: string, dueAt: string | null): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:add', text, dueAt),
+
+  /** 更新待办截止时间。 */
+  setQuickNoteDueAt: (id: string, dueAt: string | null): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:set-due-at', id, dueAt),
 
   /** 更新待办完成状态。 */
   setQuickNoteDone: (id: string, done: boolean): Promise<QuickNoteState> =>
@@ -246,6 +250,27 @@ const electronAPI = {
   /** 清空已完成待办。 */
   clearCompletedQuickNotes: (): Promise<QuickNoteState> =>
     ipcRenderer.invoke('quick-notes:clear-completed'),
+
+  /** 通知主进程待办渲染器已就绪，补发未送达的提醒。 */
+  notifyQuickNotesRendererReady: (): Promise<boolean> =>
+    ipcRenderer.invoke('quick-notes:renderer-ready'),
+
+  /** 确认应用内提醒已展示。 */
+  ackQuickNoteReminder: (id: string, dueAt: string): Promise<boolean> =>
+    ipcRenderer.invoke('quick-notes:ack-reminder', id, dueAt),
+
+  /** 订阅主进程转发的待办提醒。 */
+  onQuickNoteReminder: (listener: (reminder: QuickNoteReminder) => void): (() => void) => {
+    const handler = (_event: IpcRendererEvent, reminder: QuickNoteReminder): void => {
+      listener(reminder)
+    }
+
+    ipcRenderer.on('quick-notes:reminder', handler)
+
+    return () => {
+      ipcRenderer.removeListener('quick-notes:reminder', handler)
+    }
+  },
 
   /** 订阅主进程转发的待办简记打开事件。 */
   onQuickNotesOpen: (listener: () => void): (() => void) => {
@@ -1477,6 +1502,10 @@ const electronAPI = {
   /** 通过飞书云盘检查新版本。 */
   checkForUpdates: (): Promise<UpdateCheckResult> =>
     ipcRenderer.invoke('updater:check'),
+
+  /** 记录稍后更新的版本，停止该版本的自动弹窗。 */
+  skipUpdateVersion: (version: string): Promise<string> =>
+    ipcRenderer.invoke('updater:skip-version', version),
 
   /** 下载指定更新安装包到系统下载目录。 */
   downloadUpdatePackage: (item: UpdatePackage): Promise<UpdateDownloadResult> =>

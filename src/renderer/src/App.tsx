@@ -75,7 +75,10 @@ export default function App(): JSX.Element {
   const quickNotes = useQuickNotes()
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null)
   const [updateOpen, setUpdateOpen] = useState(false)
-  const updateCheckRef = useRef<'idle' | 'checking' | 'completed'>('idle')
+  const [windowShowCount, setWindowShowCount] = useState(0)
+  const updateOpenRef = useRef(false)
+  const autoUpdateCheckRequestRef = useRef(0)
+  const sessionDismissedUpdateVersionRef = useRef<string | null>(null)
 
   /**
    * 重新读取本地 CLI 安装和授权状态。
@@ -169,6 +172,7 @@ export default function App(): JSX.Element {
     // 首次进入读取环境状态；窗口重新显示时静默刷新。
     refreshEnvironment(true)
     const unsubscribeWindow = window.electron.onWindowShown(() => {
+      setWindowShowCount((value) => value + 1)
       refreshEnvironment()
     })
     const unsubscribeMeegle = window.electron.onMeegleLoginEvent((event) => {
@@ -315,39 +319,70 @@ export default function App(): JSX.Element {
   }, [environmentLoading, environmentReady])
 
   useEffect(() => {
-    if (environmentLoading || !environmentReady || guideOpen) return
-    if (updateCheckRef.current !== 'idle') return
+    updateOpenRef.current = updateOpen
+  }, [updateOpen])
 
+  useEffect(() => {
+    if (
+      environmentLoading ||
+      !environmentReady ||
+      guideOpen ||
+      changelogOpen ||
+      settingsOpen ||
+      downloadsModalOpen ||
+      quickNotesOpen
+    ) {
+      return
+    }
+
+    const requestId = ++autoUpdateCheckRequestRef.current
+    const delay = windowShowCount === 0 ? 3000 : 800
     let cancelled = false
     const timer = window.setTimeout(() => {
-      updateCheckRef.current = 'checking'
-
       window.electron
         .checkForUpdates()
         .then((result) => {
-          // 只有仍有效的请求才能标记完成，未发现更新也属于一次成功检查。
-          if (cancelled) return
-          updateCheckRef.current = 'completed'
-          if (!result.hasUpdate) return
+          if (cancelled || requestId !== autoUpdateCheckRequestRef.current) {
+            return
+          }
 
+          if (!result.hasUpdate) return
+          if (result.skippedVersion === result.latestVersion) return
+          if (result.latestVersion === sessionDismissedUpdateVersionRef.current) {
+            return
+          }
+          if (updateOpenRef.current) return
+
+          updateOpenRef.current = true
           setUpdateInfo(result)
           setUpdateOpen(true)
         })
-        .catch(() => {
-          if (!cancelled) updateCheckRef.current = 'idle'
-        })
-    }, 3000)
+        .catch(() => undefined)
+    }, delay)
 
     return () => {
       cancelled = true
       window.clearTimeout(timer)
-      // IPC 请求无法在此中止，但可以丢弃结果并允许手册关闭后重新检查。
-      // 迟到的旧请求会被 cancelled 拦截，不会覆盖后续请求的状态。
-      if (updateCheckRef.current === 'checking') {
-        updateCheckRef.current = 'idle'
+
+      if (autoUpdateCheckRequestRef.current === requestId) {
+        autoUpdateCheckRequestRef.current += 1
       }
     }
-  }, [environmentLoading, environmentReady, guideOpen])
+  }, [
+    changelogOpen,
+    downloadsModalOpen,
+    environmentLoading,
+    environmentReady,
+    guideOpen,
+    quickNotesOpen,
+    settingsOpen,
+    windowShowCount
+  ])
+
+  const closeUpdatePrompt = useCallback((): void => {
+    updateOpenRef.current = false
+    setUpdateOpen(false)
+  }, [])
 
   const closeGuide = useCallback((): void => {
     setGuideOpen(false)
@@ -428,6 +463,7 @@ export default function App(): JSX.Element {
         onReload={() => quickNotes.reload()}
         onClose={closeQuickNotes}
         onAdd={quickNotes.add}
+        onSetDueAt={quickNotes.setDueAt}
         onSetDone={quickNotes.setDone}
         onRemove={quickNotes.remove}
         onClearCompleted={quickNotes.clearCompleted}
@@ -448,7 +484,17 @@ export default function App(): JSX.Element {
       <UpdatePrompt
         update={updateInfo}
         open={updateOpen}
-        onClose={() => setUpdateOpen(false)}
+        onClose={closeUpdatePrompt}
+        onLater={(version) => {
+          sessionDismissedUpdateVersionRef.current = version
+          window.electron.skipUpdateVersion(version).catch(() => {
+            message.error('保存“稍后更新”设置失败，下次启动可能再次提示')
+          })
+          closeUpdatePrompt()
+        }}
+        onStartUpdate={(version) => {
+          sessionDismissedUpdateVersionRef.current = version
+        }}
       />
 
       <AppFooter
@@ -495,6 +541,7 @@ export default function App(): JSX.Element {
         appInfo={appInfo}
         onLarkCliUpdated={() => refreshEnvironment()}
         onOpenUpdatePrompt={(update) => {
+          updateOpenRef.current = true
           setUpdateInfo(update)
           setUpdateOpen(true)
         }}

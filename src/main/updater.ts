@@ -10,6 +10,7 @@ import {
   getCompletedUpdateDownloadPath
 } from './embedded-browser'
 import { runLarkCli } from './lark'
+import { getPreferences, updatePreferences } from './preferences'
 import type {
   UpdateCheckResult,
   UpdateDownloadResult,
@@ -22,6 +23,7 @@ const UPDATE_FOLDER_URL =
 const UPDATE_FILE_PATTERN =
   /^develop-workbench-(\d+\.\d+\.\d+)-(mac|win)\.(dmg|zip|exe)$/i
 const DOWNLOAD_TIMEOUT_MS = 30 * 60 * 1000
+let updateCheckPromise: Promise<UpdateCheckResult> | null = null
 
 /** 下载和目录解析共用命名校验；不剥离路径，避免非法输入被悄悄转换成合法包名。 */
 const parsePackageName = (name: unknown): {
@@ -119,7 +121,7 @@ const selectPackage = (
   return null
 }
 
-export const checkForUpdates = async (): Promise<UpdateCheckResult> => {
+const performUpdateCheck = async (): Promise<UpdateCheckResult> => {
   const output = await runLarkCli(
     [
       'drive',
@@ -162,8 +164,36 @@ export const checkForUpdates = async (): Promise<UpdateCheckResult> => {
     latestVersion,
     hasUpdate: compareVersions(latestVersion, currentVersion) > 0,
     package: selectPackage(platformPackages, process.platform),
-    folderUrl: UPDATE_FOLDER_URL
+    folderUrl: UPDATE_FOLDER_URL,
+    skippedVersion: getPreferences().skippedUpdateVersion ?? null
   }
+}
+
+/** 合并并发检查，避免窗口连续显示时同时启动多个 lark-cli 进程。 */
+export const checkForUpdates = async (): Promise<UpdateCheckResult> => {
+  if (updateCheckPromise) return updateCheckPromise
+
+  const pending = performUpdateCheck()
+  updateCheckPromise = pending
+
+  try {
+    return await pending
+  } finally {
+    if (updateCheckPromise === pending) updateCheckPromise = null
+  }
+}
+
+/** 记录用户选择稍后更新的版本，后续自动检查不再弹窗。 */
+export const skipUpdateVersion = (value: unknown): string => {
+  if (typeof value !== 'string' || !/^\d+\.\d+\.\d+$/.test(value.trim())) {
+    throw new Error('版本号不合法')
+  }
+
+  const version = value.trim()
+
+  updatePreferences({ skippedUpdateVersion: version })
+
+  return version
 }
 
 export const downloadUpdatePackage = async (
@@ -287,7 +317,8 @@ export const downloadUpdatePackage = async (
 
   return {
     path: targetPath,
-    name: fileName
+    name: fileName,
+    downloadId: download.id
   }
 }
 
@@ -335,6 +366,9 @@ export const installUpdateDownload = async (
  */
 export const initializeUpdater = (): void => {
   ipcMain.handle('updater:check', () => checkForUpdates())
+  ipcMain.handle('updater:skip-version', (_event, version: unknown) =>
+    skipUpdateVersion(version)
+  )
   ipcMain.handle('updater:download', (_event, item: unknown) =>
     downloadUpdatePackage(item)
   )

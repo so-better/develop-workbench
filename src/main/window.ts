@@ -153,10 +153,22 @@ export const createMainWindow = (): void => {
     showMainWindow()
   })
 
-  // 每次窗口重新显示时通知渲染进程刷新 lark 登录状态。
-  window.on('show', () => {
-    window.webContents.send('window:shown')
-  })
+  let lastWindowShownAt = 0
+  const notifyWindowShown = (): void => {
+    const now = Date.now()
+
+    if (now - lastWindowShownAt < 250) return
+
+    lastWindowShownAt = now
+
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send('window:shown')
+    }
+  }
+
+  // 每次窗口重新显示或从最小化恢复时通知渲染进程刷新状态并静默检查更新。
+  window.on('show', notifyWindowShown)
+  window.on('restore', notifyWindowShown)
 
   // 点击关闭按钮时最小化而不是销毁窗口；通过菜单、托盘或 Cmd+Q 退出。
   window.on('close', (event) => {

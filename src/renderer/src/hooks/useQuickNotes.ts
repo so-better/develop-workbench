@@ -8,7 +8,8 @@ interface QuickNotesController {
   loading: boolean
   error: string | null
   reload: () => Promise<void>
-  add: (text: string) => Promise<void>
+  add: (text: string, dueAt: string | null) => Promise<void>
+  setDueAt: (id: string, dueAt: string | null) => Promise<void>
   setDone: (id: string, done: boolean) => Promise<void>
   remove: (id: string) => Promise<void>
   clearCompleted: () => Promise<void>
@@ -69,8 +70,12 @@ export const useQuickNotes = (): QuickNotesController => {
       setError(null)
     }), [enqueue])
 
-  const add = useCallback(async (text: string): Promise<void> => {
-    await mutate(() => window.electron.addQuickNote(text))
+  const add = useCallback(async (text: string, dueAt: string | null): Promise<void> => {
+    await mutate(() => window.electron.addQuickNote(text, dueAt))
+  }, [mutate])
+
+  const setDueAt = useCallback(async (id: string, dueAt: string | null): Promise<void> => {
+    await mutate(() => window.electron.setQuickNoteDueAt(id, dueAt))
   }, [mutate])
 
   const setDone = useCallback(async (id: string, done: boolean): Promise<void> => {
@@ -97,6 +102,7 @@ export const useQuickNotes = (): QuickNotesController => {
     error,
     reload,
     add,
+    setDueAt,
     setDone,
     remove,
     clearCompleted

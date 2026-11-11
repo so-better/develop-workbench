@@ -1,15 +1,71 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import type {
+  ClipboardEvent as ReactClipboardEvent,
+  KeyboardEvent as ReactKeyboardEvent
+} from 'react'
 import {
   CheckCircleFilled,
   CheckSquareOutlined,
+  ClockCircleOutlined,
   CloseOutlined,
   DeleteOutlined,
-  DownOutlined
+  DownOutlined,
+  PlusOutlined
 } from '@ant-design/icons'
-import { App, Button, Checkbox, Input, Popconfirm, Spin } from 'antd'
-import type { InputRef } from 'antd'
+import {
+  App,
+  Button,
+  Checkbox,
+  DatePicker,
+  Input,
+  Modal,
+  Popconfirm,
+  Spin
+} from 'antd'
+import type { TextAreaRef } from 'antd/es/input/TextArea'
+import dayjs from 'dayjs'
+import type { Dayjs } from 'dayjs'
 import type { QuickNote } from '../../../../types/quick-note'
-import { getErrorMessage } from '../../../../utils'
+import { getErrorMessage, getQuickNoteSummary } from '../../../../utils'
+import MarkdownContent from '../MarkdownContent/MarkdownContent'
+import { hasRichTextFormatting, htmlToMarkdown } from './html-to-markdown'
+
+const MAX_DRAFT_LENGTH = 5000
+const MAX_CLIPBOARD_HTML_LENGTH = 200_000
+const PANEL_WIDTH = 560
+const PANEL_Z_INDEX = 1100
+const OVERLAY_Z_INDEX = 1000
+const DUE_MODAL_Z_INDEX = 1300
+const DATE_POPUP_Z_INDEX = 1400
+
+const isOverlayTarget = (target: Element): boolean => {
+  let element: Element | null = target
+
+  while (element && element !== document.body) {
+    if (
+      element.matches(
+        'dialog[open], [role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="tooltip"]'
+      )
+    ) {
+      return true
+    }
+
+    const style = window.getComputedStyle(element)
+    const zIndex = Number(style.zIndex)
+
+    if (
+      (style.position === 'fixed' || style.position === 'absolute') &&
+      Number.isFinite(zIndex) &&
+      zIndex >= OVERLAY_Z_INDEX
+    ) {
+      return true
+    }
+
+    element = element.parentElement
+  }
+
+  return false
+}
 
 interface QuickNotesProps {
   open: boolean
@@ -19,7 +75,8 @@ interface QuickNotesProps {
   onOpen: () => void
   onReload: () => void
   onClose: () => void
-  onAdd: (text: string) => Promise<void>
+  onAdd: (text: string, dueAt: string | null) => Promise<void>
+  onSetDueAt: (id: string, dueAt: string | null) => Promise<void>
   onSetDone: (id: string, done: boolean) => Promise<void>
   onRemove: (id: string) => Promise<void>
   onClearCompleted: () => Promise<void>
@@ -38,22 +95,28 @@ export default function QuickNotes({
   onReload,
   onClose,
   onAdd,
+  onSetDueAt,
   onSetDone,
   onRemove,
   onClearCompleted
 }: QuickNotesProps): JSX.Element | null {
-  const { message } = App.useApp()
+  const { message, notification } = App.useApp()
   const [draft, setDraft] = useState('')
+  const [composerDueAt, setComposerDueAt] = useState<Dayjs | null>(null)
+  const [composerDueOpen, setComposerDueOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set())
+  const [editingDueNoteId, setEditingDueNoteId] = useState<string | null>(null)
+  const [editingDueValue, setEditingDueValue] = useState<Dayjs | null>(null)
+  const [dueSaving, setDueSaving] = useState(false)
   const [panelPosition, setPanelPosition] = useState<{
     left: number
     bottom: number
     width: number
   } | null>(null)
   const panelRef = useRef<HTMLElement>(null)
-  const inputRef = useRef<InputRef>(null)
+  const inputRef = useRef<TextAreaRef>(null)
   const isMac = window.electron.platform === 'darwin'
   const shortcut = isMac ? '⌘⇧K' : 'Ctrl Shift K'
 
@@ -62,7 +125,7 @@ export default function QuickNotes({
     if (!open) return
 
     const updatePosition = (): void => {
-      const width = Math.min(368, window.innerWidth - 16)
+      const width = Math.min(PANEL_WIDTH, window.innerWidth - 16)
       const trigger = document.querySelector<HTMLElement>(
         '[data-quick-notes-trigger]'
       )
@@ -119,6 +182,39 @@ export default function QuickNotes({
   }, [onOpen])
 
   useEffect(() => {
+    const unsubscribe = window.electron.onQuickNoteReminder((reminder) => {
+      notification.warning({
+        message: '待办即将截止',
+        description: `${reminder.text} · 截止 ${dayjs(reminder.dueAt).format(
+          'MM-DD HH:mm'
+        )}`,
+        duration: 12,
+        placement: 'topLeft',
+        key: `quick-note-reminder-${reminder.id}-${reminder.dueAt}`,
+        onClick: onOpen
+      })
+      void window.electron
+        .ackQuickNoteReminder(reminder.id, reminder.dueAt)
+        .catch(() => undefined)
+    })
+
+    return unsubscribe
+  }, [notification, onOpen])
+
+  useEffect(() => {
+    void window.electron.notifyQuickNotesRendererReady().catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    if (open) return
+
+    setComposerDueOpen(false)
+    setEditingDueNoteId(null)
+    setEditingDueValue(null)
+    setDueSaving(false)
+  }, [open])
+
+  useEffect(() => {
     if (open) {
       window.requestAnimationFrame(() => inputRef.current?.focus())
     }
@@ -144,8 +240,8 @@ export default function QuickNotes({
 
       if (!(target instanceof Element)) return
       if (target.closest('[data-quick-notes-trigger]')) return
-      if (target.closest('.ant-popover')) return
       if (panelRef.current?.contains(target)) return
+      if (isOverlayTarget(target)) return
 
       onClose()
     }
@@ -162,11 +258,28 @@ export default function QuickNotes({
 
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (composerDueOpen) return
+
+      const target = event.target
+      const targetInsidePanel =
+        target instanceof Element && panelRef.current?.contains(target)
+
+      if (
+        !targetInsidePanel &&
+        target instanceof Element &&
+        isOverlayTarget(target)
+      ) {
+        return
+      }
       if (
         document.querySelector(
           '.quick-notes-popconfirm:not(.ant-popover-hidden)'
         )
       ) {
+        return
+      }
+
+      if (document.querySelector('.ant-image-preview-root')) {
         return
       }
 
@@ -180,7 +293,7 @@ export default function QuickNotes({
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true)
     }
-  }, [onClose, open])
+  }, [composerDueOpen, onClose, open])
 
   const setBusy = (id: string, busy: boolean): void => {
     setBusyIds((current) => {
@@ -201,17 +314,115 @@ export default function QuickNotes({
 
     if (loading || !text || submitting) return
 
+    if (composerDueAt && !composerDueAt.isAfter(dayjs())) {
+      message.warning('截止时间需晚于当前时间')
+      return
+    }
+
     setSubmitting(true)
 
     try {
-      await onAdd(text)
+      await onAdd(text, composerDueAt?.toISOString() ?? null)
       setDraft('')
+      setComposerDueAt(null)
       window.requestAnimationFrame(() => inputRef.current?.focus())
     } catch (addError) {
       message.error(getErrorMessage(addError, '添加待办失败'))
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const openDueEditor = (note: QuickNote): void => {
+    setEditingDueNoteId(note.id)
+    setEditingDueValue(note.dueAt ? dayjs(note.dueAt) : null)
+  }
+
+  const closeDueEditor = (): void => {
+    if (dueSaving) return
+
+    setEditingDueNoteId(null)
+    setEditingDueValue(null)
+  }
+
+  const handleSaveDue = async (): Promise<void> => {
+    if (!editingDueNoteId || dueSaving) return
+
+    if (editingDueValue && !editingDueValue.isAfter(dayjs())) {
+      message.warning('截止时间需晚于当前时间')
+      return
+    }
+
+    setDueSaving(true)
+
+    try {
+      await onSetDueAt(
+        editingDueNoteId,
+        editingDueValue?.toISOString() ?? null
+      )
+      setEditingDueNoteId(null)
+      setEditingDueValue(null)
+    } catch (dueError) {
+      message.error(getErrorMessage(dueError, '更新截止时间失败'))
+    } finally {
+      setDueSaving(false)
+    }
+  }
+
+  const handleComposerKeyDown = (
+    event: ReactKeyboardEvent<HTMLTextAreaElement>
+  ): void => {
+    if (
+      event.key !== 'Enter' ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing
+    ) {
+      return
+    }
+
+    event.preventDefault()
+    handleAdd()
+  }
+
+  const handlePaste = (
+    event: ReactClipboardEvent<HTMLTextAreaElement>
+  ): void => {
+    const html = event.clipboardData.getData('text/html')
+
+    if (!html) return
+
+    if (html.length > MAX_CLIPBOARD_HTML_LENGTH) {
+      message.info('富文本内容过大，已按纯文本粘贴')
+      return
+    }
+
+    if (!hasRichTextFormatting(html)) return
+
+    const markdown = htmlToMarkdown(html)
+
+    if (!markdown) return
+
+    event.preventDefault()
+
+    const textarea = inputRef.current?.resizableTextArea?.textArea
+    const start = textarea?.selectionStart ?? draft.length
+    const end = textarea?.selectionEnd ?? draft.length
+    const next = `${draft.slice(0, start)}${markdown}${draft.slice(end)}`.slice(
+      0,
+      MAX_DRAFT_LENGTH
+    )
+
+    setDraft(next)
+    window.requestAnimationFrame(() => {
+      const target = inputRef.current?.resizableTextArea?.textArea
+
+      if (!target) return
+
+      const cursor = Math.min(start + markdown.length, next.length)
+
+      target.focus()
+      target.setSelectionRange(cursor, cursor)
+    })
   }
 
   const handleToggle = async (note: QuickNote): Promise<void> => {
@@ -261,6 +472,9 @@ export default function QuickNotes({
 
   const renderNote = (note: QuickNote): JSX.Element => {
     const busy = busyIds.has(note.id)
+    const summary = getQuickNoteSummary(note.text, 80)
+    const dueAt = note.dueAt ? dayjs(note.dueAt) : null
+    const dueOverdue = Boolean(dueAt && !note.done && dueAt.isBefore(dayjs()))
 
     return (
       <div
@@ -270,30 +484,63 @@ export default function QuickNotes({
         <Checkbox
           checked={note.done}
           disabled={busy}
-          aria-label={note.done ? `标记 ${note.text} 为未完成` : `完成 ${note.text}`}
+          aria-label={
+            note.done ? `标记「${summary}」为未完成` : `完成「${summary}」`
+          }
           onChange={() => handleToggle(note)}
         />
-        <span className="quick-note-text">{note.text}</span>
-        <Popconfirm
-          title="删除这条待办？"
-          rootClassName="quick-notes-popconfirm"
-          okText="删除"
-          cancelText="取消"
-          okButtonProps={{ danger: true }}
-          placement="left"
-          disabled={busy}
-          onConfirm={() => handleRemove(note)}
-        >
-          <Button
-            type="text"
-            size="small"
-            danger
-            className="quick-note-delete"
-            icon={<DeleteOutlined />}
-            aria-label={`删除待办 ${note.text}`}
+        <div className="quick-note-content">
+          <div className="quick-note-text">
+            <MarkdownContent
+              content={note.text}
+              className="quick-note-markdown"
+            />
+          </div>
+          {dueAt ? (
+            <button
+              type="button"
+              className={`quick-note-due${dueOverdue ? ' is-overdue' : ''}`}
+              onClick={() => openDueEditor(note)}
+            >
+              <ClockCircleOutlined />
+              截止 {dueAt.format('MM-DD HH:mm')}
+            </button>
+          ) : null}
+        </div>
+        <div className="quick-note-actions">
+          {!dueAt ? (
+            <Button
+              type="text"
+              size="small"
+              className="quick-note-action"
+              icon={<ClockCircleOutlined />}
+              aria-label={`为「${summary}」设置截止时间`}
+              title="设置截止时间"
+              disabled={busy}
+              onClick={() => openDueEditor(note)}
+            />
+          ) : null}
+          <Popconfirm
+            title="删除这条待办？"
+            rootClassName="quick-notes-popconfirm"
+            okText="删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            placement="left"
             disabled={busy}
-          />
-        </Popconfirm>
+            onConfirm={() => handleRemove(note)}
+          >
+            <Button
+              type="text"
+              size="small"
+              danger
+              className="quick-note-action quick-note-delete"
+              icon={<DeleteOutlined />}
+              aria-label={`删除待办「${summary}」`}
+              disabled={busy}
+            />
+          </Popconfirm>
+        </div>
       </div>
     )
   }
@@ -304,15 +551,14 @@ export default function QuickNotes({
       className="quick-notes-panel"
       role="dialog"
       aria-label="待办简记"
-      style={
-        panelPosition
-          ? {
-              left: panelPosition.left,
-              bottom: panelPosition.bottom,
-              width: panelPosition.width
-            }
-          : undefined
-      }
+      style={{
+        left: panelPosition?.left,
+        bottom: panelPosition?.bottom,
+        width:
+          panelPosition?.width ??
+          Math.min(PANEL_WIDTH, window.innerWidth - 16),
+        zIndex: PANEL_Z_INDEX
+      }}
     >
       <header className="quick-notes-head">
         <div className="quick-notes-title">
@@ -353,29 +599,61 @@ export default function QuickNotes({
       ) : null}
 
       <div className="quick-notes-capture">
-        <div className="quick-notes-input-row">
-          <Input
+        <div className="quick-notes-composer">
+          <Input.TextArea
             ref={inputRef}
+            className="quick-notes-composer-input"
             value={draft}
-            maxLength={200}
-            placeholder="记一条待办，Enter 添加"
-            allowClear
+            maxLength={MAX_DRAFT_LENGTH}
+            autoSize={{ minRows: 4, maxRows: 10 }}
+            placeholder="记一条待办，支持 Markdown / 富文本粘贴"
             disabled={loading}
             onChange={(event) => setDraft(event.target.value)}
-            onPressEnter={(event) => {
-              if (event.nativeEvent.isComposing) return
-              handleAdd()
-            }}
+            onKeyDown={handleComposerKeyDown}
+            onPaste={handlePaste}
           />
-          <Button
-            color="primary"
-            variant="text"
-            loading={submitting}
-            disabled={loading || !draft.trim()}
-            onClick={() => handleAdd()}
-          >
-            添加
-          </Button>
+          <div className="quick-notes-composer-bar">
+            <div className="quick-notes-composer-meta">
+              <DatePicker
+                value={composerDueAt}
+                size="small"
+                variant="borderless"
+                showTime={{ format: 'HH:mm' }}
+                format="MM-DD HH:mm"
+                placeholder="截止时间（可选）"
+                suffixIcon={<ClockCircleOutlined />}
+                allowClear
+                disabled={loading}
+                popupStyle={{ zIndex: DATE_POPUP_Z_INDEX }}
+                onOpenChange={(nextOpen) => setComposerDueOpen(nextOpen)}
+                disabledDate={(current) =>
+                  Boolean(
+                    current && current.endOf('day').isBefore(dayjs(), 'day')
+                  )
+                }
+                onChange={(value) => setComposerDueAt(value)}
+              />
+              <span className="quick-notes-composer-hint">提前 5 分钟提醒</span>
+            </div>
+            <div className="quick-notes-composer-actions">
+              {draft.length > 0 ? (
+                <span className="quick-notes-draft-count">
+                  {draft.length}/{MAX_DRAFT_LENGTH}
+                </span>
+              ) : null}
+              <Button
+                type="primary"
+                size="small"
+                className="quick-notes-add"
+                icon={<PlusOutlined />}
+                loading={submitting}
+                disabled={loading || !draft.trim()}
+                onClick={() => handleAdd()}
+              >
+                添加
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -467,6 +745,34 @@ export default function QuickNotes({
         )}
       </div>
 
+      <Modal
+        open={editingDueNoteId !== null}
+        title="设置截止时间"
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={dueSaving}
+        zIndex={DUE_MODAL_Z_INDEX}
+        destroyOnHidden
+        onOk={() => void handleSaveDue()}
+        onCancel={closeDueEditor}
+      >
+        <div className="quick-note-due-editor">
+          <DatePicker
+            value={editingDueValue}
+            showTime={{ format: 'HH:mm' }}
+            format="YYYY-MM-DD HH:mm"
+            placeholder="选择截止时间"
+            allowClear
+            popupStyle={{ zIndex: DATE_POPUP_Z_INDEX }}
+            disabledDate={(current) =>
+              Boolean(current && current.endOf('day').isBefore(dayjs(), 'day'))
+            }
+            onChange={(value) => setEditingDueValue(value)}
+          />
+          <span>保存后会在截止前 5 分钟发送应用通知，清空日期可取消提醒。</span>
+        </div>
+      </Modal>
+
       <footer className="quick-notes-foot">
         <span>
           <kbd>{shortcut}</kbd>
@@ -475,6 +781,8 @@ export default function QuickNotes({
         <span>
           <kbd>Enter</kbd>
           添加
+          <kbd>Shift Enter</kbd>
+          换行
           <kbd>Esc</kbd>
           关闭
         </span>
