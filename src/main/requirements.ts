@@ -924,9 +924,11 @@ const groupRequirements = (requirements: MeegleRequirement[]): MeegleRequirement
   const groups = new Map<string, MeegleRequirementGroup>()
 
   for (const requirement of requirements) {
-    const key =
-      requirement.iterationId ??
-      (requirement.iterationName ? `name:${requirement.iterationName}` : 'unplanned')
+    // 同一版本可能按产线拆成 SOM-20261123、SLM-20261123，按日期合并为一个迭代。
+    const key = requirement.iterationDate
+      ? `date:${requirement.iterationDate}`
+      : requirement.iterationId ??
+        (requirement.iterationName ? `name:${requirement.iterationName}` : 'unplanned')
     const existing = groups.get(key)
 
     if (existing) {
@@ -937,7 +939,9 @@ const groupRequirements = (requirements: MeegleRequirement[]): MeegleRequirement
     groups.set(key, {
       key,
       iterationId: requirement.iterationId,
-      iterationName: requirement.iterationName ?? '未规划迭代',
+      iterationName: requirement.iterationDate
+        ? requirement.iterationDate.replace(/-/g, '')
+        : requirement.iterationName ?? '未规划迭代',
       releaseDate: requirement.iterationDate,
       requirements: [requirement]
     })
@@ -1960,10 +1964,14 @@ const parseIterationSummaryRequirement = (
 
   if (!id || !name) return null
 
+  const productLinePath = readCascadePath(readFieldByName(row, '产品线'))
+  const productLine = productLinePath[productLinePath.length - 1]
+
   return {
     id,
     name,
-    iterations: readIterations(fields)
+    iterations: readIterations(fields),
+    productLines: productLine ? [productLine] : []
   }
 }
 
@@ -1985,7 +1993,7 @@ export const getIterationSummaryRequirements = async (): Promise<
         await fetchMqlRows(
           project,
           [
-            'SELECT `工作项id`, `名称`, `规划迭代`',
+            'SELECT `工作项id`, `名称`, `规划迭代`, `产品线`',
             `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
             `WHERE (${roleCondition})`
           ].join(' ')
@@ -2009,7 +2017,8 @@ export const getIterationSummaryRequirements = async (): Promise<
               date: requirement.iterationDate
             }
           ]
-        : []
+        : [],
+      productLines: requirement.productLine ? [requirement.productLine] : []
     }))
 
   return [...remoteRequirements, ...localSummaryRequirements]

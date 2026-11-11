@@ -95,9 +95,24 @@ export interface IterationSummaryGroup {
   requirements: IterationSummaryRequirement[]
 }
 
+/** 获取轻量需求所属产线，本地临时需求可能包含多个产线。 */
+export const getIterationSummaryProductLines = (
+  requirement: IterationSummaryRequirement
+): string[] => {
+  const lines = Array.from(
+    new Set(
+      requirement.productLines
+        .map((line) => line.trim())
+        .filter(Boolean)
+    )
+  )
+
+  return lines.length > 0 ? lines : ['未设置产线']
+}
+
 /**
  * 按需求关联的全部迭代分组，未规划需求归入固定分组。
- * 同一需求关联多个迭代时会出现在多个分组中。
+ * 同一版本的不同产线迭代会按日期合并；同一需求关联多个迭代时会出现在多个分组中。
  */
 export const groupIterationSummaryRequirements = (
   requirements: IterationSummaryRequirement[]
@@ -110,11 +125,15 @@ export const groupIterationSummaryRequirements = (
     iterationName: string,
     releaseDate: string | null
   ): void => {
-    const key =
-      iterationId ??
-      (iterationName === '未规划迭代'
-        ? 'unplanned'
-        : `name:${iterationName}`)
+    const key = releaseDate
+      ? `date:${releaseDate}`
+      : iterationId ??
+        (iterationName === '未规划迭代'
+          ? 'unplanned'
+          : `name:${iterationName}`)
+    const displayName = releaseDate
+      ? releaseDate.replace(/-/g, '')
+      : iterationName
     const existing = groups.get(key)
 
     if (existing) {
@@ -125,7 +144,7 @@ export const groupIterationSummaryRequirements = (
     groups.set(key, {
       key,
       iterationId,
-      iterationName,
+      iterationName: displayName,
       releaseDate,
       requirements: [requirement]
     })
@@ -140,7 +159,9 @@ export const groupIterationSummaryRequirements = (
     const seen = new Set<string>()
 
     for (const iteration of requirement.iterations) {
-      const key = iteration.id ?? `name:${iteration.name}`
+      const key = iteration.date
+        ? `date:${iteration.date}`
+        : iteration.id ?? `name:${iteration.name}`
 
       if (seen.has(key)) continue
 

@@ -6,9 +6,10 @@
   margin-bottom: 4px;
 }
 
-.iteration-summary-iteration-select {
+.iteration-summary-iteration-select,
+.iteration-summary-product-line-select {
   flex: 1;
-  min-width: 260px;
+  min-width: 210px;
 }
 
 .iteration-summary-toolbar-hint {
@@ -250,7 +251,8 @@
 }
 
 @media (max-width: 640px) {
-  .iteration-summary-iteration-select {
+  .iteration-summary-iteration-select,
+  .iteration-summary-product-line-select {
     min-width: 100%;
   }
 }

@@ -49,8 +49,6 @@
   flex: 1;
   min-height: 0;
   width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
   padding: 22px 32px 40px;
   overflow-y: auto;
 }

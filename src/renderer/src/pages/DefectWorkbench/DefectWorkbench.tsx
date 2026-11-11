@@ -31,6 +31,7 @@ import type {
   DefectTransition,
   DefectTransitionFieldValue,
   DefectTransitions,
+  MeegleDefect,
   MeegleDefectComment,
   MeegleDefectComments,
   MeegleDefectOwner,
@@ -107,6 +108,25 @@ const getSeverityTone = (severity: string | null): string => {
   return 'default'
 }
 
+/** 缺陷迭代按日期归并，和需求列表保持一致。 */
+const getDefectIterationKey = (defect: MeegleDefect): string =>
+  defect.iterationDate
+    ? `date:${defect.iterationDate}`
+    : defect.iterationId ?? (defect.iterationName ? `name:${defect.iterationName}` : 'unplanned')
+
+const getDefectIterationName = (defect: MeegleDefect): string =>
+  defect.iterationDate
+    ? defect.iterationDate.replace(/-/g, '')
+    : defect.iterationName ?? '未规划迭代'
+
+const getDefectProductLine = (defect: MeegleDefect): string => {
+  const segments = defect.productLines
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  return segments[segments.length - 1] ?? '未设置产线'
+}
+
 /** 与需求详情一致的人员头像 + 名称。 */
 const renderPerson = (person: MeegleDefectOwner): JSX.Element => (
   <span
@@ -178,6 +198,7 @@ export default function DefectWorkbench({
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilters, setStatusFilters] = useState<string[]>([])
+  const [productLineFilters, setProductLineFilters] = useState<string[]>([])
   const [iterationFilter, setIterationFilter] = useState<string | null>(null)
   const [showClosedDefects, setShowClosedDefects] = useState(false)
   const [reloadVersion, setReloadVersion] = useState(0)
@@ -291,6 +312,7 @@ export default function DefectWorkbench({
       setSelectedId(null)
       setSearch('')
       setStatusFilters([])
+      setProductLineFilters([])
       setIterationFilter(null)
       setDescriptionExpanded(false)
       setAssigneesEditing(false)
@@ -315,6 +337,7 @@ export default function DefectWorkbench({
       setSelectedId(null)
       setSearch('')
       setStatusFilters([])
+      setProductLineFilters([])
       setIterationFilter(null)
       setDescriptionExpanded(false)
       setAssigneesEditing(false)
@@ -362,15 +385,56 @@ export default function DefectWorkbench({
     const options = new Map<string, string>()
 
     for (const defect of defects) {
-      if (defect.iterationId) {
-        options.set(defect.iterationId, defect.iterationName ?? defect.iterationId)
+      const key = getDefectIterationKey(defect)
+
+      if (key !== 'unplanned') {
+        options.set(key, getDefectIterationName(defect))
       }
     }
 
     return Array.from(options.entries())
       .map(([value, label]) => ({ value, label }))
-      .sort((left, right) => left.label.localeCompare(right.label, 'zh-CN'))
+      .sort((left, right) => right.label.localeCompare(left.label, 'zh-CN'))
   }, [defects])
+
+  const productLineScopeDefects = useMemo(() => {
+    if (!iterationFilter) return defects
+
+    return defects.filter(
+      (defect) => getDefectIterationKey(defect) === iterationFilter
+    )
+  }, [defects, iterationFilter])
+
+  const productLineOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    for (const defect of productLineScopeDefects) {
+      const productLine = getDefectProductLine(defect)
+      counts.set(productLine, (counts.get(productLine) ?? 0) + 1)
+    }
+
+    return Array.from(counts.entries())
+      .sort((left, right) => {
+        if (left[0] === '未设置产线') return 1
+        if (right[0] === '未设置产线') return -1
+
+        return left[0].localeCompare(right[0], 'zh-CN', { numeric: true })
+      })
+      .map(([productLine, count]) => ({
+        value: productLine,
+        label: `${productLine}（${count}）`
+      }))
+  }, [productLineScopeDefects])
+
+  useEffect(() => {
+    const available = new Set(productLineOptions.map((option) => option.value))
+
+    setProductLineFilters((current) =>
+      current.every((value) => available.has(value))
+        ? current
+        : current.filter((value) => available.has(value))
+    )
+  }, [productLineOptions])
 
   const filteredDefects = useMemo(() => {
     const keyword = search.trim().toLowerCase()
@@ -382,7 +446,18 @@ export default function DefectWorkbench({
       ) {
         return false
       }
-      if (iterationFilter && defect.iterationId !== iterationFilter) return false
+      if (
+        iterationFilter &&
+        getDefectIterationKey(defect) !== iterationFilter
+      ) {
+        return false
+      }
+      if (
+        productLineFilters.length > 0 &&
+        !productLineFilters.includes(getDefectProductLine(defect))
+      ) {
+        return false
+      }
       if (!keyword) return true
 
       return [
@@ -391,12 +466,14 @@ export default function DefectWorkbench({
         defect.priority,
         defect.severity,
         defect.iterationName,
+        getDefectIterationName(defect),
+        defect.productLines.join(' '),
         ...defect.owners.map((owner) => owner.name)
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword))
     })
-  }, [defects, iterationFilter, search, statusFilters])
+  }, [defects, iterationFilter, productLineFilters, search, statusFilters])
 
   const selectedDefect =
     filteredDefects.find((defect) => defect.id === selectedId) ??
@@ -1016,7 +1093,7 @@ export default function DefectWorkbench({
           <Input
             className="workbench-requirement-search"
             prefix={<SearchOutlined />}
-            placeholder="搜索缺陷、状态或负责人"
+            placeholder="搜索缺陷、状态、迭代或产线"
             value={search}
             allowClear
             disabled={loading && !data}
@@ -1032,6 +1109,31 @@ export default function DefectWorkbench({
             onChange={handleRoleChange}
           />
           <Select
+            className="workbench-filter-select"
+            value={iterationFilter ?? undefined}
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            options={iterationOptions}
+            placeholder={`全部迭代（${iterationOptions.length}）`}
+            aria-label="按缺陷迭代筛选"
+            onChange={(value?: string) => setIterationFilter(value ?? null)}
+          />
+          {productLineOptions.length > 1 ? (
+            <Select
+              mode="multiple"
+              allowClear
+              maxTagCount="responsive"
+              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
+              className="workbench-filter-select workbench-product-line-filter"
+              value={productLineFilters}
+              options={productLineOptions}
+              placeholder={`全部产线（${productLineOptions.length}）`}
+              aria-label="按缺陷产线筛选"
+              onChange={(values: string[]) => setProductLineFilters(values)}
+            />
+          ) : null}
+          <Select
             mode="multiple"
             allowClear
             maxTagCount="responsive"
@@ -1042,17 +1144,6 @@ export default function DefectWorkbench({
             placeholder={`全部状态（${defects.length}）`}
             aria-label="按缺陷状态筛选"
             onChange={(values: string[]) => setStatusFilters(values)}
-          />
-          <Select
-            className="workbench-filter-select"
-            value={iterationFilter ?? undefined}
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            options={iterationOptions}
-            placeholder="全部迭代"
-            aria-label="按缺陷迭代筛选"
-            onChange={(value?: string) => setIterationFilter(value ?? null)}
           />
         </div>
 
@@ -1149,7 +1240,7 @@ export default function DefectWorkbench({
                           </span>
                         ) : null}
                         <span className="workbench-requirement-type">
-                          {defect.iterationName ?? '未规划迭代'}
+                          {getDefectIterationName(defect)}
                         </span>
                       </span>
                       <span className="workbench-requirement-item-updated">
@@ -1213,7 +1304,7 @@ export default function DefectWorkbench({
             <header className="workbench-header">
               <div className="workbench-heading">
                 <span className="workbench-eyebrow">
-                  {data.project.name} / {selectedDefect.iterationName ?? '我参与的缺陷'}
+                  {data.project.name} / {getDefectIterationName(selectedDefect)}
                 </span>
                 <div className="workbench-title-row">
                   <Tooltip title="刷新数据">

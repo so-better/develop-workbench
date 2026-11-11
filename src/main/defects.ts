@@ -50,6 +50,16 @@ interface MqlValue {
     key?: string
     label?: string
   }>
+  cascade_key_label_value?: {
+    label?: string
+    children?: Array<{
+      label?: string
+      children?: Array<{
+        label?: string
+        children?: Array<{ label?: string }> | null
+      }> | null
+    }> | null
+  }
   user_value?: {
     user_key?: string
     name_cn?: string
@@ -362,6 +372,28 @@ const readOwners = (
     .filter((owner): owner is MeegleDefectOwner => owner !== null)
 }
 
+const readCascadePath = (value: MqlValue | null | undefined): string[] => {
+  const cascade = value?.cascade_key_label_value
+
+  if (!cascade) return []
+
+  const labels: string[] = []
+  let current: typeof cascade | undefined = cascade
+
+  while (current) {
+    if (current.label?.trim()) labels.push(current.label.trim())
+    current = current.children?.[0]
+  }
+
+  return labels
+}
+
+const parseIterationDate = (name: string | null): string | null => {
+  const match = /(\d{4})(\d{2})(\d{2})$/.exec(name ?? '')
+
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : null
+}
+
 const readLinkedRequirement = (
   fields: Map<string, MqlValue | null>
 ): MeegleDefectLinkedRequirement | null => {
@@ -395,6 +427,8 @@ const parseDefect = (row: MqlRow): MeegleDefect | null => {
     severity: readLabel(fields, '缺陷等级'),
     iterationId: iteration?.key?.trim() || null,
     iterationName: iteration?.label?.trim() || null,
+    iterationDate: parseIterationDate(iteration?.label?.trim() || null),
+    productLines: readCascadePath(fields.get('产品线')),
     owners: readOwners(fields, '当前负责人'),
     collaborators,
     updatedAt: readString(fields, '更新时间'),
@@ -494,7 +528,7 @@ export const searchDefects = async (query: string): Promise<MeegleMyDefects> => 
     ? await fetchMqlRows(
         project,
         [
-          `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
+          `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
           `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
           `WHERE ${condition}`,
           'ORDER BY `更新时间` DESC',
@@ -532,7 +566,7 @@ export const getMyDefects = async (
   const rows = await fetchMqlRows(
     project,
     [
-      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
+      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
       `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
       `WHERE (${buildRoleCondition(role)})${
         includeClosed
@@ -569,7 +603,7 @@ export const getWeeklyResolvedDefects = async (
   const rows = await fetchMqlRows(
     project,
     [
-      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
+      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
       `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
       `WHERE \`状态\` in (${DEFECT_FIXED_STATUSES.map(
         (status) => `'${status.replace(/'/g, "''")}'`

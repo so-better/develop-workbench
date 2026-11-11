@@ -105,6 +105,10 @@ export interface MeegleDefect {
   severity: string | null
   iterationId: string | null
   iterationName: string | null
+  /** 从迭代名称解析出的日期。 */
+  iterationDate: string | null
+  /** 产品线路径。 */
+  productLines: string[]
   owners: MeegleDefectOwner[]
   collaborators: MeegleDefectCollaborator[]
   updatedAt: string | null

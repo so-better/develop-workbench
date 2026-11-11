@@ -21,6 +21,7 @@ import type { Repository } from '../../../../types/repository'
 import { getErrorMessage } from '../../../../utils'
 import {
   buildIterationRepositorySummary,
+  getIterationSummaryProductLines,
   groupIterationSummaryRequirements,
   type IterationBranchKind,
   type IterationSummaryGroup
@@ -114,6 +115,7 @@ export default function IterationRepositorySummary({
   const [groups, setGroups] = useState<IterationSummaryGroup[] | null>(null)
   const [repositories, setRepositories] = useState<Repository[]>([])
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [productLineFilters, setProductLineFilters] = useState<string[]>([])
   const [bindings, setBindings] = useState<RequirementBindingsMap>({})
   const [bindingsKey, setBindingsKey] = useState<string | null>(null)
   const [loadingData, setLoadingData] = useState(false)
@@ -134,6 +136,7 @@ export default function IterationRepositorySummary({
     setGroups(null)
     setRepositories([])
     setSelectedKey(null)
+    setProductLineFilters([])
     setBindings({})
     setBindingsKey(null)
     setDataError(null)
@@ -197,6 +200,55 @@ export default function IterationRepositorySummary({
   )
 
   useEffect(() => {
+    setProductLineFilters([])
+  }, [selectedKey])
+
+  const productLineOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    for (const requirement of selectedGroup?.requirements ?? []) {
+      for (const productLine of getIterationSummaryProductLines(requirement)) {
+        counts.set(productLine, (counts.get(productLine) ?? 0) + 1)
+      }
+    }
+
+    return Array.from(counts.entries())
+      .sort((left, right) => {
+        if (left[0] === '未设置产线') return 1
+        if (right[0] === '未设置产线') return -1
+
+        return left[0].localeCompare(right[0], 'zh-CN', { numeric: true })
+      })
+      .map(([productLine, count]) => ({
+        value: productLine,
+        label: `${productLine}（${count}）`
+      }))
+  }, [selectedGroup])
+
+  useEffect(() => {
+    const available = new Set(productLineOptions.map((option) => option.value))
+
+    setProductLineFilters((current) =>
+      current.every((value) => available.has(value))
+        ? current
+        : current.filter((value) => available.has(value))
+    )
+  }, [productLineOptions])
+
+  const selectedRequirements = useMemo(() => {
+    const requirements = selectedGroup?.requirements ?? []
+    const selectedLines = new Set(productLineFilters)
+
+    return selectedLines.size > 0
+      ? requirements.filter((requirement) =>
+          getIterationSummaryProductLines(requirement).some((line) =>
+            selectedLines.has(line)
+          )
+        )
+      : requirements
+  }, [productLineFilters, selectedGroup])
+
+  useEffect(() => {
     if (!open || !selectedGroup) {
       setBindings({})
       setBindingsKey(null)
@@ -241,21 +293,21 @@ export default function IterationRepositorySummary({
     if (!selectedGroup) return null
 
     return buildIterationRepositorySummary(
-      selectedGroup.requirements,
+      selectedRequirements,
       bindings,
       repositories
     )
-  }, [bindings, repositories, selectedGroup])
+  }, [bindings, repositories, selectedRequirements, selectedGroup])
 
   const requirementNameMap = useMemo(
     () =>
       new Map(
-        (selectedGroup?.requirements ?? []).map((requirement) => [
+        selectedRequirements.map((requirement) => [
           requirement.id,
           requirement.name
         ])
       ),
-    [selectedGroup]
+    [selectedRequirements]
   )
 
   const iterationOptions = useMemo(
@@ -275,11 +327,15 @@ export default function IterationRepositorySummary({
     <Modal
       title={
         selectedGroup
-          ? `${selectedGroup.iterationName} · 仓库汇总`
+          ? `${selectedGroup.iterationName}${
+              productLineFilters.length > 0
+                ? ` · ${productLineFilters.join('、')}`
+                : ''
+            } · 仓库汇总`
           : '迭代仓库汇总'
       }
       open={open}
-      width={780}
+      width={920}
       footer={null}
       destroyOnHidden
       onCancel={onClose}
@@ -312,13 +368,26 @@ export default function IterationRepositorySummary({
               placeholder="选择迭代"
               onChange={(value: string) => setSelectedKey(value)}
             />
+            <Select
+              mode="multiple"
+              allowClear
+              showSearch
+              maxTagCount="responsive"
+              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
+              className="iteration-summary-product-line-select"
+              value={productLineFilters}
+              options={productLineOptions}
+              optionFilterProp="label"
+              placeholder={`全部产线（${productLineOptions.length}）`}
+              onChange={(values: string[]) => setProductLineFilters(values)}
+            />
             <span className="iteration-summary-toolbar-hint">
               包含已结束需求和本地需求
             </span>
           </div>
 
           <p className="iteration-summary-note">
-            统计范围为当前空间里我参与的需求，不受搜索和状态筛选影响。
+            统计范围为当前空间里我参与的需求；切换迭代或产线会同步更新以下统计。
           </p>
 
           {bindingsError ? (
@@ -344,7 +413,7 @@ export default function IterationRepositorySummary({
             <>
               <div className="iteration-summary-stats">
                 <div>
-                  <strong>{selectedGroup.requirements.length}</strong>
+                  <strong>{selectedRequirements.length}</strong>
                   <span>需求</span>
                 </div>
                 <div>

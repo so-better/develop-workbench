@@ -6,7 +6,7 @@ import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { OpenDialogOptions } from 'electron'
 import { spawn } from 'node:child_process'
 import { constants } from 'node:fs'
-import { access, readdir } from 'node:fs/promises'
+import { access, readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import QRCode from 'qrcode'
@@ -67,6 +67,7 @@ interface PendingMeegleLogin {
 }
 
 const MEEGLE_COMMAND_TIMEOUT_MS = 15_000
+const MEEGLE_PROBE_TIMEOUT_MS = 5_000
 const DEFAULT_MEEGLE_HOST = 'project.feishu.cn'
 const MEEGLE_MAX_BUFFER_BYTES = 2 * 1024 * 1024
 
@@ -78,6 +79,10 @@ let pendingLogin: PendingMeegleLogin | null = null
  */
 const isExecutable = async (filePath: string): Promise<boolean> => {
   try {
+    const info = await stat(filePath)
+
+    if (!info.isFile()) return false
+
     await access(filePath, constants.X_OK)
     return true
   } catch {
@@ -300,7 +305,48 @@ export const runMeegle = async (
 const parseJson = <T>(value: string): T => JSON.parse(value) as T
 
 /**
+ * 读取 CLI 版本。
+ * 兼容只支持 `meegle version` 的版本，并允许版本信息出现在 stderr。
+ */
+const readMeegleVersion = async (executablePath: string): Promise<string | null> => {
+  for (const args of [['--version'], ['version']]) {
+    try {
+      const result = await runExecutable(executablePath, args, MEEGLE_PROBE_TIMEOUT_MS)
+      const output = `${result.stdout}\n${result.stderr}`.trim()
+      const version = /\b\d+\.\d+\.\d+(?:[-+][\w.-]+)?\b/.exec(output)?.[0] ?? null
+
+      if (version) return version
+
+      if (result.code === 0 && output) {
+        return output.split(/\r?\n/)[0] ?? null
+      }
+    } catch {
+      // 尝试下一个版本命令。
+    }
+  }
+
+  return null
+}
+
+/** 校验目标文件确实是一个 Meegle CLI。 */
+const isMeegleCli = async (executablePath: string): Promise<boolean> => {
+  try {
+    const result = await runExecutable(
+      executablePath,
+      ['--help'],
+      MEEGLE_PROBE_TIMEOUT_MS
+    )
+    const output = `${result.stdout}\n${result.stderr}`
+
+    return result.code === 0 && /meegle|lark project/i.test(output)
+  } catch {
+    return false
+  }
+}
+
+/**
  * 获取 Meegle CLI 路径和版本。
+ * available 以文件可执行为准，版本探测失败不回退成“未检测到”。
  */
 export const getMeegleCliInfo = async (
   force = false,
@@ -317,23 +363,14 @@ export const getMeegleCliInfo = async (
     }
   }
 
-  try {
-    const result = await runExecutable(resolved.path, ['--version'])
-    const version = result.code === 0 ? result.stdout.trim() : null
+  const executable = await isExecutable(resolved.path)
+  const version = executable ? await readMeegleVersion(resolved.path) : null
 
-    return {
-      path: resolved.path,
-      source: resolved.source,
-      version,
-      available: Boolean(version)
-    }
-  } catch {
-    return {
-      path: resolved.path,
-      source: resolved.source,
-      version: null,
-      available: false
-    }
+  return {
+    path: resolved.path,
+    source: resolved.source,
+    version,
+    available: executable
   }
 }
 
@@ -348,11 +385,8 @@ export const setMeegleCliPath = async (cliPath: string | null): Promise<MeegleCl
     if (!(await isExecutable(normalizedPath))) {
       throw new Error('选择的文件不可执行')
     }
-
-    const result = await runExecutable(normalizedPath, ['--version'])
-
-    if (result.code !== 0 || !result.stdout.trim()) {
-      throw new Error('无法执行该 Meegle CLI 文件')
+    if (!(await isMeegleCli(normalizedPath))) {
+      throw new Error('无法识别该 Meegle CLI 文件')
     }
   }
 

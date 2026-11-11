@@ -40,6 +40,9 @@ interface LocalRequirementModalProps {
   /** 可选择的迭代列表。 */
   versions: LocalRequirementVersionOption[]
 
+  /** 可选择的产线列表。 */
+  productLines: string[]
+
   /** 是否正在保存。 */
   saving: boolean
 
@@ -56,6 +59,7 @@ interface LocalRequirementFormValues {
   status: LocalRequirementStatus
   priority: LocalRequirementPriority | null
   productManagerKey: string | null | undefined
+  productLine: string | null
   description: string
 }
 
@@ -119,6 +123,7 @@ export default function LocalRequirementModal({
   open,
   initialRequirement,
   versions,
+  productLines,
   saving,
   onCancel,
   onSubmit
@@ -160,6 +165,10 @@ export default function LocalRequirementModal({
           ? initialRequirement.priority
           : null,
       productManagerKey: getPersonKey(initialPerson),
+      productLine:
+        initialRequirement?.productLines[
+          initialRequirement.productLines.length - 1
+        ] ?? null,
       description: initialRequirement?.description ?? ''
     })
   }, [form, initialRequirement, open, versions])
@@ -269,6 +278,7 @@ export default function LocalRequirementModal({
       status: values.status,
       priority: values.priority ?? null,
       productManager: toLocalPerson(productManager),
+      productLine: values.productLine ?? null,
       iterationId: version.iterationId,
       iterationName: version.iterationName,
       iterationDate: version.iterationDate
@@ -316,6 +326,19 @@ export default function LocalRequirementModal({
               label: version.label
             }))}
             placeholder="选择现有迭代"
+          />
+        </Form.Item>
+
+        <Form.Item label="产线" name="productLine">
+          <Select
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="可选，选择产线"
+            options={productLines.map((line) => ({
+              value: line,
+              label: line
+            }))}
           />
         </Form.Item>
 

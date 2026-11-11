@@ -51,6 +51,9 @@ export interface LocalRequirement {
   /** 产品负责人。 */
   productManager: LocalRequirementPerson | null
 
+  /** 产线名称；未设置时为 null。 */
+  productLine: string | null
+
   /** 所属迭代 ID；未规划时为 null。 */
   iterationId: string | null
 
@@ -91,6 +94,9 @@ export interface LocalRequirementInput {
 
   /** 产品负责人。 */
   productManager: LocalRequirementPerson | null
+
+  /** 产线名称；未设置时为 null。 */
+  productLine: string | null
 
   /** 所属迭代 ID；未规划时为 null。 */
   iterationId: string | null

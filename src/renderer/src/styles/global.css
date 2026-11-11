@@ -2444,12 +2444,18 @@ body {
   margin-inline-start: 0 !important;
 }
 
+.workbench-filter-select.ant-select-multiple .ant-select-selection-overflow-item {
+  align-self: center;
+}
+
 .workbench-filter-select.ant-select-multiple .ant-select-selection-item {
+  display: flex;
+  align-items: center;
   height: 20px;
-  margin-top: 0;
+  margin-block: 0 !important;
   color: var(--app-text);
   font-size: 11px;
-  line-height: 18px !important;
+  line-height: 20px !important;
 }
 
 .workbench-filter-select .ant-select-selection-placeholder {
@@ -2574,6 +2580,91 @@ body {
   flex-direction: column;
   gap: 4px;
   margin-top: 6px;
+}
+
+.workbench-requirement-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workbench-requirement-subgroup + .workbench-requirement-subgroup {
+  margin-top: 2px;
+}
+
+.workbench-requirement-subgroup-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 26px;
+  padding: 4px 8px;
+  color: var(--workbench-secondary);
+  font-family: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.workbench-requirement-subgroup-heading:hover {
+  color: var(--app-text);
+  background: var(--workbench-hover);
+}
+
+.workbench-requirement-subgroup-heading:focus-visible {
+  outline: 2px solid rgba(22, 119, 255, 0.55);
+  outline-offset: -2px;
+}
+
+.workbench-requirement-subgroup-title {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.workbench-requirement-subgroup-chevron {
+  flex-shrink: 0;
+  color: var(--workbench-secondary);
+  font-size: 9px;
+  transition: transform 0.15s ease;
+}
+
+.workbench-requirement-subgroup-heading.is-collapsed
+  .workbench-requirement-subgroup-chevron {
+  transform: rotate(-90deg);
+}
+
+.workbench-requirement-subgroup-name {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-requirement-subgroup-count {
+  flex-shrink: 0;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.78;
+}
+
+.workbench-requirement-subgroup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 8px;
+  margin-left: 7px;
+  border-left: 1px solid var(--workbench-divider);
 }
 
 .workbench-requirement-item {
@@ -3219,7 +3310,6 @@ body {
 /* 需求流程图。 */
 .requirement-repo-section {
   width: 100%;
-  max-width: 1000px;
   padding: 16px;
   margin-bottom: 14px;
   background: var(--workbench-panel);
@@ -3880,7 +3970,6 @@ body {
 
 .requirement-flow-section {
   width: 100%;
-  max-width: 1000px;
   padding: 18px;
   background: var(--workbench-panel);
   border: 1px solid var(--workbench-divider);
@@ -4563,7 +4652,6 @@ body {
 
 .requirement-info-section {
   width: 100%;
-  max-width: 1000px;
   padding: 0 18px 18px;
   margin-top: 14px;
   background: var(--workbench-panel);
@@ -5906,7 +5994,7 @@ body {
 .weekly-report-error,
 .weekly-report-card {
   width: 100%;
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -6370,8 +6458,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
 .sites-section {
@@ -6836,8 +6922,7 @@ body {
   gap: 8px;
   align-items: center;
   justify-content: flex-start;
-  max-width: 1200px;
-  margin: 0 auto 18px;
+  margin-bottom: 18px;
 }
 
 .sites-search {

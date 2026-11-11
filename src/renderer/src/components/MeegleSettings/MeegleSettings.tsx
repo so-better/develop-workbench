@@ -294,8 +294,12 @@ export default function MeegleSettings(): JSX.Element {
           <Alert
             type="warning"
             showIcon
-            message="未检测到 Meegle CLI"
-            description="请安装 @lark-project/meegle，或手动选择可执行文件。"
+            message={state.cli.path ? 'Meegle CLI 路径不可用' : '未检测到 Meegle CLI'}
+            description={
+              state.cli.path
+                ? '请确认文件存在、可执行，并且是有效的 Meegle CLI。'
+                : '请安装 @lark-project/meegle，或手动选择可执行文件。'
+            }
           />
         ) : null}
       </div>

@@ -62,6 +62,9 @@ export interface IterationSummaryRequirement {
 
   /** 需求关联的全部规划迭代；未规划时为空数组。 */
   iterations: MeegleRequirementIteration[]
+
+  /** 产品线路径。 */
+  productLines: string[]
 }
 
 /**

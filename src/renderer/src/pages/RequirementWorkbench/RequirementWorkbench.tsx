@@ -329,6 +329,41 @@ const getNodeTone = (status: string): string => {
   return 'idle'
 }
 
+/** 获取需求所属产线；正式需求取级联路径最后一级，本地需求使用已保存的产线。 */
+const getRequirementProductLines = (requirement: MeegleRequirement): string[] => {
+  const segments = requirement.productLines
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const productLine = segments[segments.length - 1]
+
+  return productLine ? [productLine] : ['未设置产线']
+}
+
+/** 按产品线聚合需求，并保持稳定排序。 */
+const groupRequirementsByProductLine = (
+  requirements: MeegleRequirement[]
+): Array<{ key: string; label: string; requirements: MeegleRequirement[] }> => {
+  const groups = new Map<string, MeegleRequirement[]>()
+
+  for (const requirement of requirements) {
+    for (const label of getRequirementProductLines(requirement)) {
+      const items = groups.get(label) ?? []
+
+      items.push(requirement)
+      groups.set(label, items)
+    }
+  }
+
+  return [...groups.entries()]
+    .map(([label, items]) => ({ key: label, label, requirements: items }))
+    .sort((left, right) => {
+      if (left.label === '未设置产线') return 1
+      if (right.label === '未设置产线') return -1
+
+      return left.label.localeCompare(right.label, 'zh-CN', { numeric: true })
+    })
+}
+
 /**
  * 格式化节点总排期，例如 10-16 ~ 10-16。
  */
@@ -509,6 +544,7 @@ export default function RequirementWorkbench({
     () => localStorage.getItem(OPEN_CLOSED_REQUIREMENT_KEY) === '1'
   )
   const [statusFilters, setStatusFilters] = useState<string[]>([])
+  const [productLineFilters, setProductLineFilters] = useState<string[]>([])
   const [iterationFilter, setIterationFilter] = useState<string | null>(null)
   const [localModalOpen, setLocalModalOpen] = useState(false)
   const [iterationSummaryOpen, setIterationSummaryOpen] = useState(false)
@@ -2795,6 +2831,65 @@ export default function RequirementWorkbench({
       }))
   }, [allRequirements])
 
+  /** 本地临时需求可选的产线，使用全部需求中的产线选项。 */
+  const allProductLineOptions = useMemo(() => {
+    const values = new Set(
+      allRequirements.flatMap((requirement) =>
+        getRequirementProductLines(requirement)
+      )
+    )
+
+    return [...values].sort((left, right) => {
+      if (left === '未设置产线') return 1
+      if (right === '未设置产线') return -1
+
+      return left.localeCompare(right, 'zh-CN', { numeric: true })
+    })
+  }, [allRequirements])
+
+  /** 当前迭代范围内的需求；未选迭代时使用全部需求。 */
+  const productLineScopeRequirements = useMemo(() => {
+    if (!iterationFilter) return allRequirements
+
+    return (
+      data?.groups.find((group) => group.key === iterationFilter)?.requirements ?? []
+    )
+  }, [allRequirements, data, iterationFilter])
+
+  /** 产线筛选选项。 */
+  const productLineOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    for (const requirement of productLineScopeRequirements) {
+      for (const productLine of getRequirementProductLines(requirement)) {
+        counts.set(productLine, (counts.get(productLine) ?? 0) + 1)
+      }
+    }
+
+    return Array.from(counts.entries())
+      .sort((left, right) => {
+        if (left[0] === '未设置产线') return 1
+        if (right[0] === '未设置产线') return -1
+
+        return left[0].localeCompare(right[0], 'zh-CN', { numeric: true })
+      })
+      .map(([productLine, count]) => ({
+        value: productLine,
+        label: `${productLine}（${count}）`
+      }))
+  }, [productLineScopeRequirements])
+
+  // 迭代切换后移除当前迭代不存在的产线选择。
+  useEffect(() => {
+    const available = new Set(productLineOptions.map((option) => option.value))
+
+    setProductLineFilters((current) =>
+      current.every((value) => available.has(value))
+        ? current
+        : current.filter((value) => available.has(value))
+    )
+  }, [productLineOptions])
+
   /** 迭代筛选选项。 */
   const iterationOptions = useMemo(
     () =>
@@ -2813,6 +2908,7 @@ export default function RequirementWorkbench({
     const keyword = requirementFilter.trim().toLocaleLowerCase()
 
     const selectedStatuses = new Set(statusFilters)
+    const selectedProductLines = new Set(productLineFilters)
 
     const scopedGroups = iterationFilter
       ? (data?.groups ?? []).filter((group) => group.key === iterationFilter)
@@ -2825,20 +2921,29 @@ export default function RequirementWorkbench({
             selectedStatuses.has(requirement.status ?? '状态未知')
           )
           : group.requirements
+      const productLineFiltered =
+        selectedProductLines.size > 0
+          ? statusFiltered.filter((requirement) =>
+            getRequirementProductLines(requirement).some((line) =>
+              selectedProductLines.has(line)
+            )
+          )
+          : statusFiltered
 
-      if (statusFiltered.length === 0) return []
+      if (productLineFiltered.length === 0) return []
 
       if (!keyword || group.iterationName.toLocaleLowerCase().includes(keyword)) {
-        return [{ ...group, requirements: statusFiltered }]
+        return [{ ...group, requirements: productLineFiltered }]
       }
 
-      const requirements = statusFiltered.filter((requirement) =>
+      const requirements = productLineFiltered.filter((requirement) =>
         [
           requirement.name,
           requirement.status ?? '',
           requirement.priority ?? '',
           requirement.requirementType ?? '',
           requirement.riskLabels.join(' '),
+          requirement.productLines.join(' '),
           requirement.productManagers.map((manager) => manager.name).join(' '),
           requirement.productOwners.map((owner) => owner.name).join(' ')
         ].some((value) => value.toLocaleLowerCase().includes(keyword))
@@ -2846,7 +2951,7 @@ export default function RequirementWorkbench({
 
       return requirements.length > 0 ? [{ ...group, requirements }] : []
     })
-  }, [data, iterationFilter, requirementFilter, statusFilters])
+  }, [data, iterationFilter, productLineFilters, requirementFilter, statusFilters])
 
   /** 当前筛选的迭代不存在时自动恢复全部迭代。 */
   useEffect(() => {
@@ -2860,7 +2965,10 @@ export default function RequirementWorkbench({
   /** 是否存在有效搜索词、状态或迭代筛选。 */
   const hasSearch = requirementFilter.trim().length > 0
   const hasActiveFilter =
-    hasSearch || statusFilters.length > 0 || Boolean(iterationFilter)
+    hasSearch ||
+    statusFilters.length > 0 ||
+    productLineFilters.length > 0 ||
+    Boolean(iterationFilter)
 
   /** 所有分组是否都已收起，用于切换按钮的文案和图标。 */
   const allGroupsCollapsed =
@@ -3032,7 +3140,8 @@ export default function RequirementWorkbench({
    * 搜索时忽略收起状态，确保匹配结果始终可见。
    */
   const renderRequirementGroup = (group: MeegleRequirementGroup): JSX.Element => {
-    const collapsed = collapsedGroupKeys.has(group.key) && !hasActiveFilter
+    const collapsed = collapsedGroupKeys.has(group.key) && !hasSearch
+    const productLineGroups = groupRequirementsByProductLine(group.requirements)
 
     return (
       <section className="workbench-requirement-group" key={group.key}>
@@ -3055,9 +3164,49 @@ export default function RequirementWorkbench({
           </span>
         </button>
 
-        {collapsed ? null : (
+        {collapsed ? null : productLineGroups.length <= 1 ? (
           <div className="workbench-requirement-group-list">
             {group.requirements.map(renderRequirementItem)}
+          </div>
+        ) : (
+          <div className="workbench-requirement-group-list">
+            {productLineGroups.map((productLineGroup) => {
+              const productLineKey = `${group.key}:product-line:${productLineGroup.key}`
+              const productLineCollapsed =
+                collapsedGroupKeys.has(productLineKey) && !hasSearch
+
+              return (
+                <section className="workbench-requirement-subgroup" key={productLineKey}>
+                  <button
+                    type="button"
+                    className={`workbench-requirement-subgroup-heading${
+                      productLineCollapsed ? ' is-collapsed' : ''
+                    }`}
+                    aria-expanded={!productLineCollapsed}
+                    onClick={() => toggleRequirementGroup(productLineKey)}
+                  >
+                    <span className="workbench-requirement-subgroup-title">
+                      <DownOutlined className="workbench-requirement-subgroup-chevron" />
+                      <span className="workbench-requirement-subgroup-name">
+                        {productLineGroup.label}
+                      </span>
+                    </span>
+                    <span
+                      className="workbench-requirement-subgroup-count"
+                      aria-label={`${productLineGroup.requirements.length} 个需求`}
+                    >
+                      {productLineGroup.requirements.length}
+                    </span>
+                  </button>
+
+                  {productLineCollapsed ? null : (
+                    <div className="workbench-requirement-subgroup-list">
+                      {productLineGroup.requirements.map(renderRequirementItem)}
+                    </div>
+                  )}
+                </section>
+              )
+            })}
           </div>
         )}
       </section>
@@ -3122,6 +3271,14 @@ export default function RequirementWorkbench({
           <div>
             <dt>所属版本</dt>
             <dd>{selectedRequirement.iterationName ?? '未规划迭代'}</dd>
+          </div>
+          <div>
+            <dt>产线</dt>
+            <dd>
+              {selectedRequirement.productLines.length > 0
+                ? selectedRequirement.productLines.join(' / ')
+                : '未设置'}
+            </dd>
           </div>
           <div>
             <dt>产品</dt>
@@ -3290,7 +3447,7 @@ export default function RequirementWorkbench({
           <Input
             className="workbench-requirement-search"
             prefix={<SearchOutlined />}
-            placeholder="搜索需求、状态或迭代"
+            placeholder="搜索需求、状态、迭代或产线"
             value={requirementFilter}
             onChange={(event) => setRequirementFilter(event.target.value)}
             allowClear
@@ -3309,6 +3466,22 @@ export default function RequirementWorkbench({
             disabled={loading || !data || iterationOptions.length === 0}
             onChange={(value?: string) => setIterationFilter(value ?? null)}
           />
+
+          {productLineOptions.length > 1 ? (
+            <Select
+              mode="multiple"
+              allowClear
+              maxTagCount="responsive"
+              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
+              className="workbench-filter-select workbench-product-line-filter"
+              value={productLineFilters}
+              options={productLineOptions}
+              placeholder={`全部产线（${productLineOptions.length}）`}
+              aria-label="按产线筛选"
+              disabled={loading || !data}
+              onChange={(values: string[]) => setProductLineFilters(values)}
+            />
+          ) : null}
 
           <Select
             mode="multiple"
@@ -5182,6 +5355,7 @@ export default function RequirementWorkbench({
         open={localModalOpen}
         initialRequirement={localModalRequirement}
         versions={localVersionOptions}
+        productLines={allProductLineOptions.filter((line) => line !== '未设置产线')}
         saving={localSaving}
         onCancel={() => {
           setLocalModalOpen(false)

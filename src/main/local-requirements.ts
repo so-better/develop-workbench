@@ -108,6 +108,7 @@ const normalizeInput = (value: unknown): LocalRequirementInput => {
     status: normalizeStatus(input.status),
     priority: normalizePriority(input.priority),
     productManager: normalizePerson(input.productManager),
+    productLine: normalizeOptionalText(input.productLine, MAX_NAME_LENGTH),
     iterationId: iterationName
       ? normalizeOptionalText(input.iterationId, 160)
       : null,
@@ -145,6 +146,7 @@ const normalizeStoredRequirement = (value: unknown): LocalRequirement | null => 
     status,
     priority: normalizePriority(item.priority),
     productManager: normalizePerson(item.productManager),
+    productLine: normalizeOptionalText(item.productLine, MAX_NAME_LENGTH),
     iterationId: normalizeOptionalText(item.iterationId, 160),
     iterationName: normalizeOptionalText(item.iterationName, MAX_NAME_LENGTH),
     iterationDate: normalizeDate(item.iterationDate),
@@ -263,6 +265,7 @@ export const searchLocalRequirements = async (
       item.status,
       item.priority ?? '',
       item.iterationName ?? '',
+      item.productLine ?? '',
       item.productManager?.name ?? ''
     ].some((value) => value.toLocaleLowerCase().includes(normalized))
   )
@@ -371,7 +374,7 @@ export const toMeegleRequirement = (
   createdBy: null,
   proposedAt: item.createdAt,
   expectedReleaseAt: null,
-  productLines: [],
+  productLines: item.productLine ? [item.productLine] : [],
   planningVersions: item.iterationName ? [item.iterationName] : [],
   collaborators: [],
   requirementLevel: null,

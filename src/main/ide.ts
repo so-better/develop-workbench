@@ -439,13 +439,16 @@ const waitForQoderWindowReady = async (
   await new Promise((resolve) => setTimeout(resolve, 500))
 }
 
-/** 将当前配置对应的 IDE 窗口带到最前面。 */
-const focusIdeWindow = async (config: IdeConfig): Promise<void> => {
+/** 将当前配置对应的 IDE 窗口带到最前面，优先匹配仓库目录名。 */
+const focusIdeWindow = async (
+  config: IdeConfig,
+  repositoryPath: string
+): Promise<void> => {
   try {
     if (process.platform === 'darwin') {
       const target = getMacAppBundle(config.command) ?? config.name
 
-      await execFileAsync('open', ['-a', target], {
+      await execFileAsync('open', ['-a', target, repositoryPath], {
         timeout: 5_000,
         encoding: 'utf8'
       }).catch(() => undefined)
@@ -469,7 +472,8 @@ const focusIdeWindow = async (config: IdeConfig): Promise<void> => {
         .filter(Boolean)
         .map((name) => `'${name.replace(/'/g, "''")}'`)
         .join(',')
-      const script = `$names=@(${names}); Add-Type -Name Win32 -Namespace Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);'; foreach($name in $names){ $p=Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1; if($p){ [Native.Win32]::SetForegroundWindow($p.MainWindowHandle); break } }`
+      const repositoryName = basename(repositoryPath).replace(/'/g, "''")
+      const script = `$names=@(${names}); $repo='${repositoryName}'; Add-Type -Name Win32 -Namespace Native -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);'; foreach($name in $names){ $processes=Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }; $p=$processes | Where-Object { $_.MainWindowTitle -like "*$repo*" } | Select-Object -First 1; if(-not $p){ $p=$processes | Select-Object -First 1 }; if($p){ [Native.Win32]::SetForegroundWindow($p.MainWindowHandle); break } }`
 
       await execFileAsync('powershell.exe', ['-NoProfile', '-Command', script], {
         timeout: 5_000,
@@ -502,8 +506,18 @@ export const launchRepositoryInIde = async (
   const qoderRendererPids = qoderChatDeeplink
     ? await getQoderRendererPids()
     : new Set<string>()
+  const macAppBundle =
+    process.platform === 'darwin' ? getMacAppBundle(config.command) : null
 
-  await spawnDetached(config.command, args)
+  if (macAppBundle) {
+    // 直接让 LaunchServices 打开目标目录，避免 CLI 与激活窗口之间的竞争。
+    await execFileAsync('open', ['-a', macAppBundle, repositoryPath], {
+      timeout: 30_000,
+      encoding: 'utf8'
+    })
+  } else {
+    await spawnDetached(config.command, args)
+  }
 
   if (qoderChatDeeplink) {
     await waitForQoderWindowReady(
@@ -513,7 +527,9 @@ export const launchRepositoryInIde = async (
     await shell.openExternal(qoderChatDeeplink)
   }
 
-  await focusIdeWindow(config)
+  if (!macAppBundle) {
+    await focusIdeWindow(config, repositoryPath)
+  }
 }
 
 /**
