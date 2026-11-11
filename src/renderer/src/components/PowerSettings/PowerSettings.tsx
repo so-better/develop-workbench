@@ -57,7 +57,13 @@ export default function PowerSettings(): JSX.Element {
       setSettings(next)
       message.success(enabled ? '已开启' : '已关闭')
     } catch (saveError) {
-      message.error(getErrorMessage(saveError, '电源设置修改失败'))
+      const text = getErrorMessage(saveError, '设置未完成')
+
+      if (text.includes('已取消管理员授权')) {
+        message.info(text)
+      } else {
+        message.error(text)
+      }
     } finally {
       setSaving(null)
     }

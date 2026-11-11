@@ -122,13 +122,25 @@ const run = async (file: string, args: string[]): Promise<string> => {
   return String(stdout)
 }
 
+const isUserCancelled = (message: string): boolean =>
+  /用户已取消|已取消|User canceled|User cancelled|operation was canceled|-128/i.test(
+    message
+  )
+
 const runMacPrivileged = async (command: string): Promise<void> => {
   const escaped = command.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 
-  await run('osascript', [
-    '-e',
-    `do shell script "${escaped}" with administrator privileges`
-  ])
+  try {
+    await run('osascript', [
+      '-e',
+      `do shell script "${escaped}" with administrator privileges`
+    ])
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
+    if (isUserCancelled(message)) throw new Error('已取消管理员授权')
+    throw new Error('未完成设置，请确认管理员授权后重试')
+  }
 }
 
 const quoteWindowsArg = (value: string): string =>
@@ -161,8 +173,11 @@ const runWindowsElevated = async (commands: string[][]): Promise<void> => {
       ['-NoProfile', '-NonInteractive', '-Command', powershell],
       { timeout: COMMAND_TIMEOUT_MS, windowsHide: true }
     )
-  } catch {
-    throw new Error('系统授权已取消，或电源设置执行失败')
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+
+    if (isUserCancelled(message)) throw new Error('已取消管理员授权')
+    throw new Error('未完成设置，请确认管理员授权后重试')
   } finally {
     await unlink(scriptPath).catch(() => undefined)
   }
