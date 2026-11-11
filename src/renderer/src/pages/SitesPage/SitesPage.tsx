@@ -41,7 +41,6 @@ import {
   Popconfirm,
   Select,
   Spin,
-  Switch,
   Tag,
   Tooltip
 } from 'antd'
@@ -412,9 +411,7 @@ export default function SitesPage(): JSX.Element {
   const frequentSites = useMemo(
     () =>
       filteredSites
-        .filter(
-          (site) => !site.important && site.clickCount >= FREQUENT_CLICK_THRESHOLD
-        )
+        .filter((site) => site.clickCount >= FREQUENT_CLICK_THRESHOLD)
         .sort((left, right) => {
           const countDiff = right.clickCount - left.clickCount
 
@@ -857,12 +854,16 @@ export default function SitesPage(): JSX.Element {
             />
           </Form.Item>
           <Form.Item
-            label="重要站点"
+            label="站点级别"
             name="important"
-            valuePropName="checked"
             extra="重要站点会显示在常用站点上方，最多 4 个"
           >
-            <Switch />
+            <Select
+              options={[
+                { value: false, label: '普通站点' },
+                { value: true, label: '重要站点' }
+              ]}
+            />
           </Form.Item>
           <Form.Item label="标签" name="tags">
             <Select
