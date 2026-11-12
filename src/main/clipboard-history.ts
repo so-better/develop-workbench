@@ -970,6 +970,24 @@ const notify = (body: string): void => {
   new Notification({ title: '剪贴板', body }).show()
 }
 
+/**
+ * 根据 osascript 错误区分缺失的是自动化权限还是辅助功能权限。
+ * 应用更新后 ad-hoc 签名变化会重置授权，需要重新添加。
+ */
+const describePastePermissionFailure = (error: unknown): string => {
+  const text = error instanceof Error ? error.message : String(error)
+
+  if (/-1743|not authorized to send apple events/i.test(text)) {
+    return '内容已复制到剪贴板。请在“系统设置 → 隐私与安全性 → 自动化”中允许本应用控制 System Events，或手动按 Cmd+V。'
+  }
+
+  if (/-1719|assistive access/i.test(text)) {
+    return '内容已复制到剪贴板。请在“系统设置 → 隐私与安全性 → 辅助功能”中重新添加本应用（应用更新后可能需要重新授权），或手动按 Cmd+V。'
+  }
+
+  return '内容已复制到剪贴板。请在系统设置中授予辅助功能或自动化权限后自动粘贴，或手动按 Cmd+V。'
+}
+
 /** 使用记录后置顶，并按“恢复焦点 → 隐藏浮层 → 粘贴”的顺序执行。 */
 const pasteItem = async (id: string): Promise<ClipboardPasteResult> => {
   const store = await readStore()
@@ -1017,10 +1035,10 @@ const pasteItem = async (id: string): Promise<ClipboardPasteResult> => {
     await new Promise((resolve) => setTimeout(resolve, 60))
     await sendPasteShortcut()
     return { success: true, message: null }
-  } catch {
+  } catch (error) {
     const message =
       process.platform === 'darwin'
-        ? '内容已复制到剪贴板。请在系统设置中授予辅助功能权限后自动粘贴，或手动按 Cmd+V。'
+        ? describePastePermissionFailure(error)
         : '内容已复制到剪贴板，请手动粘贴。'
     notify(message)
     return { success: true, message }
