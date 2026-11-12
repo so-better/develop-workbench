@@ -354,6 +354,42 @@ export default function EmbeddedBrowserPanel({
     }
   }, [openFind, state?.visible])
 
+  // Cmd+W（macOS）或 Ctrl+W（Windows/Linux）关闭当前标签页。
+  useEffect(() => {
+    if (!state?.visible) return
+
+    const handleCloseTabShortcut = (event: KeyboardEvent): void => {
+      const isMac = window.electron.platform === 'darwin'
+      const primaryModifier = isMac
+        ? event.metaKey && !event.ctrlKey
+        : event.ctrlKey && !event.metaKey
+
+      if (
+        !primaryModifier ||
+        event.altKey ||
+        event.shiftKey ||
+        event.key.toLowerCase() !== 'w'
+      ) {
+        return
+      }
+
+      const activeTabId = state.activeTabId
+
+      if (!activeTabId) return
+
+      event.preventDefault()
+      window.electron
+        .closeEmbeddedBrowserTab(activeTabId)
+        .catch(() => message.error('关闭标签页失败'))
+    }
+
+    window.addEventListener('keydown', handleCloseTabShortcut, true)
+
+    return () => {
+      window.removeEventListener('keydown', handleCloseTabShortcut, true)
+    }
+  }, [message, state?.activeTabId, state?.visible])
+
   useEffect(() => {
     if (state?.visible) return
 

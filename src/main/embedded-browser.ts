@@ -831,6 +831,12 @@ const createEntry = (window: BrowserWindow): BrowserEntry => {
       return
     }
 
+    if (isKeyDown && primaryModifier && !input.alt && !input.shift && key === 'w') {
+      event.preventDefault()
+      closeEmbeddedBrowserTab(entry.window, entry.id)
+      return
+    }
+
     if (isKeyDown && primaryModifier && !input.alt && key === 'r') {
       event.preventDefault()
       if (input.shift) webContents.reloadIgnoringCache()
