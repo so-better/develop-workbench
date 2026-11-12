@@ -320,6 +320,20 @@ export interface MeegleRequirementActivity {
 }
 
 /**
+ * 当前用户在单个需求下负责的节点完成情况。
+ */
+export interface MeegleRequirementNodeCompletion {
+  /** 当前用户负责的节点是否已完成（有已完成节点，且没有进行中的节点）。 */
+  completed: boolean
+
+  /** 当前用户负责且已完成的节点名称。 */
+  doneNodeNames: string[]
+
+  /** 当前用户负责且仍在进行中的节点名称。 */
+  activeNodeNames: string[]
+}
+
+/**
  * 节点信息更新参数。
  */
 export interface UpdateNodeInfoInput {

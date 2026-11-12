@@ -66,6 +66,7 @@ import type {
   MeegleRequirementCollaborator,
   MeegleRequirementComment,
   MeegleRequirementGroup,
+  MeegleRequirementNodeCompletion,
   MeegleRequirementOwner
 } from '../../../../types/requirements'
 import type { SettingsSection } from '../../../../types/settings'
@@ -526,12 +527,20 @@ export default function RequirementWorkbench({
   const { message, notification } = App.useApp()
   const { openAiDialog } = useAiChatDialog()
   const [data, setData] = useState<MeegleMyRequirements | null>(null)
+  // 当前用户在各需求下负责节点的完成情况，用于左侧卡片标记。
+  const [nodeCompletions, setNodeCompletions] = useState<
+    Record<string, MeegleRequirementNodeCompletion>
+  >({})
   const [projects, setProjects] = useState<MeegleProject[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectSwitching, setProjectSwitching] = useState(false)
   // 主动切换空间时忽略自身收到的广播，避免重复清空状态和重复加载。
   const projectSwitchRef = useRef(false)
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null)
+  // 记录从哪个迭代分组点开需求，跨版本需求据此显示当前查看的版本。
+  const [selectedRequirementGroupKey, setSelectedRequirementGroupKey] = useState<
+    string | null
+  >(null)
   const [personalStatus, setPersonalStatus] = useState<RequirementPersonalStatus | null>(null)
   const [personalStatusLoading, setPersonalStatusLoading] = useState(false)
   const [personalStatusEditing, setPersonalStatusEditing] = useState(false)
@@ -558,11 +567,18 @@ export default function RequirementWorkbench({
 
   const loadRequestRef = useRef(0)
 
-  /** 当前用户全部需求，用于保持选中项和生成头部信息。 */
-  const allRequirements = useMemo(
-    () => data?.groups.flatMap((group) => group.requirements) ?? [],
-    [data]
-  )
+  /** 当前用户全部需求，用于保持选中项和生成头部信息；跨版本会重复出现在多个分组，按 ID 去重。 */
+  const allRequirements = useMemo(() => {
+    const byId = new Map<string, MeegleRequirement>()
+
+    for (const group of data?.groups ?? []) {
+      for (const requirement of group.requirements) {
+        if (!byId.has(requirement.id)) byId.set(requirement.id, requirement)
+      }
+    }
+
+    return Array.from(byId.values())
+  }, [data])
 
   /** 空间选择器选项，始终包含当前需求列表所属空间。 */
   const projectOptions = useMemo(() => {
@@ -582,11 +598,28 @@ export default function RequirementWorkbench({
   const selectedRequirement =
     allRequirements.find((requirement) => requirement.id === selectedRequirementId) ?? null
 
-  /** 当前选中需求所属的迭代分组。 */
-  const selectedGroup =
-    data?.groups.find((group) =>
-      group.requirements.some((requirement) => requirement.id === selectedRequirementId)
-    ) ?? null
+  /** 当前选中需求所属的迭代分组；跨版本需求优先使用当前查看的分组。 */
+  const selectedGroup = useMemo(() => {
+    if (!selectedRequirementId) return null
+
+    const groups = data?.groups ?? []
+    const containsSelected = (group: MeegleRequirementGroup): boolean =>
+      group.requirements.some(
+        (requirement) => requirement.id === selectedRequirementId
+      )
+
+    for (const key of [iterationFilter, selectedRequirementGroupKey]) {
+      if (!key) continue
+
+      const matched = groups.find(
+        (group) => group.key === key && containsSelected(group)
+      )
+
+      if (matched) return matched
+    }
+
+    return groups.find(containsSelected) ?? null
+  }, [data, iterationFilter, selectedRequirementGroupKey, selectedRequirementId])
 
   /** 打开仓库汇总时优先选中的迭代。 */
   const iterationSummaryPreferredKey = useMemo(() => {
@@ -1298,6 +1331,57 @@ export default function RequirementWorkbench({
   useEffect(() => {
     loadRequirements()
   }, [loadRequirements])
+
+  /**
+   * 需求列表加载后，分批读取当前用户负责节点的完成情况。
+   * 每批返回后立即合并，避免需求较多时所有标记一起等待。
+   */
+  useEffect(() => {
+    const remoteIds = Array.from(
+      new Set(
+        (data?.groups ?? []).flatMap((group) =>
+          group.requirements
+            .filter((requirement) => requirement.source === 'meegle')
+            .map((requirement) => requirement.id)
+        )
+      )
+    )
+
+    if (remoteIds.length === 0) {
+      setNodeCompletions({})
+      return
+    }
+
+    let cancelled = false
+
+    const loadChunks = async (): Promise<void> => {
+      const batchSize = 8
+
+      for (let index = 0; index < remoteIds.length; index += batchSize) {
+        if (cancelled) return
+
+        const batch = remoteIds.slice(index, index + batchSize)
+
+        try {
+          const result = await window.electron.getMyRequirementNodeCompletions(
+            batch
+          )
+
+          if (cancelled) return
+
+          setNodeCompletions((current) => ({ ...current, ...result }))
+        } catch {
+          // 单批读取失败时跳过，不打扰左侧列表。
+        }
+      }
+    }
+
+    void loadChunks()
+
+    return () => {
+      cancelled = true
+    }
+  }, [data])
 
   useEffect(() => {
     let mounted = true
@@ -2942,7 +3026,6 @@ export default function RequirementWorkbench({
           requirement.status ?? '',
           requirement.priority ?? '',
           requirement.requirementType ?? '',
-          requirement.riskLabels.join(' '),
           requirement.productLines.join(' '),
           requirement.productManagers.map((manager) => manager.name).join(' '),
           requirement.productOwners.map((owner) => owner.name).join(' ')
@@ -3033,107 +3116,133 @@ export default function RequirementWorkbench({
   useEffect(() => {
     if (!selectedRequirementId) return
 
-    document
-      .getElementById(`workbench-requirement-${selectedRequirementId}`)
-      ?.scrollIntoView({ block: 'nearest' })
-  }, [selectedRequirementId, data, requirementFilter])
+    const groupKey = selectedGroup?.key
+    const element = groupKey
+      ? document.getElementById(
+          `workbench-requirement-${groupKey}-${selectedRequirementId}`
+        )
+      : document.getElementById(`workbench-requirement-${selectedRequirementId}`)
+
+    element?.scrollIntoView({ block: 'nearest' })
+  }, [selectedRequirementId, selectedGroup?.key, data, requirementFilter])
 
   /**
    * 渲染左侧单条需求。
    */
-  const renderRequirementItem = (requirement: MeegleRequirement): JSX.Element => (
-    <button
-      key={requirement.id}
-      id={`workbench-requirement-${requirement.id}`}
-      type="button"
-      className={`workbench-requirement-item${requirement.id === selectedRequirementId ? ' is-active' : ''
-        }`}
-      aria-current={requirement.id === selectedRequirementId ? 'true' : undefined}
-      onClick={() => setSelectedRequirementId(requirement.id)}
-    >
-      <span className="workbench-requirement-item-title-row">
-        {requirement.priority === 'P0' ||
+  const renderRequirementItem = (
+    requirement: MeegleRequirement,
+    groupKey: string
+  ): JSX.Element => {
+    const nodeCompletion = nodeCompletions[requirement.id]
+    const isMyNodeDone = nodeCompletion?.completed === true
+
+    return (
+      <button
+        key={`${groupKey}:${requirement.id}`}
+        id={`workbench-requirement-${groupKey}-${requirement.id}`}
+        type="button"
+        className={`workbench-requirement-item${
+          requirement.id === selectedRequirementId ? ' is-active' : ''
+        }${isMyNodeDone ? ' is-my-node-done' : ''}`}
+        aria-current={requirement.id === selectedRequirementId ? 'true' : undefined}
+        onClick={() => {
+          setSelectedRequirementId(requirement.id)
+          setSelectedRequirementGroupKey(groupKey)
+        }}
+      >
+        <span className="workbench-requirement-item-title-row">
+          {requirement.priority === 'P0' ||
           requirement.priority === 'P1' ||
           requirement.priority === 'P2' ? (
-          <span className={`requirement-priority is-${getPriorityTone(requirement.priority)}`}>
-            {requirement.priority}
-          </span>
-        ) : null}
-        <span className="workbench-requirement-item-name" title={requirement.name}>
-          {requirement.name}
-        </span>
-      </span>
-      <span className="workbench-requirement-item-top">
-        <span className="workbench-requirement-item-state">
-          <span className={`requirement-status-dot is-${getStatusTone(requirement.status)}`} />
-          <span className="workbench-requirement-item-status">
-            {requirement.status ?? '状态未知'}
-          </span>
-        </span>
-        {(() => {
-          const productContact =
-            requirement.productManagers.length > 0
-              ? { label: '产品经理', members: requirement.productManagers }
-              : requirement.productOwners.length > 0
-                ? { label: '产品负责人', members: requirement.productOwners }
-                : null
-
-          if (!productContact) {
-            return null
-          }
-
-          return (
-            <Tooltip
-              title={`${productContact.label}：${productContact.members
-                .map((member) => member.name)
-                .join('、')}`}
+            <span
+              className={`requirement-priority is-${getPriorityTone(requirement.priority)}`}
             >
-              <span className="workbench-requirement-item-owner">
-                <Avatar
-                  size={20}
-                  src={productContact.members[0].avatarUrl ?? undefined}
-                  className="workbench-requirement-contact-avatar"
-                >
-                  {productContact.members[0].name.slice(0, 1)}
-                </Avatar>
-                <span className="workbench-requirement-item-owner-text">
-                  {productContact.label} · {productContact.members[0].name}
-                </span>
-                {productContact.members.length > 1 ? (
-                  <span className="workbench-requirement-item-owner-extra">
-                    等 {productContact.members.length} 人
-                  </span>
-                ) : null}
-              </span>
-            </Tooltip>
-          )
-        })()}
-      </span>
-      <span className="workbench-requirement-item-footer">
-        <span className="workbench-requirement-item-tags">
-          {requirement.source === 'local' ? (
-            <Tag className="local-requirement-tag" bordered={false}>
-              临时
-            </Tag>
-          ) : null}
-          {requirement.riskLabels.length > 0 ? (
-            <Tooltip title={requirement.riskLabels.join('、')}>
-              <span className="workbench-requirement-risk">{requirement.riskLabels[0]}</span>
-            </Tooltip>
-          ) : null}
-          {requirement.source !== 'local' &&
-          formatRequirementType(requirement.requirementType) ? (
-            <span className="workbench-requirement-type">
-              {formatRequirementType(requirement.requirementType)}
+              {requirement.priority}
             </span>
           ) : null}
+          <span className="workbench-requirement-item-name" title={requirement.name}>
+            {requirement.name}
+          </span>
         </span>
-        <span className="workbench-requirement-item-updated">
-          {formatUpdatedAt(requirement.updatedAt)}
+        <span className="workbench-requirement-item-top">
+          <span className="workbench-requirement-item-state">
+            <span
+              className={`requirement-status-dot is-${getStatusTone(requirement.status)}`}
+            />
+            <span className="workbench-requirement-item-status">
+              {requirement.status ?? '状态未知'}
+            </span>
+          </span>
+          {(() => {
+            const productContact =
+              requirement.productManagers.length > 0
+                ? { label: '产品经理', members: requirement.productManagers }
+                : requirement.productOwners.length > 0
+                  ? { label: '产品负责人', members: requirement.productOwners }
+                  : null
+
+            if (!productContact) {
+              return null
+            }
+
+            return (
+              <Tooltip
+                title={`${productContact.label}：${productContact.members
+                  .map((member) => member.name)
+                  .join('、')}`}
+              >
+                <span className="workbench-requirement-item-owner">
+                  <Avatar
+                    size={20}
+                    src={productContact.members[0].avatarUrl ?? undefined}
+                    className="workbench-requirement-contact-avatar"
+                  >
+                    {productContact.members[0].name.slice(0, 1)}
+                  </Avatar>
+                  <span className="workbench-requirement-item-owner-text">
+                    {productContact.label} · {productContact.members[0].name}
+                  </span>
+                  {productContact.members.length > 1 ? (
+                    <span className="workbench-requirement-item-owner-extra">
+                      等 {productContact.members.length} 人
+                    </span>
+                  ) : null}
+                </span>
+              </Tooltip>
+            )
+          })()}
         </span>
-      </span>
-    </button>
-  )
+        <span className="workbench-requirement-item-footer">
+          <span className="workbench-requirement-item-tags">
+            {isMyNodeDone ? (
+              <Tooltip
+                title={`我负责的节点已完成：${nodeCompletion.doneNodeNames.join('、')}`}
+              >
+                <span className="workbench-requirement-item-done-flag">
+                  <CheckCircleFilled />
+                  我已完成
+                </span>
+              </Tooltip>
+            ) : null}
+            {requirement.source === 'local' ? (
+              <Tag className="local-requirement-tag" bordered={false}>
+                临时
+              </Tag>
+            ) : null}
+            {requirement.source !== 'local' &&
+            formatRequirementType(requirement.requirementType) ? (
+              <span className="workbench-requirement-type">
+                {formatRequirementType(requirement.requirementType)}
+              </span>
+            ) : null}
+          </span>
+          <span className="workbench-requirement-item-updated">
+            {formatUpdatedAt(requirement.updatedAt)}
+          </span>
+        </span>
+      </button>
+    )
+  }
 
   /**
    * 渲染左侧需求分组。
@@ -3166,7 +3275,9 @@ export default function RequirementWorkbench({
 
         {collapsed ? null : productLineGroups.length <= 1 ? (
           <div className="workbench-requirement-group-list">
-            {group.requirements.map(renderRequirementItem)}
+            {group.requirements.map((requirement) =>
+              renderRequirementItem(requirement, group.key)
+            )}
           </div>
         ) : (
           <div className="workbench-requirement-group-list">
@@ -3201,7 +3312,9 @@ export default function RequirementWorkbench({
 
                   {productLineCollapsed ? null : (
                     <div className="workbench-requirement-subgroup-list">
-                      {productLineGroup.requirements.map(renderRequirementItem)}
+                      {productLineGroup.requirements.map((requirement) =>
+                        renderRequirementItem(requirement, group.key)
+                      )}
                     </div>
                   )}
                 </section>

@@ -21,6 +21,7 @@ import type {
   MeegleRequirementComment,
   MeegleRequirementGroup,
   MeegleRequirementIteration,
+  MeegleRequirementNodeCompletion,
   MeegleRequirementOwner,
   MeegleWorkflowNode,
   UpdateNodeInfoInput
@@ -239,6 +240,18 @@ const userCache = new Map<string, MeegleRequirementOwner>()
 /** 按邮箱缓存用户信息，用于补齐 MQL 人员字段的头像。 */
 const emailUserCache = new Map<string, MeegleRequirementOwner>()
 
+/** 当前 Meegle 用户 user_key 缓存，用于判断节点负责人是否为当前用户。 */
+let cachedCurrentUserKey: { value: string; expiresAt: number } | null = null
+
+/** 需求节点完成情况缓存，避免列表刷新时重复读取流程节点。 */
+const nodeCompletionCache = new Map<
+  string,
+  { value: MeegleRequirementNodeCompletion; expiresAt: number }
+>()
+
+/** 节点状态变更时间，用于阻止变更前发起的请求把旧结果写回缓存。 */
+const nodeCompletionInvalidatedAt = new Map<string, number>()
+
 /** 空间根团队缓存，用于模糊搜索成员。 */
 let cachedRootTeams: {
   projectKey: string
@@ -247,14 +260,68 @@ let cachedRootTeams: {
 } | null = null
 
 /**
+ * 将 Meegle 服务端错误转换为适合界面展示的提示。
+ */
+const toReadableMeegleError = (message: string, action: string): string => {
+  if (/ErrWorkItemNoPermission|No Permission/i.test(message)) {
+    return `${action}失败：没有该需求的权限，请确认你是当前节点负责人，且需求未被冻结`
+  }
+
+  if (/ErrWorkItemFrozen|frozen/i.test(message)) {
+    return `${action}失败：需求已冻结，暂时无法操作`
+  }
+
+  return message
+}
+
+/**
+ * 从 CLI 输出中提取服务端错误信息。
+ * 失败时 CLI 通常把 JSON 写到 stderr，因此两路输出都要尝试解析。
+ */
+const readCliErrorMessage = (output: string): string | null => {
+  const text = output.trim()
+
+  if (!text) return null
+
+  try {
+    const parsed = JSON.parse(text) as { error?: CliError } | null
+    const message = parsed?.error?.message
+
+    if (typeof message === 'string' && message.trim()) {
+      return message.split(/\r?\n/)[0]
+    }
+  } catch {
+    // 非 JSON 输出直接使用原文。
+  }
+
+  return null
+}
+
+/**
+ * 生成 CLI 失败提示，优先使用服务端 error.message。
+ */
+const describeCliFailure = (result: CommandResult, action: string): string => {
+  const raw =
+    readCliErrorMessage(result.stderr) ||
+    readCliErrorMessage(result.stdout) ||
+    result.stderr.trim() ||
+    result.stdout.trim()
+
+  if (!raw) {
+    return `${action}失败：Meegle CLI 退出码 ${result.code}`
+  }
+
+  return toReadableMeegleError(raw, action)
+}
+
+/**
  * 解析 CLI JSON 输出，并把服务端错误转为可读异常。
  */
 const parseCommandJson = <T>(result: CommandResult, action: string): T => {
   const output = result.stdout.trim()
 
   if (!output) {
-    const detail = result.stderr.trim()
-    throw new Error(detail || `${action}失败：Meegle CLI 没有返回内容`)
+    throw new Error(describeCliFailure(result, action))
   }
 
   let parsed: T
@@ -262,18 +329,19 @@ const parseCommandJson = <T>(result: CommandResult, action: string): T => {
   try {
     parsed = JSON.parse(output) as T
   } catch {
-    throw new Error(`${action}失败：无法解析 Meegle CLI 返回内容`)
+    throw new Error(describeCliFailure(result, action))
   }
 
   const error = (parsed as { error?: CliError } | null)?.error
 
   if (error?.message) {
-    throw new Error(error.message.split(/\r?\n/)[0])
+    throw new Error(
+      toReadableMeegleError(error.message.split(/\r?\n/)[0], action)
+    )
   }
 
   if (result.code !== 0) {
-    const detail = result.stderr.trim()
-    throw new Error(detail || `${action}失败：Meegle CLI 退出码 ${result.code}`)
+    throw new Error(describeCliFailure(result, action))
   }
 
   return parsed
@@ -285,7 +353,7 @@ const parseCommandJson = <T>(result: CommandResult, action: string): T => {
  */
 const ensureWriteSuccess = (result: CommandResult, action: string): void => {
   if (result.code !== 0) {
-    throw new Error(result.stderr.trim() || `${action}失败：Meegle CLI 退出码 ${result.code}`)
+    throw new Error(describeCliFailure(result, action))
   }
 
   if (result.stdout.trim()) {
@@ -310,6 +378,8 @@ const clearProjectScopedCaches = (): void => {
   roleCache.clear()
   statusCache.clear()
   cachedRootTeams = null
+  nodeCompletionCache.clear()
+  nodeCompletionInvalidatedAt.clear()
 }
 
 /**
@@ -918,32 +988,54 @@ const parseRequirement = (row: MoqlRow): MeegleRequirement | null => {
 
 /**
  * 按所属迭代分组，并按迭代日期倒序排列。
- * 未规划迭代固定放在最后。
+ * 跨版本需求会同时进入每个关联迭代分组；未规划迭代固定放在最后。
  */
 const groupRequirements = (requirements: MeegleRequirement[]): MeegleRequirementGroup[] => {
   const groups = new Map<string, MeegleRequirementGroup>()
 
-  for (const requirement of requirements) {
+  const addRequirement = (
+    requirement: MeegleRequirement,
+    iteration: { id: string | null; name: string | null; date: string | null }
+  ): void => {
     // 同一版本可能按产线拆成 SOM-20261123、SLM-20261123，按日期合并为一个迭代。
-    const key = requirement.iterationDate
-      ? `date:${requirement.iterationDate}`
-      : requirement.iterationId ??
-        (requirement.iterationName ? `name:${requirement.iterationName}` : 'unplanned')
+    const key = iteration.date
+      ? `date:${iteration.date}`
+      : iteration.id ??
+        (iteration.name ? `name:${iteration.name}` : 'unplanned')
     const existing = groups.get(key)
 
     if (existing) {
-      existing.requirements.push(requirement)
-      continue
+      // 跨版本需求会进入多个迭代；同一迭代按日期合并后需要避免重复卡片。
+      if (!existing.requirements.some((item) => item.id === requirement.id)) {
+        existing.requirements.push(requirement)
+      }
+      return
     }
 
     groups.set(key, {
       key,
-      iterationId: requirement.iterationId,
-      iterationName: requirement.iterationDate
-        ? requirement.iterationDate.replace(/-/g, '')
-        : requirement.iterationName ?? '未规划迭代',
-      releaseDate: requirement.iterationDate,
+      iterationId: iteration.id,
+      iterationName: iteration.date
+        ? iteration.date.replace(/-/g, '')
+        : iteration.name ?? '未规划迭代',
+      releaseDate: iteration.date,
       requirements: [requirement]
+    })
+  }
+
+  for (const requirement of requirements) {
+    if (requirement.iterations.length > 0) {
+      // 跨版本需求同时归入每个规划迭代，确保左侧每个版本都能看到。
+      for (const iteration of requirement.iterations) {
+        addRequirement(requirement, iteration)
+      }
+      continue
+    }
+
+    addRequirement(requirement, {
+      id: requirement.iterationId,
+      name: requirement.iterationName,
+      date: requirement.iterationDate
     })
   }
 
@@ -1554,6 +1646,167 @@ export const getRequirementActivity = async (
   }
 }
 
+/** 当前用户 user_key 缓存时长。 */
+const CURRENT_USER_KEY_CACHE_TTL_MS = 5 * 60 * 1000
+
+/** 需求节点完成情况缓存时长。 */
+const NODE_COMPLETION_CACHE_TTL_MS = 2 * 60 * 1000
+
+/** 批量读取节点完成情况时的并发上限，避免同时拉起过多 Meegle 进程。 */
+const NODE_COMPLETION_CONCURRENCY = 4
+
+/**
+ * 读取当前登录的 Meegle 用户 user_key。
+ */
+const getCurrentMeegleUserKey = async (): Promise<string> => {
+  if (cachedCurrentUserKey && cachedCurrentUserKey.expiresAt > Date.now()) {
+    return cachedCurrentUserKey.value
+  }
+
+  const result = await runMeegle(
+    ['user', 'me', '--format', 'json'],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+  const response = parseCommandJson<{ user_key?: string }>(
+    result,
+    '读取当前用户'
+  )
+  const userKey = response.user_key?.trim()
+
+  if (!userKey) throw new Error('无法读取当前 Meegle 用户')
+
+  cachedCurrentUserKey = {
+    value: userKey,
+    expiresAt: Date.now() + CURRENT_USER_KEY_CACHE_TTL_MS
+  }
+
+  return userKey
+}
+
+/**
+ * 判断节点是否已完成。
+ */
+const isFinishedNode = (status: string): boolean =>
+  status === 'finished' || status === 'done'
+
+/**
+ * 读取单个需求下当前用户负责节点的完成情况。
+ * 由于角色会映射到多个流程节点（含发版、冒烟测试等后续节点），
+ * 只要用户有已完成节点且没有进行中的节点，就视为个人部分已完成。
+ */
+const computeRequirementNodeCompletion = async (
+  project: MeegleProject,
+  workItemId: string,
+  userKey: string
+): Promise<MeegleRequirementNodeCompletion> => {
+  const nodes = await fetchWorkflowNodes(project, workItemId)
+  const myNodes = nodes.filter((node) =>
+    node.owners.some((owner) => owner.userKey === userKey)
+  )
+  const doneNodeNames = myNodes
+    .filter((node) => isFinishedNode(node.status))
+    .map((node) => node.name)
+  const activeNodeNames = myNodes
+    .filter((node) => node.status === 'doing')
+    .map((node) => node.name)
+
+  return {
+    completed: doneNodeNames.length > 0 && activeNodeNames.length === 0,
+    doneNodeNames,
+    activeNodeNames
+  }
+}
+
+/**
+ * 批量读取当前用户在各需求下负责节点的完成情况。
+ * 单个需求读取失败时跳过，不影响其他卡片。
+ */
+export const getMyRequirementNodeCompletions = async (
+  workItemIds: unknown
+): Promise<Record<string, MeegleRequirementNodeCompletion>> => {
+  const ids = Array.isArray(workItemIds)
+    ? Array.from(
+        new Set(
+          workItemIds.filter(
+            (id): id is string => typeof id === 'string' && /^\d+$/.test(id)
+          )
+        )
+      )
+    : []
+
+  if (ids.length === 0) return {}
+
+  const project = await getProject()
+  const userKey = await getCurrentMeegleUserKey().catch(() => null)
+
+  if (!userKey) return {}
+
+  const now = Date.now()
+  const result: Record<string, MeegleRequirementNodeCompletion> = {}
+  const pendingIds: string[] = []
+
+  for (const id of ids) {
+    const cached = nodeCompletionCache.get(`${userKey}:${id}`)
+
+    if (cached && cached.expiresAt > now) {
+      result[id] = cached.value
+    } else {
+      pendingIds.push(id)
+    }
+  }
+
+  let cursor = 0
+
+  const worker = async (): Promise<void> => {
+    while (cursor < pendingIds.length) {
+      const id = pendingIds[cursor]
+      cursor += 1
+      const startedAt = Date.now()
+
+      try {
+        const value = await computeRequirementNodeCompletion(
+          project,
+          id,
+          userKey
+        )
+        // 计算期间节点状态可能已被修改，避免把旧结果写回缓存。
+        if ((nodeCompletionInvalidatedAt.get(id) ?? 0) <= startedAt) {
+          nodeCompletionCache.set(`${userKey}:${id}`, {
+            value,
+            expiresAt: Date.now() + NODE_COMPLETION_CACHE_TTL_MS
+          })
+        }
+        result[id] = value
+      } catch {
+        // 单个需求读取失败时保留未知状态。
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(NODE_COMPLETION_CONCURRENCY, pendingIds.length) },
+      () => worker()
+    )
+  )
+
+  return result
+}
+
+/**
+ * 清除指定需求的节点完成情况缓存。
+ * 缓存按用户隔离，因此需要删除所有用户下的该需求条目。
+ */
+const invalidateRequirementNodeCompletion = (workItemId: string): void => {
+  nodeCompletionInvalidatedAt.set(workItemId, Date.now())
+
+  const suffix = `:${workItemId}`
+
+  for (const key of nodeCompletionCache.keys()) {
+    if (key.endsWith(suffix)) nodeCompletionCache.delete(key)
+  }
+}
+
 /**
  * 添加需求评论。
  */
@@ -1665,6 +1918,7 @@ export const transitionRequirementNode = async (
 
   const result = await runMeegle(args, MEEGLE_QUERY_TIMEOUT_MS)
   ensureWriteSuccess(result, action === 'confirm' ? '完成节点' : '回滚节点')
+  invalidateRequirementNodeCompletion(workItemId)
 }
 
 /**
@@ -2197,6 +2451,11 @@ export const getWeeklyWorkItems = async (
 export const initializeRequirements = (): void => {
   ipcMain.handle('requirements:get-my', (_event, includeClosed: unknown) =>
     getMyRequirements(includeClosed === true)
+  )
+  ipcMain.handle(
+    'requirements:get-my-node-completions',
+    (_event, workItemIds: unknown) =>
+      getMyRequirementNodeCompletions(workItemIds)
   )
   ipcMain.handle('requirements:get-iteration-summary', () =>
     getIterationSummaryRequirements()

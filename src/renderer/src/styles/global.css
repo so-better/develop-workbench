@@ -2702,6 +2702,48 @@ body {
   background: var(--workbench-selected-bg);
 }
 
+.workbench-requirement-item.is-my-node-done {
+  background:
+    linear-gradient(135deg, rgba(18, 183, 106, 0.07), transparent 58%),
+    var(--workbench-panel);
+  border-color: rgba(18, 183, 106, 0.26);
+}
+
+.workbench-requirement-item.is-my-node-done:hover {
+  background:
+    linear-gradient(135deg, rgba(18, 183, 106, 0.1), transparent 58%),
+    var(--workbench-hover);
+  border-color: rgba(18, 183, 106, 0.4);
+}
+
+.workbench-requirement-item.is-my-node-done.is-active {
+  background:
+    linear-gradient(135deg, rgba(18, 183, 106, 0.12), transparent 58%),
+    var(--workbench-selected-bg);
+  border-color: rgba(18, 183, 106, 0.46);
+}
+
+.workbench-requirement-item-done-flag {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 3px;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  color: #0b7a4b;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  background: rgba(18, 183, 106, 0.14);
+  border: 1px solid rgba(18, 183, 106, 0.28);
+  border-radius: 999px;
+}
+
+.workbench-requirement-item-done-flag .anticon {
+  font-size: 10px;
+}
+
 :root[data-theme="dark"] .workbench-requirement-group-heading {
   border-color: rgba(255, 255, 255, 0.08);
   box-shadow: none;
@@ -2718,6 +2760,27 @@ body {
 
 :root[data-theme="dark"] .workbench-requirement-item.is-active {
   border-color: rgba(255, 255, 255, 0.32);
+}
+
+:root[data-theme="dark"] .workbench-requirement-item.is-my-node-done {
+  background:
+    linear-gradient(135deg, rgba(18, 183, 106, 0.16), transparent 58%),
+    var(--workbench-panel);
+  border-color: rgba(18, 183, 106, 0.42);
+}
+
+:root[data-theme="dark"] .workbench-requirement-item.is-my-node-done:hover {
+  border-color: rgba(18, 183, 106, 0.56);
+}
+
+:root[data-theme="dark"] .workbench-requirement-item.is-my-node-done.is-active {
+  border-color: rgba(18, 183, 106, 0.58);
+}
+
+:root[data-theme="dark"] .workbench-requirement-item-done-flag {
+  color: #6ce9a6;
+  background: rgba(18, 183, 106, 0.2);
+  border-color: rgba(18, 183, 106, 0.34);
 }
 
 .workbench-requirement-item:focus-visible {
@@ -2828,28 +2891,6 @@ body {
   align-items: center;
   min-width: 0;
   overflow: hidden;
-}
-
-.workbench-requirement-risk {
-  overflow: hidden;
-  flex-shrink: 0;
-  max-width: 150px;
-  height: 18px;
-  padding: 0 5px;
-  color: #dc6803;
-  font-size: 10px;
-  line-height: 16px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  background: rgba(247, 144, 9, 0.08);
-  border: 1px solid rgba(247, 144, 9, 0.2);
-  border-radius: 4px;
-}
-
-:root[data-theme="dark"] .workbench-requirement-risk {
-  color: #fdb022;
-  background: rgba(247, 144, 9, 0.14);
-  border-color: rgba(247, 144, 9, 0.28);
 }
 
 .workbench-requirement-type {

@@ -96,6 +96,7 @@ import type {
   MeegleMyRequirements,
   MeegleProject,
   MeegleRequirementActivity,
+  MeegleRequirementNodeCompletion,
   MeegleRequirementOwner,
   UpdateNodeInfoInput
 } from '../types/requirements'
@@ -523,6 +524,10 @@ export interface ElectronAPI {
   ) => Promise<void>
   /** 读取当前 Meegle 用户负责的需求，并按迭代分组。 */
   getMyRequirements: (includeClosed?: boolean) => Promise<MeegleMyRequirements>
+  /** 批量读取当前用户在需求下负责节点的完成情况。 */
+  getMyRequirementNodeCompletions: (
+    workItemIds: string[]
+  ) => Promise<Record<string, MeegleRequirementNodeCompletion>>
   /** 读取迭代仓库汇总所需的轻量需求。 */
   getIterationSummaryRequirements: () => Promise<IterationSummaryRequirement[]>
   /** 按关键词搜索当前空间内的全部需求。 */

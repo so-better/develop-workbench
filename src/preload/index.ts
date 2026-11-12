@@ -98,6 +98,7 @@ import type {
   MeegleMyRequirements,
   MeegleProject,
   MeegleRequirementActivity,
+  MeegleRequirementNodeCompletion,
   MeegleRequirementOwner,
   UpdateNodeInfoInput
 } from '../types/requirements'
@@ -1080,6 +1081,14 @@ const electronAPI = {
    */
   getMyRequirements: (includeClosed = false): Promise<MeegleMyRequirements> =>
     ipcRenderer.invoke('requirements:get-my', includeClosed),
+
+  /**
+   * 批量读取当前用户在需求下负责节点的完成情况。
+   */
+  getMyRequirementNodeCompletions: (
+    workItemIds: string[]
+  ): Promise<Record<string, MeegleRequirementNodeCompletion>> =>
+    ipcRenderer.invoke('requirements:get-my-node-completions', workItemIds),
 
   /**
    * 读取迭代仓库汇总所需的轻量需求。
