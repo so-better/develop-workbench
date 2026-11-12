@@ -1,0 +1,15 @@
+[ req ]
+distinguished_name = dn
+x509_extensions = v3_req
+prompt = no
+
+[ dn ]
+CN = Develop Workbench Self Signed
+O = Develop Workbench
+C = CN
+
+[ v3_req ]
+basicConstraints = critical, CA:false
+keyUsage = critical, digitalSignature
+extendedKeyUsage = codeSigning
+subjectKeyIdentifier = hash

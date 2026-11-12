@@ -149,7 +149,16 @@ npm run dist:win
 - 构建完成后产物在 `release/`
 - `release/` 是构建产物，不要上传到源码仓库
 - 每个版本必须同时提供 macOS 和 Windows 包，否则另一平台的更新检查可能无法拿到安装包
-- 未配置 Developer ID 时，mac 构建会通过 `afterPack` 做整包 ad-hoc 签名，避免 Gatekeeper 报「已损坏」；首次打开仍可能需要右键打开或在系统设置中允许。
+- mac 构建默认使用固定自签名证书签名；只有未配置证书时才通过 `afterPack` 做整包 ad-hoc 签名。首次打开仍可能需要右键打开或在系统设置中允许。
+
+### macOS 固定自签名证书
+
+为避免每次升级后辅助功能/自动化权限失效，构建机需要使用固定的自签名证书签名，而不是临时 ad-hoc 签名：
+
+1. 在构建机钥匙串中保留一张名为 `Develop Workbench Self Signed` 的 Code Signing 证书，并确保 `security find-identity -v -p codesigning` 能看到它
+2. `electron-builder.yml` 的 `mac.identity` 固定指向该证书；配置了证书时 `after-pack` 会跳过 ad-hoc 签名
+3. 证书私钥只保存在构建机或密码管理器，不要提交到仓库；证书重建后所有用户需要重新授权一次
+4. 从 ad-hoc 切换到固定证书后的第一个版本，用户需要重新授权一次；之后升级不再失效
 
 ## 4. 检查产物
 

@@ -11,6 +11,19 @@ const execFileAsync = promisify(execFile)
 module.exports = async (context) => {
   if (context.electronPlatformName !== 'darwin') return
 
+  // 配置了固定签名证书时交给 electron-builder 签名，避免被 ad-hoc 覆盖。
+  const identity = context.packager?.platformSpecificBuildOptions?.identity
+  const hasSigningIdentity =
+    (typeof identity === 'string' && identity.length > 0 && identity !== '-') ||
+    Boolean(process.env.CSC_NAME || process.env.CSC_LINK)
+
+  if (hasSigningIdentity) {
+    console.log(
+      `skip ad-hoc signing: using identity ${identity ?? 'from environment'}`
+    )
+    return
+  }
+
   const appPath = join(
     context.appOutDir,
     `${context.packager.appInfo.productFilename}.app`

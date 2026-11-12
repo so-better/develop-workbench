@@ -22,6 +22,8 @@ mac:
   target:
     - dmg
     - zip
+  # 固定自签名证书，保证辅助功能/自动化权限跨版本保留。
+  identity: "Develop Workbench Self Signed"
   artifactName: ${name}-${version}-mac.${ext}
   category: public.app-category.developer-tools
   icon: build/icon.icns
