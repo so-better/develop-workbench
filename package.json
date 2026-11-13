@@ -1,6 +1,6 @@
 {
   "name": "develop-workbench",
-  "version": "0.2.11",
+  "version": "0.2.12",
   "description": "AI 研发工作台桌面应用",
   "main": "./out/main/index.js",
   "author": "lingkai",

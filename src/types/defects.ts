@@ -103,6 +103,8 @@ export interface MeegleDefect {
   status: string | null
   priority: string | null
   severity: string | null
+  /** 规划版本。 */
+  planningVersions: string[]
   iterationId: string | null
   iterationName: string | null
   /** 从迭代名称解析出的日期。 */

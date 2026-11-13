@@ -94,7 +94,7 @@ import type {
 import type { LinkPreview } from '../types/link-preview'
 import type { MeegleCliInfo, MeegleLoginEvent, MeegleLoginSession, MeegleState } from '../types/meegle'
 import type {
-  IterationSummaryRequirement,
+  VersionSummaryRequirement,
   MeegleMyRequirements,
   MeegleProject,
   MeegleRequirementActivity,
@@ -1077,7 +1077,7 @@ const electronAPI = {
     ipcRenderer.invoke('weekly-report:auto-status'),
 
   /**
-   * 读取当前 Meegle 用户负责的需求，并按迭代分组。
+   * 读取当前 Meegle 用户负责的需求，并按规划版本分组。
    */
   getMyRequirements: (includeClosed = false): Promise<MeegleMyRequirements> =>
     ipcRenderer.invoke('requirements:get-my', includeClosed),
@@ -1091,10 +1091,10 @@ const electronAPI = {
     ipcRenderer.invoke('requirements:get-my-node-completions', workItemIds),
 
   /**
-   * 读取迭代仓库汇总所需的轻量需求。
+   * 读取版本仓库汇总所需的轻量需求。
    */
-  getIterationSummaryRequirements: (): Promise<IterationSummaryRequirement[]> =>
-    ipcRenderer.invoke('requirements:get-iteration-summary'),
+  getVersionSummaryRequirements: (): Promise<VersionSummaryRequirement[]> =>
+    ipcRenderer.invoke('requirements:get-version-summary'),
 
   /** 按关键词搜索当前空间内的全部需求。 */
   searchRequirements: (keyword: string): Promise<MeegleMyRequirements> =>

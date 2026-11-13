@@ -1,6 +1,6 @@
 /**
  * Meegle 需求工作台数据模块。
- * 读取当前登录用户负责的未结束需求，并按所属迭代分组后注册 IPC。
+ * 读取当前登录用户负责的未结束需求，并按所属规划版本分组后注册 IPC。
  */
 import { ipcMain } from 'electron'
 import {
@@ -10,8 +10,9 @@ import {
 } from './local-requirements'
 import { runMeegle } from './meegle'
 import { getPreferences, updatePreferences } from './preferences'
+import { parseReleaseDate } from '../utils'
 import type {
-  IterationSummaryRequirement,
+  VersionSummaryRequirement,
   MeegleMyRequirements,
   MeegleNodeFormItem,
   MeegleProject,
@@ -738,30 +739,6 @@ const readIterations = (
 }
 
 /**
- * 从迭代名称末尾解析 YYYYMMDD 日期。
- */
-const parseReleaseDate = (name: string): string | null => {
-  const match = /(\d{4})(\d{2})(\d{2})$/.exec(name)
-
-  if (!match) return null
-
-  const year = Number(match[1])
-  const month = Number(match[2])
-  const day = Number(match[3])
-  const date = new Date(Date.UTC(year, month - 1, day))
-
-  if (
-    date.getUTCFullYear() !== year ||
-    date.getUTCMonth() !== month - 1 ||
-    date.getUTCDate() !== day
-  ) {
-    return null
-  }
-
-  return `${match[1]}-${match[2]}-${match[3]}`
-}
-
-/**
  * 按固定大小切分数组。
  */
 const chunk = <T>(items: T[], size: number): T[][] => {
@@ -987,25 +964,30 @@ const parseRequirement = (row: MoqlRow): MeegleRequirement | null => {
 }
 
 /**
- * 按所属迭代分组，并按迭代日期倒序排列。
- * 跨版本需求会同时进入每个关联迭代分组；未规划迭代固定放在最后。
+ * 按所属规划版本分组，并按版本日期倒序排列。
+ * 没有规划版本时回退到规划迭代；未规划需求固定放在最后。
  */
 const groupRequirements = (requirements: MeegleRequirement[]): MeegleRequirementGroup[] => {
   const groups = new Map<string, MeegleRequirementGroup>()
 
   const addRequirement = (
     requirement: MeegleRequirement,
-    iteration: { id: string | null; name: string | null; date: string | null }
+    version: {
+      id: string | null
+      name: string | null
+      date: string | null
+      displayName?: string
+    }
   ): void => {
-    // 同一版本可能按产线拆成 SOM-20261123、SLM-20261123，按日期合并为一个迭代。
-    const key = iteration.date
-      ? `date:${iteration.date}`
-      : iteration.id ??
-        (iteration.name ? `name:${iteration.name}` : 'unplanned')
+    const key = version.date
+      ? `date:${version.date}`
+      : version.id ??
+        (version.name && version.name !== '未规划版本'
+          ? `version:${version.name}`
+          : 'unplanned')
     const existing = groups.get(key)
 
     if (existing) {
-      // 跨版本需求会进入多个迭代；同一迭代按日期合并后需要避免重复卡片。
       if (!existing.requirements.some((item) => item.id === requirement.id)) {
         existing.requirements.push(requirement)
       }
@@ -1014,20 +996,52 @@ const groupRequirements = (requirements: MeegleRequirement[]): MeegleRequirement
 
     groups.set(key, {
       key,
-      iterationId: iteration.id,
-      iterationName: iteration.date
-        ? iteration.date.replace(/-/g, '')
-        : iteration.name ?? '未规划迭代',
-      releaseDate: iteration.date,
+      representativeIterationId: version.id,
+      versionName:
+        version.displayName ??
+        (version.date
+          ? version.date.replace(/-/g, '')
+          : version.name ?? '未规划版本'),
+      releaseDate: version.date,
       requirements: [requirement]
     })
   }
 
   for (const requirement of requirements) {
+    const versions = Array.from(
+      new Set(
+        requirement.planningVersions
+          .map((version) => version.trim())
+          .filter(Boolean)
+      )
+    )
+
+    if (versions.length > 0) {
+      for (const versionName of versions) {
+        const releaseDate = parseReleaseDate(versionName)
+        const matchedIteration =
+          requirement.iterations.find(
+            (iteration) => releaseDate && iteration.date === releaseDate
+          ) ?? requirement.iterations[0]
+
+        addRequirement(requirement, {
+          id: matchedIteration?.id ?? requirement.iterationId,
+          name: versionName,
+          date: releaseDate,
+          displayName: versionName
+        })
+      }
+      continue
+    }
+
+    // 缺少规划版本时回退到规划迭代，保持已结束需求仍能按原迭代日期归类。
     if (requirement.iterations.length > 0) {
-      // 跨版本需求同时归入每个规划迭代，确保左侧每个版本都能看到。
       for (const iteration of requirement.iterations) {
-        addRequirement(requirement, iteration)
+        addRequirement(requirement, {
+          id: iteration.id,
+          name: iteration.name,
+          date: iteration.date
+        })
       }
       continue
     }
@@ -1048,7 +1062,7 @@ const groupRequirements = (requirements: MeegleRequirement[]): MeegleRequirement
   return Array.from(groups.values()).sort((left, right) => {
     // 未规划需求固定排在最后。
     if (!left.releaseDate && !right.releaseDate) {
-      return right.iterationName.localeCompare(left.iterationName, 'zh-CN')
+      return right.versionName.localeCompare(left.versionName, 'zh-CN')
     }
 
     if (!left.releaseDate) return 1
@@ -1058,7 +1072,7 @@ const groupRequirements = (requirements: MeegleRequirement[]): MeegleRequirement
 
     return dateCompare !== 0
       ? dateCompare
-      : right.iterationName.localeCompare(left.iterationName, 'zh-CN')
+      : right.versionName.localeCompare(left.versionName, 'zh-CN')
   })
 }
 
@@ -2094,7 +2108,7 @@ const buildRequirementClosedCondition = (statusNames: string[]): string => {
 
 /** 关键词搜索使用的需求字段。 */
 const REQUIREMENT_SEARCH_FIELDS =
-  '`工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `产品线`, `需求等级`, `需求性质`, `研发难度估分`, `难度估分-前端app`, `难度估分-前端PC`, `难度估分-后端`, `标签`, risk_label()'
+  '`工作项id`, `名称`, `状态`, `优先级`, `规划版本`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `创建人`, `产品线`, `需求等级`, `需求性质`, `研发难度估分`, `难度估分-前端app`, `难度估分-前端PC`, `难度估分-后端`, `标签`, risk_label()'
 
 /** 生成名称/ID 的 MQL 搜索条件。 */
 const buildRequirementSearchCondition = (value: unknown): string => {
@@ -2153,7 +2167,7 @@ export const searchRequirements = async (query: string): Promise<MeegleMyRequire
 }
 
 /**
- * 读取当前用户通过任意角色参与的需求，并按迭代分组。
+ * 读取当前用户通过任意角色参与的需求，并按规划版本分组。
  * includeClosed 为 false 时只返回未结束需求。
  */
 export const getMyRequirements = async (
@@ -2208,10 +2222,10 @@ export const getMyRequirements = async (
   }
 }
 
-/** 将 MQL 行解析为迭代汇总所需的轻量需求。 */
-const parseIterationSummaryRequirement = (
+/** 将 MQL 行解析为版本汇总所需的轻量需求。 */
+const parseVersionSummaryRequirement = (
   row: MoqlRow
-): IterationSummaryRequirement | null => {
+): VersionSummaryRequirement | null => {
   const fields = toFieldMap(row)
   const id = readString(fields, 'work_item_id')
   const name = readString(fields, 'name')
@@ -2224,17 +2238,18 @@ const parseIterationSummaryRequirement = (
   return {
     id,
     name,
+    planningVersions: readLabelList(fields, 'planning_version'),
     iterations: readIterations(fields),
     productLines: productLine ? [productLine] : []
   }
 }
 
 /**
- * 读取迭代仓库汇总所需的轻量需求。
- * 只查询需求 ID、名称和全部规划迭代，不补齐头像等详情字段。
+ * 读取版本仓库汇总所需的轻量需求。
+ * 只查询需求 ID、名称、规划版本和全部规划迭代，不补齐头像等详情字段。
  */
-export const getIterationSummaryRequirements = async (): Promise<
-  IterationSummaryRequirement[]
+export const getVersionSummaryRequirements = async (): Promise<
+  VersionSummaryRequirement[]
 > => {
   const project = await getProject()
   const [roleNames, localRequirements] = await Promise.all([
@@ -2247,28 +2262,31 @@ export const getIterationSummaryRequirements = async (): Promise<
         await fetchMqlRows(
           project,
           [
-            'SELECT `工作项id`, `名称`, `规划迭代`, `产品线`',
+            'SELECT `工作项id`, `名称`, `规划版本`, `规划迭代`, `产品线`',
             `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
             `WHERE (${roleCondition})`
           ].join(' ')
         )
       )
-        .map(parseIterationSummaryRequirement)
+        .map(parseVersionSummaryRequirement)
         .filter(
-          (requirement): requirement is IterationSummaryRequirement =>
+          (requirement): requirement is VersionSummaryRequirement =>
             requirement !== null
         )
     : []
-  const localSummaryRequirements: IterationSummaryRequirement[] =
+  const localSummaryRequirements: VersionSummaryRequirement[] =
     localRequirements.map((requirement) => ({
       id: requirement.id,
       name: requirement.name,
-      iterations: requirement.iterationName
+      planningVersions: requirement.versionName
+        ? [requirement.versionName]
+        : [],
+      iterations: requirement.versionName
         ? [
             {
-              id: requirement.iterationId,
-              name: requirement.iterationName,
-              date: requirement.iterationDate
+              id: requirement.versionId,
+              name: requirement.versionName,
+              date: requirement.versionDate
             }
           ]
         : [],
@@ -2286,7 +2304,8 @@ export interface WeeklyWorkItem {
   name: string
   status: string | null
   priority: string | null
-  iteration: string | null
+  /** 所属规划版本。 */
+  version: string | null
   updatedAt: string | null
   completedAt: string | null
   requirementType: string | null
@@ -2378,7 +2397,7 @@ export const getWeeklyWorkItems = async (
         await fetchMqlRows(
           project,
           [
-            'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `完成日期`, `技术方案`, `标签`, `risk_label()`',
+            'SELECT `工作项id`, `名称`, `状态`, `优先级`, `规划版本`, `规划迭代`, `当前节点负责人`, `更新时间`, `需求类型`, `需求描述`, `需求文档`, `完成日期`, `技术方案`, `标签`, `risk_label()`',
             `FROM ${quoteMqlIdentifier(project.name)}.\`研发需求\``,
             `WHERE (${roleCondition}) AND (RELATIVE_DATETIME_EQ(\`更新时间\`, '${relativeWeek}') OR RELATIVE_DATETIME_EQ(\`完成日期\`, '${relativeWeek}'))`,
             'ORDER BY `更新时间` DESC'
@@ -2412,7 +2431,10 @@ export const getWeeklyWorkItems = async (
       name: requirement.name,
       status: requirement.status,
       priority: requirement.priority,
-      iteration: requirement.iterationName,
+      version:
+        requirement.planningVersions.join('、') ||
+        requirement.iterationName ||
+        null,
       updatedAt: requirement.updatedAt,
       completedAt: requirement.completedAt,
       requirementType: requirement.requirementType,
@@ -2457,8 +2479,8 @@ export const initializeRequirements = (): void => {
     (_event, workItemIds: unknown) =>
       getMyRequirementNodeCompletions(workItemIds)
   )
-  ipcMain.handle('requirements:get-iteration-summary', () =>
-    getIterationSummaryRequirements()
+  ipcMain.handle('requirements:get-version-summary', () =>
+    getVersionSummaryRequirements()
   )
   ipcMain.handle('requirements:search', (_event, query: unknown) =>
     searchRequirements(typeof query === 'string' ? query : '')

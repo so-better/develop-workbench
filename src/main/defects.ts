@@ -425,6 +425,7 @@ const parseDefect = (row: MqlRow): MeegleDefect | null => {
     status: readLabels(fields, '状态')[0] ?? null,
     priority: readLabel(fields, '优先级'),
     severity: readLabel(fields, '缺陷等级'),
+    planningVersions: readLabels(fields, '规划版本'),
     iterationId: iteration?.key?.trim() || null,
     iterationName: iteration?.label?.trim() || null,
     iterationDate: parseIterationDate(iteration?.label?.trim() || null),
@@ -528,7 +529,7 @@ export const searchDefects = async (query: string): Promise<MeegleMyDefects> => 
     ? await fetchMqlRows(
         project,
         [
-          `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
+          `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划版本\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
           `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
           `WHERE ${condition}`,
           'ORDER BY `更新时间` DESC',
@@ -566,7 +567,7 @@ export const getMyDefects = async (
   const rows = await fetchMqlRows(
     project,
     [
-      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
+      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划版本\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
       `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
       `WHERE (${buildRoleCondition(role)})${
         includeClosed
@@ -603,7 +604,7 @@ export const getWeeklyResolvedDefects = async (
   const rows = await fetchMqlRows(
     project,
     [
-      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
+      `SELECT \`工作项id\`, \`名称\`, \`状态\`, \`优先级\`, \`缺陷等级\`, \`规划版本\`, \`规划迭代\`, \`产品线\`, \`当前负责人\`, \`更新时间\`, \`完成日期\`, \`详细描述\`, \`关联需求\`, \`影响版本\`, \`解决版本\`, \`发现阶段\`, \`BUG解决人\`, \`BUG责任人\`, \`创建人\`, \`更新人\`, \`关注人\`, \`提出时间\`, ${roleFields}`,
       `FROM ${quoteMqlIdentifier(project.name)}.\`缺陷\``,
       `WHERE \`状态\` in (${DEFECT_FIXED_STATUSES.map(
         (status) => `'${status.replace(/'/g, "''")}'`

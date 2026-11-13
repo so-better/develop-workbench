@@ -116,6 +116,31 @@ export const getErrorMessage = (
   return message || fallback
 }
 
+/**
+ * 从规划版本或规划迭代名称末尾解析 YYYYMMDD 日期。
+ * 返回 YYYY-MM-DD；无法解析或日期非法时返回 null。
+ */
+export const parseReleaseDate = (name: string): string | null => {
+  const match = /(\d{4})(\d{2})(\d{2})$/.exec(name)
+
+  if (!match) return null
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  return `${match[1]}-${match[2]}-${match[3]}`
+}
+
 /** 等待指定毫秒数，供轮询和重试流程复用。 */
 export const delay = (ms: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, ms))

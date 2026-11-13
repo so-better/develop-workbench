@@ -52,13 +52,16 @@ export interface MeegleRequirementIteration {
   date: string | null
 }
 
-/** 迭代仓库汇总使用的轻量需求。 */
-export interface IterationSummaryRequirement {
+/** 版本仓库汇总使用的轻量需求。 */
+export interface VersionSummaryRequirement {
   /** 需求 ID。 */
   id: string
 
   /** 需求名称。 */
   name: string
+
+  /** 需求关联的全部规划版本；未规划时为空数组。 */
+  planningVersions: string[]
 
   /** 需求关联的全部规划迭代；未规划时为空数组。 */
   iterations: MeegleRequirementIteration[]
@@ -196,22 +199,22 @@ export interface MeegleRequirement {
 }
 
 /**
- * 按迭代分组后的需求。
+ * 按规划版本分组后的需求。
  */
 export interface MeegleRequirementGroup {
-  /** 分组稳定键，未规划迭代时使用固定值。 */
+  /** 分组稳定键，未规划版本时使用固定值。 */
   key: string
 
-  /** 迭代 ID；未规划时为空。 */
-  iterationId: string | null
+  /** 代表迭代 ID；用于本地需求归入该版本。 */
+  representativeIterationId: string | null
 
-  /** 迭代名称；未规划时为“未规划迭代”。 */
-  iterationName: string
+  /** 版本名称；未规划时为“未规划版本”。 */
+  versionName: string
 
-  /** 从迭代名称解析出的日期。 */
+  /** 版本日期。 */
   releaseDate: string | null
 
-  /** 该迭代下的需求。 */
+  /** 该版本下的需求。 */
   requirements: MeegleRequirement[]
 }
 
@@ -363,7 +366,7 @@ export interface MeegleMyRequirements {
   /** 当前使用的 Meegle 空间。 */
   project: MeegleProject
 
-  /** 按迭代分组后的需求。 */
+  /** 按规划版本分组后的需求。 */
   groups: MeegleRequirementGroup[]
 
   /** 去重后的需求总数。 */

@@ -40,7 +40,7 @@ import type {
 } from '../../../../types/defects'
 import type { MeegleProject } from '../../../../types/requirements'
 import type { SettingsSection } from '../../../../types/settings'
-import { getErrorMessage } from '../../../../utils'
+import { getErrorMessage, parseReleaseDate } from '../../../../utils'
 import MarkdownContent from '../../components/MarkdownContent/MarkdownContent'
 import MarkdownEditor from '../../components/MarkdownEditor/MarkdownEditor'
 import RobotMark from '../../components/RobotMark/RobotMark'
@@ -108,16 +108,63 @@ const getSeverityTone = (severity: string | null): string => {
   return 'default'
 }
 
-/** 缺陷迭代按日期归并，和需求列表保持一致。 */
-const getDefectIterationKey = (defect: MeegleDefect): string =>
-  defect.iterationDate
-    ? `date:${defect.iterationDate}`
-    : defect.iterationId ?? (defect.iterationName ? `name:${defect.iterationName}` : 'unplanned')
+/** 缺陷按规划版本归并；缺少规划版本时回退到规划迭代。 */
+const getDefectVersionEntries = (
+  defect: MeegleDefect
+): Array<{ key: string; label: string }> => {
+  const versions = Array.from(
+    new Set(
+      defect.planningVersions
+        .map((version) => version.trim())
+        .filter(Boolean)
+    )
+  )
 
-const getDefectIterationName = (defect: MeegleDefect): string =>
-  defect.iterationDate
-    ? defect.iterationDate.replace(/-/g, '')
-    : defect.iterationName ?? '未规划迭代'
+  if (versions.length > 0) {
+    return versions.map((version) => {
+      const date = parseReleaseDate(version)
+      return {
+        key: date ? `date:${date}` : `version:${version}`,
+        label: version
+      }
+    })
+  }
+
+  if (defect.iterationDate) {
+    return [
+      {
+        key: `date:${defect.iterationDate}`,
+        label: defect.iterationDate.replace(/-/g, '')
+      }
+    ]
+  }
+
+  if (defect.iterationId) {
+    return [
+      {
+        key: defect.iterationId,
+        label: defect.iterationName ?? '未规划版本'
+      }
+    ]
+  }
+
+  if (defect.iterationName) {
+    return [
+      {
+        key: `version:${defect.iterationName}`,
+        label: defect.iterationName
+      }
+    ]
+  }
+
+  return [{ key: 'unplanned', label: '未规划版本' }]
+}
+
+const getDefectVersionKeys = (defect: MeegleDefect): string[] =>
+  getDefectVersionEntries(defect).map((entry) => entry.key)
+
+const getDefectVersionLabel = (defect: MeegleDefect): string =>
+  defect.planningVersions[0] ?? defect.iterationName ?? '未规划版本'
 
 const getDefectProductLine = (defect: MeegleDefect): string => {
   const segments = defect.productLines
@@ -199,7 +246,7 @@ export default function DefectWorkbench({
   const [search, setSearch] = useState('')
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [productLineFilters, setProductLineFilters] = useState<string[]>([])
-  const [iterationFilter, setIterationFilter] = useState<string | null>(null)
+  const [versionFilter, setVersionFilter] = useState<string | null>(null)
   const [showClosedDefects, setShowClosedDefects] = useState(false)
   const [reloadVersion, setReloadVersion] = useState(0)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
@@ -313,7 +360,7 @@ export default function DefectWorkbench({
       setSearch('')
       setStatusFilters([])
       setProductLineFilters([])
-      setIterationFilter(null)
+      setVersionFilter(null)
       setDescriptionExpanded(false)
       setAssigneesEditing(false)
       setActiveTab('basic')
@@ -338,7 +385,7 @@ export default function DefectWorkbench({
       setSearch('')
       setStatusFilters([])
       setProductLineFilters([])
-      setIterationFilter(null)
+      setVersionFilter(null)
       setDescriptionExpanded(false)
       setAssigneesEditing(false)
       setActiveTab('basic')
@@ -381,14 +428,14 @@ export default function DefectWorkbench({
       }))
   }, [defects])
 
-  const iterationOptions = useMemo(() => {
+  const versionOptions = useMemo(() => {
     const options = new Map<string, string>()
 
     for (const defect of defects) {
-      const key = getDefectIterationKey(defect)
-
-      if (key !== 'unplanned') {
-        options.set(key, getDefectIterationName(defect))
+      for (const entry of getDefectVersionEntries(defect)) {
+        if (entry.key !== 'unplanned') {
+          options.set(entry.key, entry.label)
+        }
       }
     }
 
@@ -397,13 +444,22 @@ export default function DefectWorkbench({
       .sort((left, right) => right.label.localeCompare(left.label, 'zh-CN'))
   }, [defects])
 
-  const productLineScopeDefects = useMemo(() => {
-    if (!iterationFilter) return defects
+  // 版本选项变化后移除已不存在的筛选，避免列表被清空。
+  useEffect(() => {
+    if (!versionFilter) return
 
-    return defects.filter(
-      (defect) => getDefectIterationKey(defect) === iterationFilter
+    if (!versionOptions.some((option) => option.value === versionFilter)) {
+      setVersionFilter(null)
+    }
+  }, [versionFilter, versionOptions])
+
+  const productLineScopeDefects = useMemo(() => {
+    if (!versionFilter) return defects
+
+    return defects.filter((defect) =>
+      getDefectVersionKeys(defect).includes(versionFilter)
     )
-  }, [defects, iterationFilter])
+  }, [defects, versionFilter])
 
   const productLineOptions = useMemo(() => {
     const counts = new Map<string, number>()
@@ -447,8 +503,8 @@ export default function DefectWorkbench({
         return false
       }
       if (
-        iterationFilter &&
-        getDefectIterationKey(defect) !== iterationFilter
+        versionFilter &&
+        !getDefectVersionKeys(defect).includes(versionFilter)
       ) {
         return false
       }
@@ -465,15 +521,15 @@ export default function DefectWorkbench({
         defect.status,
         defect.priority,
         defect.severity,
-        defect.iterationName,
-        getDefectIterationName(defect),
+        ...defect.planningVersions,
+        getDefectVersionLabel(defect),
         defect.productLines.join(' '),
         ...defect.owners.map((owner) => owner.name)
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(keyword))
     })
-  }, [defects, iterationFilter, productLineFilters, search, statusFilters])
+  }, [defects, versionFilter, productLineFilters, search, statusFilters])
 
   const selectedDefect =
     filteredDefects.find((defect) => defect.id === selectedId) ??
@@ -623,8 +679,8 @@ export default function DefectWorkbench({
               value: selectedDefect.findingStage ?? '未填写'
             },
             {
-              label: '规划迭代',
-              value: selectedDefect.iterationName ?? '未规划迭代'
+              label: '规划版本',
+              value: selectedDefect.planningVersions.join('、') || '未填写'
             }
           ]
         },
@@ -727,7 +783,7 @@ export default function DefectWorkbench({
     setRole(nextRole ?? null)
     setSelectedId(null)
     setStatusFilters([])
-    setIterationFilter(null)
+    setVersionFilter(null)
   }
 
   const handleRefresh = (): void => {
@@ -1093,7 +1149,7 @@ export default function DefectWorkbench({
           <Input
             className="workbench-requirement-search"
             prefix={<SearchOutlined />}
-            placeholder="搜索缺陷、状态、迭代或产线"
+            placeholder="搜索缺陷、状态、版本或产线"
             value={search}
             allowClear
             disabled={loading && !data}
@@ -1110,14 +1166,14 @@ export default function DefectWorkbench({
           />
           <Select
             className="workbench-filter-select"
-            value={iterationFilter ?? undefined}
+            value={versionFilter ?? undefined}
             allowClear
             showSearch
             optionFilterProp="label"
-            options={iterationOptions}
-            placeholder={`全部迭代（${iterationOptions.length}）`}
-            aria-label="按缺陷迭代筛选"
-            onChange={(value?: string) => setIterationFilter(value ?? null)}
+            options={versionOptions}
+            placeholder={`全部版本（${versionOptions.length}）`}
+            aria-label="按缺陷版本筛选"
+            onChange={(value?: string) => setVersionFilter(value ?? null)}
           />
           {productLineOptions.length > 1 ? (
             <Select
@@ -1240,7 +1296,7 @@ export default function DefectWorkbench({
                           </span>
                         ) : null}
                         <span className="workbench-requirement-type">
-                          {getDefectIterationName(defect)}
+                          {getDefectVersionLabel(defect)}
                         </span>
                       </span>
                       <span className="workbench-requirement-item-updated">
@@ -1304,7 +1360,7 @@ export default function DefectWorkbench({
             <header className="workbench-header">
               <div className="workbench-heading">
                 <span className="workbench-eyebrow">
-                  {data.project.name} / {getDefectIterationName(selectedDefect)}
+                  {data.project.name} / {getDefectVersionLabel(selectedDefect)}
                 </span>
                 <div className="workbench-title-row">
                   <Tooltip title="刷新数据">

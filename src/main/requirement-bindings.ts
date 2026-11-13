@@ -230,7 +230,7 @@ export const getRequirementBindingState = async (
 
 /**
  * 批量读取指定需求的仓库绑定。
- * 一次读取绑定文件，供迭代仓库汇总等批量场景使用。
+ * 一次读取绑定文件，供版本仓库汇总等批量场景使用。
  */
 export const getRequirementBindingsBatch = async (
   requirementIds: string[]

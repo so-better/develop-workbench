@@ -12,7 +12,7 @@ import type {
 } from '../../../../types/requirements'
 import { getErrorMessage } from '../../../../utils'
 
-/** 可选的所属迭代。 */
+/** 可选的所属版本。 */
 export interface LocalRequirementVersionOption {
   /** 分组稳定键。 */
   key: string
@@ -20,14 +20,14 @@ export interface LocalRequirementVersionOption {
   /** 展示名称。 */
   label: string
 
-  /** Meegle 迭代 ID；未规划时为 null。 */
-  iterationId: string | null
+  /** 代表迭代 ID；未规划时为 null。 */
+  representativeIterationId: string | null
 
-  /** 迭代名称；未规划时为 null。 */
-  iterationName: string | null
+  /** 版本名称；未规划时为 null。 */
+  versionName: string | null
 
-  /** 迭代日期。 */
-  iterationDate: string | null
+  /** 版本日期。 */
+  versionDate: string | null
 }
 
 interface LocalRequirementModalProps {
@@ -37,7 +37,7 @@ interface LocalRequirementModalProps {
   /** 当前编辑的需求；新建时为 null。 */
   initialRequirement: MeegleRequirement | null
 
-  /** 可选择的迭代列表。 */
+  /** 可选择的版本列表。 */
   versions: LocalRequirementVersionOption[]
 
   /** 可选择的产线列表。 */
@@ -101,17 +101,30 @@ const getInitialVersionKey = (
 ): string => {
   if (!requirement) return versions[0]?.key ?? 'unplanned'
 
-  const matched = versions.find((version) => {
-    if (requirement.iterationId) {
-      return version.iterationId === requirement.iterationId
-    }
-
-    if (requirement.iterationName) {
-      return version.iterationName === requirement.iterationName
-    }
-
-    return version.key === 'unplanned'
-  })
+  const matched =
+    (requirement.iterationId
+      ? versions.find(
+          (version) =>
+            version.representativeIterationId === requirement.iterationId
+        )
+      : undefined) ??
+    (requirement.iterationName
+      ? versions.find(
+          (version) =>
+            version.versionName === requirement.iterationName ||
+            version.label === requirement.iterationName
+        )
+      : undefined) ??
+    (requirement.iterationDate
+      ? versions.find(
+          (version) => version.versionDate === requirement.iterationDate
+        )
+      : undefined) ??
+    (!requirement.iterationId &&
+    !requirement.iterationName &&
+    !requirement.iterationDate
+      ? versions.find((version) => version.key === 'unplanned')
+      : undefined)
 
   return matched?.key ?? versions[0]?.key ?? 'unplanned'
 }
@@ -261,10 +274,10 @@ export default function LocalRequirementModal({
       versions.find((item) => item.key === values.versionKey) ??
       versions[0] ?? {
         key: 'unplanned',
-        label: '未规划迭代',
-        iterationId: null,
-        iterationName: null,
-        iterationDate: null
+        label: '未规划版本',
+        representativeIterationId: null,
+        versionName: null,
+        versionDate: null
       }
     const productManager = values.productManagerKey
       ? personOptions.find(
@@ -279,9 +292,9 @@ export default function LocalRequirementModal({
       priority: values.priority ?? null,
       productManager: toLocalPerson(productManager),
       productLine: values.productLine ?? null,
-      iterationId: version.iterationId,
-      iterationName: version.iterationName,
-      iterationDate: version.iterationDate
+      versionId: version.representativeIterationId,
+      versionName: version.versionName,
+      versionDate: version.versionDate
     })
   }
 
@@ -325,7 +338,7 @@ export default function LocalRequirementModal({
               value: version.key,
               label: version.label
             }))}
-            placeholder="选择现有迭代"
+            placeholder="选择现有版本"
           />
         </Form.Item>
 

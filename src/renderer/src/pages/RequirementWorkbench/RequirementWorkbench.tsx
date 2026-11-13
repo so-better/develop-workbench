@@ -57,7 +57,7 @@ import type { RequirementRepoBinding } from '../../../../types/bindings'
 import type { LocalRequirementInput } from '../../../../types/local-requirements'
 import type { RequirementPersonalStatus } from '../../../../types/requirement-status'
 import type { LarkUser } from '../../../../types/lark'
-import { getErrorMessage } from '../../../../utils'
+import { getErrorMessage, parseReleaseDate } from '../../../../utils'
 import type { Repository, RepositoryBindingStatus } from '../../../../types/repository'
 import type {
   MeegleMyRequirements,
@@ -72,7 +72,7 @@ import type {
 } from '../../../../types/requirements'
 import type { SettingsSection } from '../../../../types/settings'
 import RobotMark from '../../components/RobotMark/RobotMark'
-import IterationRepositorySummary from '../../components/IterationRepositorySummary/IterationRepositorySummary'
+import VersionRepositorySummary from '../../components/VersionRepositorySummary/VersionRepositorySummary'
 import LocalRequirementModal from '../../components/LocalRequirementModal/LocalRequirementModal'
 import type { LocalRequirementVersionOption } from '../../components/LocalRequirementModal/LocalRequirementModal'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
@@ -538,7 +538,7 @@ export default function RequirementWorkbench({
   // 主动切换空间时忽略自身收到的广播，避免重复清空状态和重复加载。
   const projectSwitchRef = useRef(false)
   const [selectedRequirementId, setSelectedRequirementId] = useState<string | null>(null)
-  // 记录从哪个迭代分组点开需求，跨版本需求据此显示当前查看的版本。
+  // 记录从哪个版本分组点开需求，跨版本需求据此显示当前查看的版本。
   const [selectedRequirementGroupKey, setSelectedRequirementGroupKey] = useState<
     string | null
   >(null)
@@ -555,15 +555,15 @@ export default function RequirementWorkbench({
   )
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [productLineFilters, setProductLineFilters] = useState<string[]>([])
-  const [iterationFilter, setIterationFilter] = useState<string | null>(null)
+  const [versionFilter, setVersionFilter] = useState<string | null>(null)
   const [localModalOpen, setLocalModalOpen] = useState(false)
-  const [iterationSummaryOpen, setIterationSummaryOpen] = useState(false)
+  const [versionSummaryOpen, setVersionSummaryOpen] = useState(false)
   const [localModalRequirement, setLocalModalRequirement] =
     useState<MeegleRequirement | null>(null)
   const [localSaving, setLocalSaving] = useState(false)
   const [localDeleting, setLocalDeleting] = useState(false)
 
-  // 默认全部展开，只记录被用户主动收起的迭代。
+  // 默认全部展开，只记录被用户主动收起的版本。
   const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(() => new Set())
 
   const loadRequestRef = useRef(0)
@@ -599,7 +599,7 @@ export default function RequirementWorkbench({
   const selectedRequirement =
     allRequirements.find((requirement) => requirement.id === selectedRequirementId) ?? null
 
-  /** 当前选中需求所属的迭代分组；跨版本需求优先使用当前查看的分组。 */
+  /** 当前选中需求所属的版本分组；跨版本需求优先使用当前查看的分组。 */
   const selectedGroup = useMemo(() => {
     if (!selectedRequirementId) return null
 
@@ -609,7 +609,7 @@ export default function RequirementWorkbench({
         (requirement) => requirement.id === selectedRequirementId
       )
 
-    for (const key of [iterationFilter, selectedRequirementGroupKey]) {
+    for (const key of [versionFilter, selectedRequirementGroupKey]) {
       if (!key) continue
 
       const matched = groups.find(
@@ -620,40 +620,58 @@ export default function RequirementWorkbench({
     }
 
     return groups.find(containsSelected) ?? null
-  }, [data, iterationFilter, selectedRequirementGroupKey, selectedRequirementId])
+  }, [data, versionFilter, selectedRequirementGroupKey, selectedRequirementId])
 
-  /** 打开仓库汇总时优先选中的迭代。 */
-  const iterationSummaryPreferredKey = useMemo(() => {
-    if (iterationFilter) return iterationFilter
+  /** 打开仓库汇总时优先选中的版本。 */
+  const versionSummaryPreferredKey = useMemo(() => {
+    if (versionFilter) return versionFilter
     if (selectedGroup) return selectedGroup.key
+
+    const version = selectedRequirement?.planningVersions[0]
+
+    if (version) {
+      const date = parseReleaseDate(version)
+
+      if (date) return `date:${date}`
+      if (selectedRequirement?.iterationId) {
+        return selectedRequirement.iterationId
+      }
+
+      return `version:${version}`
+    }
+
+    if (selectedRequirement?.iterationDate) {
+      return `date:${selectedRequirement.iterationDate}`
+    }
+
     if (selectedRequirement?.iterationId) return selectedRequirement.iterationId
     if (selectedRequirement?.iterationName) {
-      return `name:${selectedRequirement.iterationName}`
+      return `version:${selectedRequirement.iterationName}`
     }
 
     return null
-  }, [iterationFilter, selectedGroup, selectedRequirement])
+  }, [versionFilter, selectedGroup, selectedRequirement])
 
   /** 当前选中的是否为本地临时需求。 */
   const selectedRequirementIsLocal = isLocalRequirementId(selectedRequirementId)
 
-  /** 新建/编辑临时需求时可选的现有迭代。 */
+  /** 新建/编辑临时需求时可选的现有版本。 */
   const localVersionOptions = useMemo<LocalRequirementVersionOption[]>(() => {
     const options = (data?.groups ?? []).map((group) => ({
       key: group.key,
-      label: group.iterationName,
-      iterationId: group.iterationId,
-      iterationName: group.key === 'unplanned' ? null : group.iterationName,
-      iterationDate: group.releaseDate
+      label: group.versionName,
+      representativeIterationId: group.representativeIterationId,
+      versionName: group.key === 'unplanned' ? null : group.versionName,
+      versionDate: group.releaseDate
     }))
 
     if (!options.some((option) => option.key === 'unplanned')) {
       options.push({
         key: 'unplanned',
-        label: '未规划迭代',
-        iterationId: null,
-        iterationName: null,
-        iterationDate: null
+        label: '未规划版本',
+        representativeIterationId: null,
+        versionName: null,
+        versionDate: null
       })
     }
 
@@ -858,7 +876,7 @@ export default function RequirementWorkbench({
         ...(selectedRequirementIsLocal
           ? [
               `需求名称：${selectedRequirement.name}`,
-              `所属版本：${selectedRequirement.iterationName ?? '未规划迭代'}`,
+              `所属版本：${selectedRequirement.iterationName ?? '未规划版本'}`,
               `状态：${selectedRequirement.status ?? '未知'}`,
               `优先级：${selectedRequirement.priority ?? '未设置'}`,
               `需求描述：${selectedRequirement.description?.trim() || '暂无描述'}`,
@@ -1455,7 +1473,7 @@ export default function RequirementWorkbench({
       setSelectedRequirementId(null)
       setRequirementFilter('')
       setStatusFilters([])
-      setIterationFilter(null)
+      setVersionFilter(null)
       setCollapsedGroupKeys(new Set())
       setActivity(null)
       setBindings([])
@@ -1479,7 +1497,7 @@ export default function RequirementWorkbench({
       setSelectedRequirementId(null)
       setRequirementFilter('')
       setStatusFilters([])
-      setIterationFilter(null)
+      setVersionFilter(null)
       setCollapsedGroupKeys(new Set())
       setActivity(null)
       setBindings([])
@@ -2120,7 +2138,7 @@ export default function RequirementWorkbench({
       '请结合当前仓库代码分析并处理下面这个本地临时需求。',
       '',
       `需求名称：${selectedRequirement.name}`,
-      `所属版本：${selectedRequirement.iterationName ?? '未规划迭代'}`,
+      `所属版本：${selectedRequirement.iterationName ?? '未规划版本'}`,
       `状态：${selectedRequirement.status ?? '未知'}`,
       `优先级：${selectedRequirement.priority ?? '未设置'}`,
       `需求描述：${promptDescription || '暂无描述'}`
@@ -2962,14 +2980,14 @@ export default function RequirementWorkbench({
     })
   }, [allRequirements])
 
-  /** 当前迭代范围内的需求；未选迭代时使用全部需求。 */
+  /** 当前版本范围内的需求；未选版本时使用全部需求。 */
   const productLineScopeRequirements = useMemo(() => {
-    if (!iterationFilter) return allRequirements
+    if (!versionFilter) return allRequirements
 
     return (
-      data?.groups.find((group) => group.key === iterationFilter)?.requirements ?? []
+      data?.groups.find((group) => group.key === versionFilter)?.requirements ?? []
     )
-  }, [allRequirements, data, iterationFilter])
+  }, [allRequirements, data, versionFilter])
 
   /** 产线筛选选项。 */
   const productLineOptions = useMemo(() => {
@@ -2994,7 +3012,7 @@ export default function RequirementWorkbench({
       }))
   }, [productLineScopeRequirements])
 
-  // 迭代切换后移除当前迭代不存在的产线选择。
+  // 版本切换后移除当前版本不存在的产线选择。
   useEffect(() => {
     const available = new Set(productLineOptions.map((option) => option.value))
 
@@ -3005,19 +3023,19 @@ export default function RequirementWorkbench({
     )
   }, [productLineOptions])
 
-  /** 迭代筛选选项。 */
-  const iterationOptions = useMemo(
+  /** 版本筛选选项。 */
+  const versionOptions = useMemo(
     () =>
       (data?.groups ?? []).map((group) => ({
         value: group.key,
-        label: `${group.iterationName}（${group.requirements.length}）`
+        label: `${group.versionName}（${group.requirements.length}）`
       })),
     [data]
   )
 
   /**
-   * 先限制迭代范围，再按状态筛选，最后按需求名称、状态或迭代名称搜索。
-   * 迭代名称命中时，保留该迭代下符合状态条件的全部需求。
+   * 先限制版本范围，再按状态筛选，最后按需求名称、状态或版本名称搜索。
+   * 版本名称命中时，保留该版本下符合状态条件的全部需求。
    */
   const filteredGroups = useMemo(() => {
     const keyword = requirementFilter.trim().toLocaleLowerCase()
@@ -3025,8 +3043,8 @@ export default function RequirementWorkbench({
     const selectedStatuses = new Set(statusFilters)
     const selectedProductLines = new Set(productLineFilters)
 
-    const scopedGroups = iterationFilter
-      ? (data?.groups ?? []).filter((group) => group.key === iterationFilter)
+    const scopedGroups = versionFilter
+      ? (data?.groups ?? []).filter((group) => group.key === versionFilter)
       : data?.groups ?? []
 
     return scopedGroups.flatMap((group) => {
@@ -3047,7 +3065,7 @@ export default function RequirementWorkbench({
 
       if (productLineFiltered.length === 0) return []
 
-      if (!keyword || group.iterationName.toLocaleLowerCase().includes(keyword)) {
+      if (!keyword || group.versionName.toLocaleLowerCase().includes(keyword)) {
         return [{ ...group, requirements: productLineFiltered }]
       }
 
@@ -3065,24 +3083,24 @@ export default function RequirementWorkbench({
 
       return requirements.length > 0 ? [{ ...group, requirements }] : []
     })
-  }, [data, iterationFilter, productLineFilters, requirementFilter, statusFilters])
+  }, [data, versionFilter, productLineFilters, requirementFilter, statusFilters])
 
-  /** 当前筛选的迭代不存在时自动恢复全部迭代。 */
+  /** 当前筛选的版本不存在时自动恢复全部版本。 */
   useEffect(() => {
-    if (!iterationFilter || !data) return
+    if (!versionFilter || !data) return
 
-    if (!data.groups.some((group) => group.key === iterationFilter)) {
-      setIterationFilter(null)
+    if (!data.groups.some((group) => group.key === versionFilter)) {
+      setVersionFilter(null)
     }
-  }, [data, iterationFilter])
+  }, [data, versionFilter])
 
-  /** 是否存在有效搜索词、状态或迭代筛选。 */
+  /** 是否存在有效搜索词、状态或版本筛选。 */
   const hasSearch = requirementFilter.trim().length > 0
   const hasActiveFilter =
     hasSearch ||
     statusFilters.length > 0 ||
     productLineFilters.length > 0 ||
-    Boolean(iterationFilter)
+    Boolean(versionFilter)
 
   /** 所有分组是否都已收起，用于切换按钮的文案和图标。 */
   const allGroupsCollapsed =
@@ -3110,7 +3128,7 @@ export default function RequirementWorkbench({
   }, [filteredGroups, selectedRequirementId])
 
   /**
-   * 收起或展开一个迭代分组。
+   * 收起或展开一个版本分组。
    * 使用新的 Set 触发 React 更新，避免直接修改原状态。
    */
   const toggleRequirementGroup = (groupKey: string): void => {
@@ -3128,7 +3146,7 @@ export default function RequirementWorkbench({
   }
 
   /**
-   * 一键展开或收起全部迭代分组。
+   * 一键展开或收起全部版本分组。
    */
   const toggleAllRequirementGroups = (): void => {
     if (!data) return
@@ -3305,7 +3323,7 @@ export default function RequirementWorkbench({
         >
           <span className="workbench-requirement-group-title">
             <DownOutlined className="workbench-requirement-group-chevron" />
-            <span className="workbench-requirement-group-name">{group.iterationName}</span>
+            <span className="workbench-requirement-group-name">{group.versionName}</span>
           </span>
           <span
             className="workbench-requirement-group-count"
@@ -3426,7 +3444,7 @@ export default function RequirementWorkbench({
         <dl className="requirement-info-grid local-requirement-grid">
           <div>
             <dt>所属版本</dt>
-            <dd>{selectedRequirement.iterationName ?? '未规划迭代'}</dd>
+            <dd>{selectedRequirement.iterationName ?? '未规划版本'}</dd>
           </div>
           <div>
             <dt>产线</dt>
@@ -3506,7 +3524,7 @@ export default function RequirementWorkbench({
 
   return (
     <div className="workbench">
-      {/* 左侧：当前用户负责的需求，按所属迭代分组。 */}
+      {/* 左侧：当前用户负责的需求，按所属版本分组。 */}
       <aside className="workbench-sidebar">
         <div className="workbench-brand">
           <div className="workbench-brand-text">
@@ -3596,14 +3614,14 @@ export default function RequirementWorkbench({
               新建需求 <DownOutlined />
             </Button>
           </Dropdown>
-          <Tooltip title="按迭代查看仓库和分支汇总">
+          <Tooltip title="按版本查看仓库和分支汇总">
             <Button
               type="default"
               size="small"
               className="workbench-repository-summary"
               icon={<BranchesOutlined />}
               disabled={loading && !data}
-              onClick={() => setIterationSummaryOpen(true)}
+              onClick={() => setVersionSummaryOpen(true)}
             >
               仓库汇总
             </Button>
@@ -3614,7 +3632,7 @@ export default function RequirementWorkbench({
           <Input
             className="workbench-requirement-search"
             prefix={<SearchOutlined />}
-            placeholder="搜索需求、状态、迭代或产线"
+            placeholder="搜索需求、状态、版本或产线"
             value={requirementFilter}
             onChange={(event) => setRequirementFilter(event.target.value)}
             allowClear
@@ -3624,14 +3642,14 @@ export default function RequirementWorkbench({
           <Select
             allowClear
             showSearch
-            className="workbench-filter-select workbench-iteration-filter"
-            value={iterationFilter ?? undefined}
-            options={iterationOptions}
-            placeholder={`全部迭代（${data?.groups.length ?? 0}）`}
-            aria-label="按迭代筛选"
+            className="workbench-filter-select workbench-version-filter"
+            value={versionFilter ?? undefined}
+            options={versionOptions}
+            placeholder={`全部版本（${data?.groups.length ?? 0}）`}
+            aria-label="按版本筛选"
             optionFilterProp="label"
-            disabled={loading || !data || iterationOptions.length === 0}
-            onChange={(value?: string) => setIterationFilter(value ?? null)}
+            disabled={loading || !data || versionOptions.length === 0}
+            onChange={(value?: string) => setVersionFilter(value ?? null)}
           />
 
           {productLineOptions.length > 1 ? (
@@ -3723,7 +3741,7 @@ export default function RequirementWorkbench({
             <header className="workbench-header">
               <div className="workbench-heading">
                 <span className="workbench-eyebrow">
-                  {projectName} / {selectedGroup?.iterationName ?? '我负责的需求'}
+                  {projectName} / {selectedGroup?.versionName ?? '我负责的需求'}
                 </span>
                 <div className="workbench-title-row">
                   <Tooltip title="刷新数据">
@@ -5512,10 +5530,10 @@ export default function RequirementWorkbench({
         </div>
       </Modal>
 
-      <IterationRepositorySummary
-        open={iterationSummaryOpen}
-        preferredIterationKey={iterationSummaryPreferredKey}
-        onClose={() => setIterationSummaryOpen(false)}
+      <VersionRepositorySummary
+        open={versionSummaryOpen}
+        preferredVersionKey={versionSummaryPreferredKey}
+        onClose={() => setVersionSummaryOpen(false)}
       />
 
       <LocalRequirementModal

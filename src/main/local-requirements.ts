@@ -95,12 +95,19 @@ const normalizeInput = (value: unknown): LocalRequirementInput => {
     throw new Error('临时需求参数不合法')
   }
 
-  const input = value as Partial<LocalRequirementInput>
+  const input = value as Partial<LocalRequirementInput> & {
+    iterationId?: unknown
+    iterationName?: unknown
+    iterationDate?: unknown
+  }
   const name = normalizeText(input.name, MAX_NAME_LENGTH)
 
   if (!name) throw new Error('临时需求名称不能为空')
 
-  const iterationName = normalizeOptionalText(input.iterationName, MAX_NAME_LENGTH)
+  const versionName = normalizeOptionalText(
+    input.versionName ?? input.iterationName,
+    MAX_NAME_LENGTH
+  )
 
   return {
     name,
@@ -109,11 +116,13 @@ const normalizeInput = (value: unknown): LocalRequirementInput => {
     priority: normalizePriority(input.priority),
     productManager: normalizePerson(input.productManager),
     productLine: normalizeOptionalText(input.productLine, MAX_NAME_LENGTH),
-    iterationId: iterationName
-      ? normalizeOptionalText(input.iterationId, 160)
+    versionId: versionName
+      ? normalizeOptionalText(input.versionId ?? input.iterationId, 160)
       : null,
-    iterationName,
-    iterationDate: iterationName ? normalizeDate(input.iterationDate) : null
+    versionName,
+    versionDate: versionName
+      ? normalizeDate(input.versionDate ?? input.iterationDate)
+      : null
   }
 }
 
@@ -147,9 +156,12 @@ const normalizeStoredRequirement = (value: unknown): LocalRequirement | null => 
     priority: normalizePriority(item.priority),
     productManager: normalizePerson(item.productManager),
     productLine: normalizeOptionalText(item.productLine, MAX_NAME_LENGTH),
-    iterationId: normalizeOptionalText(item.iterationId, 160),
-    iterationName: normalizeOptionalText(item.iterationName, MAX_NAME_LENGTH),
-    iterationDate: normalizeDate(item.iterationDate),
+    versionId: normalizeOptionalText(item.versionId ?? item.iterationId, 160),
+    versionName: normalizeOptionalText(
+      item.versionName ?? item.iterationName,
+      MAX_NAME_LENGTH
+    ),
+    versionDate: normalizeDate(item.versionDate ?? item.iterationDate),
     closed: isClosedStatus(status),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
@@ -264,7 +276,7 @@ export const searchLocalRequirements = async (
       item.description ?? '',
       item.status,
       item.priority ?? '',
-      item.iterationName ?? '',
+      item.versionName ?? '',
       item.productLine ?? '',
       item.productManager?.name ?? ''
     ].some((value) => value.toLocaleLowerCase().includes(normalized))
@@ -375,7 +387,7 @@ export const toMeegleRequirement = (
   proposedAt: item.createdAt,
   expectedReleaseAt: null,
   productLines: item.productLine ? [item.productLine] : [],
-  planningVersions: item.iterationName ? [item.iterationName] : [],
+  planningVersions: item.versionName ? [item.versionName] : [],
   collaborators: [],
   requirementLevel: null,
   requirementNature: null,
@@ -391,15 +403,15 @@ export const toMeegleRequirement = (
   historicalDataInvolved: null,
   performanceTestInvolved: null,
   remark: null,
-  iterationId: item.iterationId,
-  iterationName: item.iterationName,
-  iterationDate: item.iterationDate,
-  iterations: item.iterationName
+  iterationId: item.versionId,
+  iterationName: item.versionName,
+  iterationDate: item.versionDate,
+  iterations: item.versionName
     ? [
         {
-          id: item.iterationId,
-          name: item.iterationName,
-          date: item.iterationDate
+          id: item.versionId,
+          name: item.versionName,
+          date: item.versionDate
         }
       ]
     : [],

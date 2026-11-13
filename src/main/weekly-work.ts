@@ -67,8 +67,8 @@ export interface WeeklyFixedDefect {
   /** 缺陷等级。 */
   severity: string | null
 
-  /** 所属迭代。 */
-  iteration: string | null
+  /** 所属规划版本。 */
+  version: string | null
 
   /** 完成时间。 */
   completedAt: string | null
@@ -165,7 +165,10 @@ export const getWeeklyWorkContext = async (
       status: defect.status,
       priority: defect.priority,
       severity: defect.severity,
-      iteration: defect.iterationName,
+      version:
+        defect.planningVersions.join('、') ||
+        defect.iterationName ||
+        null,
       completedAt: defect.completedAt,
       linkedRequirement: defect.linkedRequirement?.name ?? null,
       fixedVersions: defect.fixedVersions,

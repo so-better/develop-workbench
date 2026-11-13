@@ -1,24 +1,25 @@
 import type { RequirementBindingsMap } from '../../../types/bindings'
-import type { IterationSummaryRequirement } from '../../../types/requirements'
+import type { VersionSummaryRequirement } from '../../../types/requirements'
 import type { Repository } from '../../../types/repository'
+import { parseReleaseDate } from '../../../utils'
 
-/** 迭代汇总里的分支类型。 */
-export type IterationBranchKind = 'development' | 'requirement' | 'iteration'
+/** 版本汇总里的分支类型。 */
+export type RepositoryBranchKind = 'development' | 'requirement' | 'iteration'
 
-/** 某个仓库在迭代中涉及的分支。 */
-export interface IterationBranchSummary {
+/** 某个仓库在版本中涉及的分支。 */
+export interface RepositoryBranchSummary {
   /** 分支名。 */
   name: string
 
   /** 该分支在需求绑定中的类型，可能同时属于多种类型。 */
-  kinds: IterationBranchKind[]
+  kinds: RepositoryBranchKind[]
 
   /** 关联的需求 ID。 */
   requirementIds: string[]
 }
 
-/** 某个仓库在迭代中的汇总信息。 */
-export interface IterationRepositorySummary {
+/** 某个仓库在版本中的汇总信息。 */
+export interface VersionRepositorySummary {
   /** 仓库 ID。 */
   repositoryId: string
 
@@ -35,19 +36,19 @@ export interface IterationRepositorySummary {
   missing: boolean
 
   /** 涉及的分支列表。 */
-  branches: IterationBranchSummary[]
+  branches: RepositoryBranchSummary[]
 }
 
-/** 一次迭代的仓库汇总结果。 */
-export interface IterationRepositoryCollection {
+/** 一次版本的仓库汇总结果。 */
+export interface VersionRepositoryCollection {
   /** 按仓库聚合后的列表。 */
-  repositories: IterationRepositorySummary[]
+  repositories: VersionRepositorySummary[]
 
   /** 至少绑定了一个仓库的需求数。 */
   boundRequirementCount: number
 
   /** 没有绑定任何仓库的需求。 */
-  unboundRequirements: IterationSummaryRequirement[]
+  unboundRequirements: VersionSummaryRequirement[]
 
   /** 去重后的分支数。 */
   branchCount: number
@@ -56,18 +57,18 @@ export interface IterationRepositoryCollection {
   unavailableRepositoryCount: number
 }
 
-const BRANCH_KIND_ORDER: IterationBranchKind[] = [
+const BRANCH_KIND_ORDER: RepositoryBranchKind[] = [
   'development',
   'requirement',
   'iteration'
 ]
 
-const getKindOrder = (kind: IterationBranchKind): number =>
+const getKindOrder = (kind: RepositoryBranchKind): number =>
   BRANCH_KIND_ORDER.indexOf(kind)
 
 interface BranchAccumulator {
   name: string
-  kinds: Set<IterationBranchKind>
+  kinds: Set<RepositoryBranchKind>
   requirementIds: Set<string>
 }
 
@@ -77,27 +78,24 @@ interface RepositoryAccumulator {
   branches: Map<string, BranchAccumulator>
 }
 
-/** 按迭代分组后的轻量需求。 */
-export interface IterationSummaryGroup {
+/** 按规划版本分组后的轻量需求。 */
+export interface VersionSummaryGroup {
   /** 分组稳定键。 */
   key: string
 
-  /** 迭代 ID；未规划时为空。 */
-  iterationId: string | null
+  /** 版本名称；未规划时为「未规划版本」。 */
+  versionName: string
 
-  /** 迭代名称；未规划时为「未规划迭代」。 */
-  iterationName: string
-
-  /** 从迭代名称解析出的日期。 */
+  /** 版本日期。 */
   releaseDate: string | null
 
-  /** 该迭代下的需求。 */
-  requirements: IterationSummaryRequirement[]
+  /** 该版本下的需求。 */
+  requirements: VersionSummaryRequirement[]
 }
 
 /** 获取轻量需求所属产线，本地临时需求可能包含多个产线。 */
-export const getIterationSummaryProductLines = (
-  requirement: IterationSummaryRequirement
+export const getVersionSummaryProductLines = (
+  requirement: VersionSummaryRequirement
 ): string[] => {
   const lines = Array.from(
     new Set(
@@ -111,73 +109,97 @@ export const getIterationSummaryProductLines = (
 }
 
 /**
- * 按需求关联的全部迭代分组，未规划需求归入固定分组。
- * 同一版本的不同产线迭代会按日期合并；同一需求关联多个迭代时会出现在多个分组中。
+ * 按需求关联的规划版本分组；缺少规划版本时回退到规划迭代。
+ * 同一版本的不同产线迭代会按日期合并；同一需求关联多个版本时会出现在多个分组中。
  */
-export const groupIterationSummaryRequirements = (
-  requirements: IterationSummaryRequirement[]
-): IterationSummaryGroup[] => {
-  const groups = new Map<string, IterationSummaryGroup>()
+export const groupVersionSummaryRequirements = (
+  requirements: VersionSummaryRequirement[]
+): VersionSummaryGroup[] => {
+  const groups = new Map<string, VersionSummaryGroup>()
 
   const addRequirement = (
-    requirement: IterationSummaryRequirement,
-    iterationId: string | null,
-    iterationName: string,
-    releaseDate: string | null
+    requirement: VersionSummaryRequirement,
+    version: {
+      id: string | null
+      name: string
+      date: string | null
+      displayName?: string
+    }
   ): void => {
-    const key = releaseDate
-      ? `date:${releaseDate}`
-      : iterationId ??
-        (iterationName === '未规划迭代'
+    const key = version.date
+      ? `date:${version.date}`
+      : version.id ??
+        (version.name === '未规划版本'
           ? 'unplanned'
-          : `name:${iterationName}`)
-    const displayName = releaseDate
-      ? releaseDate.replace(/-/g, '')
-      : iterationName
+          : `version:${version.name}`)
+    const displayName =
+      version.displayName ??
+      (version.date ? version.date.replace(/-/g, '') : version.name)
     const existing = groups.get(key)
 
     if (existing) {
-      existing.requirements.push(requirement)
+      if (!existing.requirements.some((item) => item.id === requirement.id)) {
+        existing.requirements.push(requirement)
+      }
       return
     }
 
     groups.set(key, {
       key,
-      iterationId,
-      iterationName: displayName,
-      releaseDate,
+      versionName: displayName,
+      releaseDate: version.date,
       requirements: [requirement]
     })
   }
 
   for (const requirement of requirements) {
-    if (requirement.iterations.length === 0) {
-      addRequirement(requirement, null, '未规划迭代', null)
+    const versions = Array.from(
+      new Set(
+        requirement.planningVersions
+          .map((version) => version.trim())
+          .filter(Boolean)
+      )
+    )
+
+    if (versions.length > 0) {
+      for (const versionName of versions) {
+        const releaseDate = parseReleaseDate(versionName)
+        const matchedIteration =
+          requirement.iterations.find(
+            (iteration) => releaseDate && iteration.date === releaseDate
+          ) ?? requirement.iterations[0]
+
+        addRequirement(requirement, {
+          id: matchedIteration?.id ?? null,
+          name: versionName,
+          date: releaseDate,
+          displayName: versionName
+        })
+      }
       continue
     }
 
-    const seen = new Set<string>()
+    if (requirement.iterations.length === 0) {
+      addRequirement(requirement, {
+        id: null,
+        name: '未规划版本',
+        date: null
+      })
+      continue
+    }
 
     for (const iteration of requirement.iterations) {
-      const key = iteration.date
-        ? `date:${iteration.date}`
-        : iteration.id ?? `name:${iteration.name}`
-
-      if (seen.has(key)) continue
-
-      seen.add(key)
-      addRequirement(
-        requirement,
-        iteration.id,
-        iteration.name,
-        iteration.date
-      )
+      addRequirement(requirement, {
+        id: iteration.id,
+        name: iteration.name,
+        date: iteration.date
+      })
     }
   }
 
   return Array.from(groups.values()).sort((left, right) => {
     if (!left.releaseDate && !right.releaseDate) {
-      return right.iterationName.localeCompare(left.iterationName, 'zh-CN')
+      return right.versionName.localeCompare(left.versionName, 'zh-CN')
     }
 
     if (!left.releaseDate) return 1
@@ -187,19 +209,19 @@ export const groupIterationSummaryRequirements = (
 
     return dateCompare !== 0
       ? dateCompare
-      : right.iterationName.localeCompare(left.iterationName, 'zh-CN')
+      : right.versionName.localeCompare(left.versionName, 'zh-CN')
   })
 }
 
 /**
- * 汇总一个迭代内所有需求的仓库和分支。
+ * 汇总一个版本内所有需求的仓库和分支。
  * 普通绑定使用开发分支，轻舟绑定同时收集需求分支和迭代分支。
  */
-export const buildIterationRepositorySummary = (
-  requirements: IterationSummaryRequirement[],
+export const buildVersionRepositorySummary = (
+  requirements: VersionSummaryRequirement[],
   bindingsByRequirement: RequirementBindingsMap,
   repositories: Repository[]
-): IterationRepositoryCollection => {
+): VersionRepositoryCollection => {
   const repositoryMap = new Map(
     repositories.map((repository) => [repository.id, repository])
   )
@@ -226,7 +248,7 @@ export const buildIterationRepositorySummary = (
   const addBranch = (
     accumulator: RepositoryAccumulator,
     branchName: string | null,
-    kind: IterationBranchKind,
+    kind: RepositoryBranchKind,
     requirementId: string
   ): void => {
     if (!branchName?.trim()) return
@@ -274,7 +296,7 @@ export const buildIterationRepositorySummary = (
     }
   }
 
-  const summaries: IterationRepositorySummary[] = Array.from(
+  const summaries: VersionRepositorySummary[] = Array.from(
     repositoriesById.values()
   ).map((accumulator) => {
     const repository = accumulator.repository

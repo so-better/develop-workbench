@@ -54,14 +54,14 @@ export interface LocalRequirement {
   /** 产线名称；未设置时为 null。 */
   productLine: string | null
 
-  /** 所属迭代 ID；未规划时为 null。 */
-  iterationId: string | null
+  /** 代表迭代 ID；未规划时为 null。 */
+  versionId: string | null
 
-  /** 所属迭代名称；未规划时为 null。 */
-  iterationName: string | null
+  /** 所属版本名称；未规划时为 null。 */
+  versionName: string | null
 
-  /** 从迭代名称解析出的日期。 */
-  iterationDate: string | null
+  /** 版本日期。 */
+  versionDate: string | null
 
   /** 是否已结束，用于跟随“显示已结束”开关。 */
   closed: boolean
@@ -98,12 +98,12 @@ export interface LocalRequirementInput {
   /** 产线名称；未设置时为 null。 */
   productLine: string | null
 
-  /** 所属迭代 ID；未规划时为 null。 */
-  iterationId: string | null
+  /** 代表迭代 ID；未规划时为 null。 */
+  versionId: string | null
 
-  /** 所属迭代名称；未规划时为 null。 */
-  iterationName: string | null
+  /** 所属版本名称；未规划时为 null。 */
+  versionName: string | null
 
-  /** 从迭代名称解析出的日期。 */
-  iterationDate: string | null
+  /** 版本日期。 */
+  versionDate: string | null
 }

@@ -20,21 +20,21 @@ import type { RequirementBindingsMap } from '../../../../types/bindings'
 import type { Repository } from '../../../../types/repository'
 import { getErrorMessage } from '../../../../utils'
 import {
-  buildIterationRepositorySummary,
-  getIterationSummaryProductLines,
-  groupIterationSummaryRequirements,
-  type IterationBranchKind,
-  type IterationSummaryGroup
-} from '../../utils/iteration-repositories'
-import './iteration-repository-summary.css'
+  buildVersionRepositorySummary,
+  getVersionSummaryProductLines,
+  groupVersionSummaryRequirements,
+  type RepositoryBranchKind,
+  type VersionSummaryGroup
+} from '../../utils/version-repositories'
+import './version-repository-summary.css'
 
-const BRANCH_KIND_LABELS: Record<IterationBranchKind, string> = {
+const BRANCH_KIND_LABELS: Record<RepositoryBranchKind, string> = {
   development: '开发分支',
   requirement: '需求分支',
   iteration: '迭代分支'
 }
 
-const BRANCH_KIND_COLORS: Record<IterationBranchKind, string | undefined> = {
+const BRANCH_KIND_COLORS: Record<RepositoryBranchKind, string | undefined> = {
   development: undefined,
   requirement: 'blue',
   iteration: 'purple'
@@ -83,7 +83,7 @@ function CopyButton({ value, label }: CopyButtonProps): JSX.Element {
       <Button
         type="text"
         size="small"
-        className={`iteration-summary-copy${copied ? ' is-copied' : ''}`}
+        className={`version-summary-copy${copied ? ' is-copied' : ''}`}
         icon={copied ? <CheckOutlined /> : <CopyOutlined />}
         aria-label={`复制${label}`}
         onClick={() => handleCopy()}
@@ -92,27 +92,27 @@ function CopyButton({ value, label }: CopyButtonProps): JSX.Element {
   )
 }
 
-interface IterationRepositorySummaryProps {
+interface VersionRepositorySummaryProps {
   /** 是否打开汇总弹窗。 */
   open: boolean
 
-  /** 优先选中的迭代分组 key。 */
-  preferredIterationKey?: string | null
+  /** 优先选中的版本分组 key。 */
+  preferredVersionKey?: string | null
 
   /** 关闭弹窗。 */
   onClose: () => void
 }
 
 /**
- * 迭代仓库汇总弹窗。
- * 打开时读取当前空间所有需求（含已结束）和本地绑定，再按所选迭代聚合。
+ * 版本仓库汇总弹窗。
+ * 打开时读取当前空间所有需求（含已结束）和本地绑定，再按所选版本聚合。
  */
-export default function IterationRepositorySummary({
+export default function VersionRepositorySummary({
   open,
-  preferredIterationKey,
+  preferredVersionKey,
   onClose
-}: IterationRepositorySummaryProps): JSX.Element {
-  const [groups, setGroups] = useState<IterationSummaryGroup[] | null>(null)
+}: VersionRepositorySummaryProps): JSX.Element {
+  const [groups, setGroups] = useState<VersionSummaryGroup[] | null>(null)
   const [repositories, setRepositories] = useState<Repository[]>([])
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [productLineFilters, setProductLineFilters] = useState<string[]>([])
@@ -161,19 +161,19 @@ export default function IterationRepositorySummary({
     setBindingsKey(null)
 
     Promise.all([
-      window.electron.getIterationSummaryRequirements(),
+      window.electron.getVersionSummaryRequirements(),
       window.electron.getRepositoryState()
     ])
       .then(([requirements, repositoryState]) => {
         if (cancelled) return
 
-        const nextGroups = groupIterationSummaryRequirements(requirements)
+        const nextGroups = groupVersionSummaryRequirements(requirements)
         const preferredKey =
           previousKey && nextGroups.some((group) => group.key === previousKey)
             ? previousKey
-            : preferredIterationKey &&
-                nextGroups.some((group) => group.key === preferredIterationKey)
-              ? preferredIterationKey
+            : preferredVersionKey &&
+                nextGroups.some((group) => group.key === preferredVersionKey)
+              ? preferredVersionKey
               : nextGroups[0]?.key ?? null
 
         setGroups(nextGroups)
@@ -182,7 +182,7 @@ export default function IterationRepositorySummary({
       })
       .catch((error) => {
         if (!cancelled) {
-          setDataError(getErrorMessage(error, '读取迭代汇总数据失败'))
+          setDataError(getErrorMessage(error, '读取版本汇总数据失败'))
         }
       })
       .finally(() => {
@@ -192,7 +192,7 @@ export default function IterationRepositorySummary({
     return () => {
       cancelled = true
     }
-  }, [open, preferredIterationKey, reloadToken])
+  }, [open, preferredVersionKey, reloadToken])
 
   const selectedGroup = useMemo(
     () => groups?.find((group) => group.key === selectedKey) ?? null,
@@ -207,7 +207,7 @@ export default function IterationRepositorySummary({
     const counts = new Map<string, number>()
 
     for (const requirement of selectedGroup?.requirements ?? []) {
-      for (const productLine of getIterationSummaryProductLines(requirement)) {
+      for (const productLine of getVersionSummaryProductLines(requirement)) {
         counts.set(productLine, (counts.get(productLine) ?? 0) + 1)
       }
     }
@@ -241,7 +241,7 @@ export default function IterationRepositorySummary({
 
     return selectedLines.size > 0
       ? requirements.filter((requirement) =>
-          getIterationSummaryProductLines(requirement).some((line) =>
+          getVersionSummaryProductLines(requirement).some((line) =>
             selectedLines.has(line)
           )
         )
@@ -292,7 +292,7 @@ export default function IterationRepositorySummary({
   const summary = useMemo(() => {
     if (!selectedGroup) return null
 
-    return buildIterationRepositorySummary(
+    return buildVersionRepositorySummary(
       selectedRequirements,
       bindings,
       repositories
@@ -310,11 +310,11 @@ export default function IterationRepositorySummary({
     [selectedRequirements]
   )
 
-  const iterationOptions = useMemo(
+  const versionOptions = useMemo(
     () =>
       (groups ?? []).map((group) => ({
         value: group.key,
-        label: `${group.iterationName}（${group.requirements.length}）`
+        label: `${group.versionName}（${group.requirements.length}）`
       })),
     [groups]
   )
@@ -327,12 +327,12 @@ export default function IterationRepositorySummary({
     <Modal
       title={
         selectedGroup
-          ? `${selectedGroup.iterationName}${
+          ? `${selectedGroup.versionName}${
               productLineFilters.length > 0
                 ? ` · ${productLineFilters.join('、')}`
                 : ''
             } · 仓库汇总`
-          : '迭代仓库汇总'
+          : '版本仓库汇总'
       }
       open={open}
       width={920}
@@ -341,14 +341,14 @@ export default function IterationRepositorySummary({
       onCancel={onClose}
     >
       {loadingData || (!groups && !dataError) ? (
-        <div className="iteration-summary-loading">
+        <div className="version-summary-loading">
           <Spin />
         </div>
       ) : dataError ? (
         <Alert
           type="error"
           showIcon
-          message="读取迭代数据失败"
+          message="读取版本数据失败"
           description={dataError}
           action={
             <Button size="small" icon={<ReloadOutlined />} onClick={retry}>
@@ -358,14 +358,14 @@ export default function IterationRepositorySummary({
         />
       ) : groups && groups.length > 0 ? (
         <>
-          <div className="iteration-summary-toolbar">
+          <div className="version-summary-toolbar">
             <Select
               showSearch
-              className="iteration-summary-iteration-select"
+              className="version-summary-version-select"
               value={selectedKey ?? undefined}
-              options={iterationOptions}
+              options={versionOptions}
               optionFilterProp="label"
-              placeholder="选择迭代"
+              placeholder="选择版本"
               onChange={(value: string) => setSelectedKey(value)}
             />
             <Select
@@ -374,20 +374,20 @@ export default function IterationRepositorySummary({
               showSearch
               maxTagCount="responsive"
               maxTagPlaceholder={(omitted) => `+${omitted.length}`}
-              className="iteration-summary-product-line-select"
+              className="version-summary-product-line-select"
               value={productLineFilters}
               options={productLineOptions}
               optionFilterProp="label"
               placeholder={`全部产线（${productLineOptions.length}）`}
               onChange={(values: string[]) => setProductLineFilters(values)}
             />
-            <span className="iteration-summary-toolbar-hint">
+            <span className="version-summary-toolbar-hint">
               包含已结束需求和本地需求
             </span>
           </div>
 
-          <p className="iteration-summary-note">
-            统计范围为当前空间里我参与的需求；切换迭代或产线会同步更新以下统计。
+          <p className="version-summary-note">
+            统计范围为当前空间里我参与的需求；切换版本或产线会同步更新以下统计。
           </p>
 
           {bindingsError ? (
@@ -406,12 +406,12 @@ export default function IterationRepositorySummary({
             !summary ||
             !selectedGroup ||
             bindingsKey !== selectedGroup.key ? (
-            <div className="iteration-summary-loading">
+            <div className="version-summary-loading">
               <Spin />
             </div>
           ) : (
             <>
-              <div className="iteration-summary-stats">
+              <div className="version-summary-stats">
                 <div>
                   <strong>{selectedRequirements.length}</strong>
                   <span>需求</span>
@@ -441,15 +441,15 @@ export default function IterationRepositorySummary({
               </div>
 
               {summary.repositories.length > 0 ? (
-                <div className="iteration-summary-repositories">
+                <div className="version-summary-repositories">
                   {summary.repositories.map((repository) => (
                     <section
-                      className="iteration-summary-repository"
+                      className="version-summary-repository"
                       key={repository.repositoryId}
                     >
-                      <div className="iteration-summary-repository-head">
-                        <div className="iteration-summary-repository-title">
-                          <FolderOpenOutlined className="iteration-summary-repository-icon" />
+                      <div className="version-summary-repository-head">
+                        <div className="version-summary-repository-title">
+                          <FolderOpenOutlined className="version-summary-repository-icon" />
                           <strong title={repository.name}>
                             {repository.name}
                           </strong>
@@ -473,19 +473,19 @@ export default function IterationRepositorySummary({
 
                       {repository.localPath ? (
                         <div
-                          className="iteration-summary-repository-path"
+                          className="version-summary-repository-path"
                           title={repository.localPath}
                         >
                           {repository.localPath}
                         </div>
                       ) : repository.missing ? (
-                        <div className="iteration-summary-repository-path">
+                        <div className="version-summary-repository-path">
                           仓库 ID：{repository.repositoryId}
                         </div>
                       ) : null}
 
                       {repository.branches.length > 0 ? (
-                        <div className="iteration-summary-branches">
+                        <div className="version-summary-branches">
                           {repository.branches.map((branch) => {
                             const names = branch.requirementIds.map(
                               (requirementId) =>
@@ -495,10 +495,10 @@ export default function IterationRepositorySummary({
 
                             return (
                               <div
-                                className="iteration-summary-branch"
+                                className="version-summary-branch"
                                 key={branch.name}
                               >
-                                <span className="iteration-summary-branch-kinds">
+                                <span className="version-summary-branch-kinds">
                                   {branch.kinds.map((kind) => (
                                     <Tag
                                       key={kind}
@@ -509,7 +509,7 @@ export default function IterationRepositorySummary({
                                     </Tag>
                                   ))}
                                 </span>
-                                <span className="iteration-summary-branch-name">
+                                <span className="version-summary-branch-name">
                                   <code title={branch.name}>{branch.name}</code>
                                   <CopyButton
                                     value={branch.name}
@@ -517,7 +517,7 @@ export default function IterationRepositorySummary({
                                   />
                                 </span>
                                 <Tooltip title={names.join('、')}>
-                                  <span className="iteration-summary-branch-requirements">
+                                  <span className="version-summary-branch-requirements">
                                     {names.length} 个需求
                                   </span>
                                 </Tooltip>
@@ -526,7 +526,7 @@ export default function IterationRepositorySummary({
                           })}
                         </div>
                       ) : (
-                        <span className="iteration-summary-branch-pending">
+                        <span className="version-summary-branch-pending">
                           分支待创建
                         </span>
                       )}
@@ -536,12 +536,12 @@ export default function IterationRepositorySummary({
               ) : (
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="本迭代还没有绑定仓库"
+                  description="本版本还没有绑定仓库"
                 />
               )}
 
               {summary.unboundRequirements.length > 0 ? (
-                <div className="iteration-summary-unbound">
+                <div className="version-summary-unbound">
                   <strong>未绑定仓库的需求：</strong>
                   <Tooltip
                     title={summary.unboundRequirements
@@ -566,7 +566,7 @@ export default function IterationRepositorySummary({
       ) : (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description="当前空间没有可汇总的迭代"
+          description="当前空间没有可汇总的版本"
         />
       )}
     </Modal>
