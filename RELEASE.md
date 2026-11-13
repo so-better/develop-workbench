@@ -18,6 +18,29 @@
 
 不要只用普通文本询问版本号，也不要默认执行 `npm version patch`。
 
+### 分步确认（每次发布必须遵守）
+
+整个发布流程必须拆成独立步骤执行，每一步开始前：
+
+1. 明确告诉用户：当前是第几步、共几步、这一步要做什么
+2. 使用 `question` 工具询问用户「继续」或「暂停」
+3. 只有用户选择「继续」后才执行该步骤
+4. 一步完成后简要汇报结果，再询问下一步
+5. 禁止一次连续执行多个步骤；失败时停在当前步骤并说明原因
+
+固定步骤：
+
+1. 选择版本号
+2. 更新版本号与 `CHANGELOG.md`
+3. 类型检查
+4. 构建 macOS 安装包
+5. 构建 Windows 安装包
+6. 检查产物
+7. 清空飞书更新目录
+8. 上传 4 个安装包
+9. 验证上传结果
+10. 提交并推送版本变更
+
 ## 发布前确认
 
 - 本地已安装依赖：`npm ci`
@@ -304,7 +327,7 @@ lark-cli drive files list \
 - 文件名可被更新规则识别：
   `^develop-workbench-<版本>-(mac|win)\.(dmg|zip|exe)$`
 
-## 7. 更新端到端验证
+## 7. 可选：更新端到端验证
 
 在旧版本应用中验证：
 
@@ -353,6 +376,8 @@ npm run clean:release
 
 ## 每次发布最短流程
 
+> 以下命令只列出每一步的内容，实际执行必须按「分步确认」逐条进行，每步都要等用户确认后再执行，禁止一次性连续跑完。
+
 ```bash
 # 1. 读取当前版本并计算 patch / minor / major
 CURRENT_VERSION=$(node -p "require('./package.json').version")
@@ -365,7 +390,7 @@ echo "当前版本：${CURRENT_VERSION}"
 # VERSION=$(node -p "require('./package.json').version")
 # 同时在根目录 CHANGELOG.md 顶部添加该版本的更新内容
 
-# 2. 检查并构建（按顺序执行）
+# 2. 检查并构建（每步单独确认后执行）
 npm run typecheck
 npm run dist:mac
 npm run dist:win
