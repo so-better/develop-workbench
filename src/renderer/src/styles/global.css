@@ -2399,6 +2399,62 @@ body {
   padding: 0 6px 8px;
 }
 
+.workbench-filter-stack.is-collapsed {
+  padding-bottom: 4px;
+}
+
+.workbench-filter-toggle {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  height: 22px;
+  padding: 0 2px;
+  color: var(--workbench-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.workbench-filter-toggle:hover {
+  color: var(--app-text);
+}
+
+.workbench-filter-toggle:focus-visible {
+  outline: 2px solid rgba(22, 119, 255, 0.55);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.workbench-filter-toggle-label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.workbench-filter-toggle-meta {
+  margin-left: auto;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+
+.workbench-filter-toggle-chevron {
+  transition: transform 0.15s ease;
+}
+
+.workbench-filter-toggle-chevron.is-collapsed {
+  transform: rotate(-90deg);
+}
+
 .workbench-requirement-search {
   width: 100%;
   height: 32px;

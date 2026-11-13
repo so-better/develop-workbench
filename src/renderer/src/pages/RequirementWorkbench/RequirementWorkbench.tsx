@@ -14,6 +14,7 @@ import {
   DownOutlined,
   EditOutlined,
   ExportOutlined,
+  FilterOutlined,
   FolderOpenOutlined,
   InfoCircleOutlined,
   LinkOutlined,
@@ -189,6 +190,8 @@ const isLocalRequirementId = (id: string | null): boolean =>
 const SELECTED_REQUIREMENT_KEY = 'develop-workbench:selected-requirement'
 /** 打开已结束本地需求时的一次性标记。 */
 const OPEN_CLOSED_REQUIREMENT_KEY = 'develop-workbench:open-closed-requirement'
+/** 记住筛选区域是否收起的 localStorage key。 */
+const FILTERS_COLLAPSED_KEY = 'develop-workbench:filters-collapsed'
 /** 记住是否预置 IDE 会话的 localStorage key。 */
 const IDE_SESSION_PROMPT_KEY = 'develop-workbench:ide-session-prompt'
 /** IDE 会话里最多带入的本地需求描述长度。 */
@@ -556,6 +559,9 @@ export default function RequirementWorkbench({
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [productLineFilters, setProductLineFilters] = useState<string[]>([])
   const [versionFilter, setVersionFilter] = useState<string | null>(null)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(
+    () => localStorage.getItem(FILTERS_COLLAPSED_KEY) === '1'
+  )
   const [localModalOpen, setLocalModalOpen] = useState(false)
   const [versionSummaryOpen, setVersionSummaryOpen] = useState(false)
   const [localModalRequirement, setLocalModalRequirement] =
@@ -3096,6 +3102,16 @@ export default function RequirementWorkbench({
 
   /** 是否存在有效搜索词、状态或版本筛选。 */
   const hasSearch = requirementFilter.trim().length > 0
+  const activeFilterCount =
+    (hasSearch ? 1 : 0) +
+    statusFilters.length +
+    productLineFilters.length +
+    (versionFilter ? 1 : 0)
+
+  useEffect(() => {
+    localStorage.setItem(FILTERS_COLLAPSED_KEY, filtersCollapsed ? '1' : '0')
+  }, [filtersCollapsed])
+
   const hasActiveFilter =
     hasSearch ||
     statusFilters.length > 0 ||
@@ -3628,59 +3644,87 @@ export default function RequirementWorkbench({
           </Tooltip>
         </div>
 
-        <div className="workbench-filter-stack">
-          <Input
-            className="workbench-requirement-search"
-            prefix={<SearchOutlined />}
-            placeholder="搜索需求、状态、版本或产线"
-            value={requirementFilter}
-            onChange={(event) => setRequirementFilter(event.target.value)}
-            allowClear
-            disabled={loading || !data}
-          />
-
-          <Select
-            allowClear
-            showSearch
-            className="workbench-filter-select workbench-version-filter"
-            value={versionFilter ?? undefined}
-            options={versionOptions}
-            placeholder={`全部版本（${data?.groups.length ?? 0}）`}
-            aria-label="按版本筛选"
-            optionFilterProp="label"
-            disabled={loading || !data || versionOptions.length === 0}
-            onChange={(value?: string) => setVersionFilter(value ?? null)}
-          />
-
-          {productLineOptions.length > 1 ? (
-            <Select
-              mode="multiple"
-              allowClear
-              maxTagCount="responsive"
-              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
-              className="workbench-filter-select workbench-product-line-filter"
-              value={productLineFilters}
-              options={productLineOptions}
-              placeholder={`全部产线（${productLineOptions.length}）`}
-              aria-label="按产线筛选"
-              disabled={loading || !data}
-              onChange={(values: string[]) => setProductLineFilters(values)}
+        <div
+          className={`workbench-filter-stack${
+            filtersCollapsed ? ' is-collapsed' : ''
+          }`}
+        >
+          <button
+            type="button"
+            className="workbench-filter-toggle"
+            aria-expanded={!filtersCollapsed}
+            onClick={() => setFiltersCollapsed((value) => !value)}
+          >
+            <span className="workbench-filter-toggle-label">
+              <FilterOutlined />
+              筛选
+            </span>
+            <span className="workbench-filter-toggle-meta">
+              {activeFilterCount > 0 ? `${activeFilterCount} 项` : '全部'}
+            </span>
+            <DownOutlined
+              className={`workbench-filter-toggle-chevron${
+                filtersCollapsed ? ' is-collapsed' : ''
+              }`}
             />
-          ) : null}
+          </button>
 
-          <Select
-            mode="multiple"
-            allowClear
-            maxTagCount="responsive"
-            maxTagPlaceholder={(omitted) => `+${omitted.length}`}
-            className="workbench-filter-select workbench-status-filter"
-            value={statusFilters}
-            options={statusOptions}
-            placeholder={`全部状态（${allRequirements.length}）`}
-            aria-label="按状态筛选"
-            disabled={loading || !data || allRequirements.length === 0}
-            onChange={(values: string[]) => setStatusFilters(values)}
-          />
+          {filtersCollapsed ? null : (
+            <>
+              <Input
+                className="workbench-requirement-search"
+                prefix={<SearchOutlined />}
+                placeholder="搜索需求、状态、版本或产线"
+                value={requirementFilter}
+                onChange={(event) => setRequirementFilter(event.target.value)}
+                allowClear
+                disabled={loading || !data}
+              />
+
+              <Select
+                allowClear
+                showSearch
+                className="workbench-filter-select workbench-version-filter"
+                value={versionFilter ?? undefined}
+                options={versionOptions}
+                placeholder={`全部版本（${data?.groups.length ?? 0}）`}
+                aria-label="按版本筛选"
+                optionFilterProp="label"
+                disabled={loading || !data || versionOptions.length === 0}
+                onChange={(value?: string) => setVersionFilter(value ?? null)}
+              />
+
+              {productLineOptions.length > 1 ? (
+                <Select
+                  mode="multiple"
+                  allowClear
+                  maxTagCount="responsive"
+                  maxTagPlaceholder={(omitted) => `+${omitted.length}`}
+                  className="workbench-filter-select workbench-product-line-filter"
+                  value={productLineFilters}
+                  options={productLineOptions}
+                  placeholder={`全部产线（${productLineOptions.length}）`}
+                  aria-label="按产线筛选"
+                  disabled={loading || !data}
+                  onChange={(values: string[]) => setProductLineFilters(values)}
+                />
+              ) : null}
+
+              <Select
+                mode="multiple"
+                allowClear
+                maxTagCount="responsive"
+                maxTagPlaceholder={(omitted) => `+${omitted.length}`}
+                className="workbench-filter-select workbench-status-filter"
+                value={statusFilters}
+                options={statusOptions}
+                placeholder={`全部状态（${allRequirements.length}）`}
+                aria-label="按状态筛选"
+                disabled={loading || !data || allRequirements.length === 0}
+                onChange={(values: string[]) => setStatusFilters(values)}
+              />
+            </>
+          )}
         </div>
 
         {/* 只有首次加载时显示骨架屏；刷新时保留已有列表，避免界面跳动。 */}
