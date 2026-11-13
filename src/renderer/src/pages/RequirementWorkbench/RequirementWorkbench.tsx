@@ -3163,6 +3163,18 @@ export default function RequirementWorkbench({
           <span className="workbench-requirement-item-name" title={requirement.name}>
             {requirement.name}
           </span>
+          {isMyNodeDone ? (
+            <Tooltip
+              title={`我负责的节点已完成：${nodeCompletion.doneNodeNames.join('、')}`}
+            >
+              <span
+                className="workbench-requirement-item-done-check"
+                aria-label="我已完成"
+              >
+                <CheckCircleFilled />
+              </span>
+            </Tooltip>
+          ) : null}
         </span>
         <span className="workbench-requirement-item-top">
           <span className="workbench-requirement-item-state">
