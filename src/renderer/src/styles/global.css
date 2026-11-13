@@ -2209,6 +2209,16 @@ body {
   margin: 0 6px 8px;
 }
 
+.workbench-sidebar-actions .ant-dropdown-trigger {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.workbench-sidebar-actions .ant-dropdown-trigger .workbench-add-local {
+  width: 100%;
+}
+
 .workbench-add-local {
   flex: 1;
   min-width: 0;

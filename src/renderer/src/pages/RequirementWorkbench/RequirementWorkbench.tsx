@@ -37,6 +37,7 @@ import {
   Button,
   Checkbox,
   DatePicker,
+  Dropdown,
   Empty,
   Input,
   InputNumber,
@@ -918,6 +919,36 @@ export default function RequirementWorkbench({
   const handleOpenCreateLocalRequirement = (): void => {
     setLocalModalRequirement(null)
     setLocalModalOpen(true)
+  }
+
+  /** 新建需求入口：飞书创建正式需求或创建本地临时需求。 */
+  const handleCreateRequirementMenu = (key: string): void => {
+    if (key === 'formal') {
+      const projectKey = data?.project.key
+
+      if (!projectKey) {
+        message.warning('当前 Meegle 空间不可用')
+        return
+      }
+
+      const createUrl = `https://project.feishu.cn/${encodeURIComponent(projectKey)}/story/create`
+
+      window.electron
+        .openEmbeddedBrowser(createUrl)
+        .then((opened) => {
+          if (opened) {
+            message.info('已打开飞书需求创建页，创建完成后刷新左侧列表')
+          } else {
+            message.error('无法打开飞书创建需求页面')
+          }
+        })
+        .catch((openError) => {
+          message.error(getErrorMessage(openError, '打开飞书创建需求页面失败'))
+        })
+      return
+    }
+
+    handleOpenCreateLocalRequirement()
   }
 
   /** 打开编辑临时需求弹窗。 */
@@ -3544,16 +3575,27 @@ export default function RequirementWorkbench({
         </div>
 
         <div className="workbench-sidebar-actions">
-          <Button
-            type="dashed"
-            size="small"
-            className="workbench-add-local"
-            icon={<PlusOutlined />}
+          <Dropdown
+            trigger={['click']}
             disabled={!data}
-            onClick={handleOpenCreateLocalRequirement}
+            menu={{
+              items: [
+                { key: 'formal', label: '正式需求（飞书创建）' },
+                { key: 'local', label: '临时需求（仅本机）' }
+              ],
+              onClick: ({ key }) => handleCreateRequirementMenu(key)
+            }}
           >
-            新建临时需求
-          </Button>
+            <Button
+              type="dashed"
+              size="small"
+              className="workbench-add-local"
+              icon={<PlusOutlined />}
+              disabled={!data}
+            >
+              新建需求 <DownOutlined />
+            </Button>
+          </Dropdown>
           <Tooltip title="按迭代查看仓库和分支汇总">
             <Button
               type="default"
