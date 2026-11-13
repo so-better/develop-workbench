@@ -2033,6 +2033,10 @@ body {
   border-top: 1px solid var(--workbench-divider);
 }
 
+.download-manager-modal .embedded-browser-download-footer {
+  background: var(--modal-panel);
+}
+
 .embedded-browser-download-actions {
   display: flex;
   flex-wrap: wrap;
