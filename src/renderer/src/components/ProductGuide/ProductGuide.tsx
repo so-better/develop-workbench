@@ -16,6 +16,7 @@ import {
   HistoryOutlined,
   InfoCircleOutlined,
   ProjectOutlined,
+  RocketOutlined,
   SearchOutlined,
   SettingOutlined,
   SnippetsOutlined,
@@ -217,6 +218,7 @@ const CAPABILITIES: GuideCapability[] = [
       '收起后可通过底部状态栏的“浏览器”入口重新展开；完全退出应用后不保留页面',
       '外部链接在应用内打开，右键可复制或添加到站点',
       '支持前进、后退、刷新、链接复制、最大化和下载管理',
+      '提交登录表单或点击登录按钮后按站点记住账号、邮箱和手机号；下次聚焦账号输入框可从历史中选择，也可一键清除历史',
       '支持页面右键编辑与导航菜单、Cmd/Ctrl+F 查找、Cmd/Ctrl+W 关闭当前标签页、缩放和常用浏览快捷键',
       'F12 或 Cmd/Ctrl 快捷键打开页面开发者工具'
     ]
@@ -298,7 +300,7 @@ const SETTINGS_GROUPS: GuideSettingGroup[] = [
     ]
   },
   {
-    title: 'AI 与维护',
+    title: 'AI 与系统',
     items: [
       {
         title: '模型与技能',
@@ -311,6 +313,12 @@ const SETTINGS_GROUPS: GuideSettingGroup[] = [
         icon: <SnippetsOutlined />,
         description:
           '设置全局快捷键，查看和清空本机保存的最近内容；只读取系统剪贴板来提供粘贴选择，不接管系统剪贴板。'
+      },
+      {
+        title: '开机自启',
+        icon: <RocketOutlined />,
+        description:
+          '设置系统登录后自动启动应用；首次安装后默认开启一次，可在设置中随时关闭。'
       },
       {
         title: '存储清理',

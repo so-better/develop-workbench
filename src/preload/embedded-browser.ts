@@ -10,6 +10,7 @@ const ACCOUNT_HINT =
 const EXCLUDED_AUTOCOMPLETE =
   /(current-password|new-password|one-time-code|cc-|credit-card)/i
 const MAX_VISIBLE_ITEMS = 10
+const LOGIN_ACTION_HINT = /(登录|登陆|登入|sign\s*in|log\s*in|submit|继续|next)/i
 
 let history: string[] = []
 let historyLoaded = false
@@ -121,32 +122,57 @@ const ensureHost = (): { host: HTMLDivElement; shadow: ShadowRoot } => {
   const style = document.createElement('style')
   style.textContent = `
     :host { all: initial; }
+    *, *::before, *::after { box-sizing: border-box; }
     .panel {
       box-sizing: border-box;
       overflow: hidden;
       color: #1f2329;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif;
       font-size: 13px;
+      line-height: 1.4;
       background: #fff;
-      border: 1px solid #dee0e3;
-      border-radius: 8px;
-      box-shadow: 0 10px 32px rgba(31, 35, 41, 0.18);
+      border: 1px solid #e1e4e8;
+      border-radius: 10px;
+      box-shadow:
+        0 12px 32px rgba(15, 23, 42, 0.14),
+        0 2px 6px rgba(15, 23, 42, 0.06);
+      animation: panel-in 120ms ease-out;
     }
-    .list { max-height: 220px; overflow-y: auto; padding: 4px; }
+    @keyframes panel-in {
+      from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+      to { opacity: 1; transform: none; }
+    }
+    .list {
+      max-height: 232px;
+      padding: 4px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .list::-webkit-scrollbar { width: 8px; }
+    .list::-webkit-scrollbar-thumb {
+      background: rgba(15, 23, 42, 0.16);
+      border: 2px solid transparent;
+      border-radius: 999px;
+      background-clip: padding-box;
+    }
     .item {
-      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      min-height: 42px;
+      padding: 9px 10px;
       overflow: hidden;
-      line-height: 20px;
       text-overflow: ellipsis;
       white-space: nowrap;
       cursor: default;
-      border-radius: 5px;
+      border-radius: 6px;
     }
-    .item.is-active, .item:hover { background: #f2f3f5; }
+    .item + .item { margin-top: 1px; }
+    .item.is-active { background: #f5f6f8; }
+    .item:hover { background: #f8f9fa; }
     .footer {
       display: flex;
       justify-content: flex-end;
-      padding: 6px 8px;
+      padding: 4px 8px;
       border-top: 1px solid #eff0f1;
     }
     .clear {
@@ -161,6 +187,22 @@ const ensureHost = (): { host: HTMLDivElement; shadow: ShadowRoot } => {
       cursor: pointer;
     }
     .clear:hover { color: #1f2329; background: #f2f3f5; }
+    @media (prefers-color-scheme: dark) {
+      .panel {
+        color: #e6e7e9;
+        background: #1f2024;
+        border-color: #303238;
+        box-shadow:
+          0 12px 36px rgba(0, 0, 0, 0.55),
+          0 2px 8px rgba(0, 0, 0, 0.35);
+      }
+      .list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.18); }
+      .item.is-active { background: #292b30; }
+      .item:hover { background: #25272b; }
+      .footer { border-top-color: #303238; }
+      .clear { color: #9b9ea5; }
+      .clear:hover { color: #e6e7e9; background: #2a2c31; }
+    }
   `
 
   const panel = document.createElement('div')
@@ -246,8 +288,10 @@ const renderDropdown = (input: HTMLInputElement): void => {
   visible.forEach((value, index) => {
     const item = document.createElement('div')
     item.className = 'item'
-    item.textContent = value
     item.dataset.index = String(index)
+    item.title = value
+
+    item.textContent = value
     item.addEventListener('pointerdown', (event) => {
       event.preventDefault()
       selectItem(input, value)
@@ -272,7 +316,7 @@ const renderDropdown = (input: HTMLInputElement): void => {
     return
   }
 
-  const width = Math.max(rect.width, 220)
+  const width = Math.max(rect.width, 260)
   const maxWidth = Math.max(160, window.innerWidth - rect.left - 8)
   dropdownHost.style.left = `${Math.max(8, rect.left)}px`
   dropdownHost.style.top = `${rect.bottom + 4}px`
@@ -335,6 +379,53 @@ const handleKeyDown = (event: KeyboardEvent): void => {
   }
 }
 
+/** 从点击事件中找出提交/登录按钮。 */
+const findSubmitControl = (
+  event: Event
+): HTMLButtonElement | HTMLInputElement | null => {
+  for (const target of event.composedPath()) {
+    if (target instanceof HTMLButtonElement) {
+      const text = [
+        target.textContent,
+        target.getAttribute('aria-label'),
+        target.getAttribute('data-testid')
+      ]
+        .filter(Boolean)
+        .join(' ')
+
+      if (target.type === 'submit' || LOGIN_ACTION_HINT.test(text)) return target
+    }
+
+    if (
+      target instanceof HTMLInputElement &&
+      (target.type === 'submit' || target.type === 'button')
+    ) {
+      const text = [target.value, target.getAttribute('aria-label')]
+        .filter(Boolean)
+        .join(' ')
+
+      if (target.type === 'submit' || LOGIN_ACTION_HINT.test(text)) return target
+    }
+  }
+
+  return null
+}
+
+/** 保存提交按钮所属表单中的账号值。 */
+const saveSubmitControlAccounts = (
+  control: HTMLButtonElement | HTMLInputElement
+): void => {
+  const form =
+    control instanceof HTMLButtonElement ? control.form : control.closest('form')
+  const scope = form ?? document
+
+  for (const element of Array.from(scope.querySelectorAll('input'))) {
+    if (isAccountInput(element) && element.value.trim()) {
+      void saveHistory(element.value, element)
+    }
+  }
+}
+
 /** 初始化账号历史监听。 */
 const setup = (): void => {
   if (document.getElementById(HOST_ID)) return
@@ -372,11 +463,11 @@ const setup = (): void => {
   )
 
   document.addEventListener(
-    'change',
+    'click',
     (event) => {
-      const input = findAccountInput(event)
+      const control = findSubmitControl(event)
 
-      if (input) void saveHistory(input.value, input)
+      if (control) saveSubmitControlAccounts(control)
     },
     true
   )
