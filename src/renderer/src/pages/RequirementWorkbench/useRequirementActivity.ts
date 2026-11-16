@@ -458,9 +458,30 @@ export const useRequirementActivity = ({
     }
   }
 
+  /** 完成节点前校验总估分和排期，缺少时提示用户先编辑节点。 */
+  const validateNodeComplete = (): boolean => {
+    if (!selectedNode) return false
+
+    if (selectedNode.supportsPoints && selectedNode.points == null) {
+      message.warning('请先在节点编辑中设置总估分')
+      return false
+    }
+
+    if (
+      selectedNode.supportsSchedule &&
+      (!selectedNode.scheduleStart || !selectedNode.scheduleEnd)
+    ) {
+      message.warning('请先在节点编辑中设置排期')
+      return false
+    }
+
+    return true
+  }
+
   /** 完成当前节点，会推进需求流程。 */
   const handleCompleteNode = async (actualWorkTimeOverride?: number): Promise<void> => {
     if (!selectedRequirementId || !selectedNode) return
+    if (!validateNodeComplete()) return
 
     const actualWorkTime = actualWorkTimeOverride ?? completeActualWorkTime
 
@@ -564,6 +585,8 @@ export const useRequirementActivity = ({
     handleCompleteNode,
     cancelNodeEditing: () => setNodeEditing(false),
     openComplete: (defaultActualWorkTime: number | null) => {
+      if (!validateNodeComplete()) return
+
       setCompleteActualWorkTime(defaultActualWorkTime)
       setCompleteOpen(true)
     },
