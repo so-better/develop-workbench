@@ -13,6 +13,7 @@ import { initializeAiChat } from './ai/chat'
 import { initializeDefects } from './defects'
 import { initializeAiConfig } from './ai/config'
 import { initializeEmbeddedBrowser } from './embedded-browser'
+import { initializeEmbeddedAutofill } from './embedded-autofill'
 import { initializeGit } from './git'
 import { initializeIde } from './ide'
 import { initializeLark } from './lark'
@@ -83,6 +84,7 @@ if (!hasSingleInstanceLock) {
     initializeMigration()
     initializeClipboardHistory()
     initializeEmbeddedBrowser()
+    initializeEmbeddedAutofill()
     initializeGit()
     initializeAdb()
     initializeIde()

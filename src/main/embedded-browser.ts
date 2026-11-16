@@ -637,6 +637,8 @@ const createEntry = (window: BrowserWindow): BrowserEntry => {
   const view = new WebContentsView({
     webPreferences: {
       partition: BROWSER_PARTITION,
+      // 独立 preload 注入账号历史提示，只记录账号类输入。
+      preload: join(__dirname, '../preload/embedded-browser.js'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,

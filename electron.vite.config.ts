@@ -10,7 +10,13 @@ export default defineConfig({
   },
   preload: {
     build: {
-      externalizeDeps: true
+      externalizeDeps: true,
+      rollupOptions: {
+        input: {
+          index: resolve('src/preload/index.ts'),
+          'embedded-browser': resolve('src/preload/embedded-browser.ts')
+        }
+      }
     }
   },
   renderer: {
