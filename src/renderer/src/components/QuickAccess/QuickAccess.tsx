@@ -20,6 +20,7 @@ import type {
 import type { MeegleMyRequirements } from '../../../../types/requirements'
 import type { SiteState } from '../../../../types/sites'
 import { getErrorMessage } from '../../../../utils'
+import './QuickAccess.css'
 
 type QuickAccessType = 'requirement' | 'defect' | 'site' | 'document' | 'message' | 'chat'
 

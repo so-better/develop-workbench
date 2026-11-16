@@ -5,6 +5,7 @@ import type { OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { useTheme } from '../../theme/ThemeProvider'
 import './monaco-setup'
+import './CodeEditor.css'
 
 export type CodeEditorLanguage =
   | 'json'

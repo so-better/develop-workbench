@@ -12,6 +12,7 @@ import { Badge, Button, Tooltip } from 'antd'
 import RobotMark from '../RobotMark/RobotMark'
 import ThemeSwitcher from '../ThemeSwitcher/ThemeSwitcher'
 import type { AppInfo } from '../../../../types/app'
+import './AppFooter.css'
 
 interface AppFooterProps {
   appInfo: AppInfo | null

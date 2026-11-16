@@ -1,3 +1,5 @@
+/* 需求关联信息。 */
+
 .requirement-links-list {
   list-style: none;
   padding: 0;
@@ -111,4 +113,52 @@
   .requirement-links-row {
     transition: none;
   }
+}
+
+/* 需求区块共享标题。 */
+
+/* 关联代码仓库。 */
+
+/* 需求关联信息。 */
+
+.requirement-repo-section {
+  width: 100%;
+  padding: 16px;
+  margin-bottom: 14px;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 12px;
+  box-shadow: var(--workbench-shadow);
+}
+
+.requirement-repo-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.requirement-repo-heading-title {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.requirement-repo-count {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+
+.requirement-repo-heading-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
 }

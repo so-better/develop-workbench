@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { QrcodeOutlined, SettingOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Spin } from 'antd'
 import type { LarkCliInfo, LarkLoginSession } from '../../../../types/lark'
+import './LoginState.css'
 
 interface LoginStateProps {
   cliInfo: LarkCliInfo | null

@@ -6,6 +6,7 @@ import { app } from 'electron'
 import { join } from 'node:path'
 import { initializeAdb } from './adb'
 import { initializeAiArtifacts } from './ai/artifacts'
+import { initializeAutoStart } from './auto-start'
 import { initializeAiAttachments } from './ai/attachments'
 import { initializeAiAssistantSession } from './ai/session'
 import { initializeAiChat } from './ai/chat'
@@ -74,6 +75,7 @@ if (!hasSingleInstanceLock) {
     // 各业务模块自行注册 IPC；先恢复主题，再创建窗口，避免启动时主题闪烁。
     initializeTheme()
     initializeSystem()
+    initializeAutoStart()
     initializePowerSettings()
     initializeProductGuide()
     initializeQuickNotes()

@@ -1,0 +1,33 @@
+/* Monaco 代码编辑器。 */
+
+.code-editor {
+  overflow: hidden;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 9px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+:root[data-theme="dark"] .code-editor {
+  background: var(--workbench-panel);
+  border-color: var(--workbench-divider);
+}
+
+.code-editor:focus-within {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.code-editor .monaco-editor,
+.code-editor .monaco-editor .overflow-guard {
+  border-radius: 8px;
+}
+
+.code-editor-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}

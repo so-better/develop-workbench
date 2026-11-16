@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { DeleteOutlined, FolderOpenOutlined, PlusOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Input, Popconfirm, Spin, Tooltip } from 'antd'
 import { getErrorMessage } from '../../../../utils'
+import './SkillSettings.css'
 
 /** 判断路径是否为绝对路径，支持 POSIX、Windows 盘符和 UNC。 */
 const isAbsolutePath = (value: string): boolean =>

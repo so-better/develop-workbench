@@ -1,0 +1,40 @@
+/* Windows 原生标题栏覆盖层。 */
+
+/* Windows 原生标题栏覆盖层下的拖拽区。 */
+.app-titlebar {
+  display: flex;
+  flex: 0 0 32px;
+  align-items: center;
+  height: 32px;
+  padding: 0 150px 0 12px;
+  background: var(--workbench-panel);
+  border-bottom: 1px solid var(--workbench-divider);
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.app-titlebar-brand {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.app-titlebar-logo {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.app-titlebar-title {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

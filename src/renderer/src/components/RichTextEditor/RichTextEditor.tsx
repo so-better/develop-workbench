@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import type { RichTextContent } from '../../../../types/rich-text'
+import './RichTextEditor.css'
 
 interface RichTextEditorProps {
   value: string

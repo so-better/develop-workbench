@@ -1,0 +1,221 @@
+/* Markdown 渲染内容。 */
+
+.markdown-content {
+  margin-top: 0;
+  color: var(--app-text);
+  font-size: 14px;
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.markdown-content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content p {
+  margin: 0 0 8px;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4 {
+  margin: 12px 0 6px;
+  color: var(--app-text);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.markdown-content h1 {
+  font-size: 16px;
+}
+
+.markdown-content h2 {
+  font-size: 15px;
+}
+
+.markdown-content h3,
+.markdown-content h4 {
+  font-size: 14px;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 20px;
+  margin: 6px 0 8px;
+}
+
+.markdown-content li + li {
+  margin-top: 3px;
+}
+
+.markdown-content a {
+  color: #1677ff;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.markdown-content code {
+  padding: 1px 5px;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  background: var(--workbench-soft);
+  border-radius: 4px;
+}
+
+.markdown-content pre {
+  padding: 10px 12px;
+  margin: 8px 0;
+  overflow-x: auto;
+  background: var(--log-bg);
+  border: 1px solid var(--log-border);
+  border-radius: 6px;
+}
+
+.markdown-content pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.markdown-content blockquote {
+  padding-left: 12px;
+  margin: 8px 0;
+  color: var(--workbench-secondary);
+  border-left: 3px solid var(--workbench-divider);
+}
+
+.markdown-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.markdown-content table {
+  width: 100%;
+  margin: 8px 0;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 6px 8px;
+  text-align: left;
+  border: 1px solid var(--workbench-divider);
+}
+
+.markdown-content th {
+  background: var(--workbench-soft);
+  font-weight: 600;
+}
+
+.markdown-content hr {
+  margin: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--workbench-divider);
+}
+
+/* AI Markdown 富内容。 */
+.ai-code-block {
+  margin: 9px 0;
+  overflow: hidden;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+}
+
+.ai-code-block-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 9px;
+  color: var(--workbench-secondary);
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  background: var(--workbench-panel);
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.ai-code-block-copy {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 2px 5px;
+  color: var(--workbench-secondary);
+  font-family: inherit;
+  font-size: 9px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.ai-code-block-copy:hover {
+  color: #1677ff;
+  background: var(--workbench-hover);
+}
+
+.ai-code-block > div:last-child {
+  overflow-x: auto;
+}
+
+.ai-code-block code {
+  font-size: 12px !important;
+}
+
+.ai-mermaid {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  padding: 12px;
+  margin: 9px 0;
+  overflow-x: auto;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+}
+
+.ai-mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.ai-diagram-loading {
+  padding: 12px;
+  margin: 9px 0;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  background: var(--workbench-soft);
+  border: 1px dashed var(--workbench-divider);
+  border-radius: 8px;
+}
+
+.ai-diagram-error {
+  padding: 10px;
+  margin: 9px 0;
+  overflow-x: auto;
+  color: #d92d20;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  white-space: pre-wrap;
+  background: rgba(217, 45, 32, 0.04);
+  border: 1px solid rgba(217, 45, 32, 0.18);
+  border-radius: 8px;
+}
+
+.ai-echart {
+  width: 100%;
+  height: 320px;
+  margin: 9px 0;
+  overflow: hidden;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+}

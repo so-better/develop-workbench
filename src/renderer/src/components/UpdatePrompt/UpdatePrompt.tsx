@@ -3,6 +3,7 @@ import { DownloadOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Modal } from 'antd'
 import type { UpdateCheckResult } from '../../../../types/updates'
 import { getErrorMessage } from '../../../../utils'
+import './UpdatePrompt.css'
 
 interface UpdatePromptProps {
   update: UpdateCheckResult | null

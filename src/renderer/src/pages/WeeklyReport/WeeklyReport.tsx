@@ -16,6 +16,7 @@ import { getErrorMessage, isRecord } from '../../../../utils'
 import RichTextEditor from '../../components/RichTextEditor/RichTextEditor'
 import RobotMark from '../../components/RobotMark/RobotMark'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
+import './WeeklyReport.css'
 
 /** 当前正在填写的周报周期；周一 08:00 前仍属于上一周。 */
 const getActiveReportWeekStart = (): number => {

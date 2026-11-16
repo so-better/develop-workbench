@@ -25,6 +25,7 @@ import type { LarkCliInfo, LarkUser } from '../../types/lark'
 import type { MeegleState } from '../../types/meegle'
 import changelogContent from '../../../CHANGELOG.md?raw'
 import type { UpdateCheckResult } from '../../types/updates'
+import './App.css'
 
 
 interface EnvironmentStatus {

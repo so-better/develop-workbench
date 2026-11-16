@@ -1,0 +1,95 @@
+/* 左侧导航。 */
+
+.app-navigation {
+  display: flex;
+  flex: 0 0 66px;
+  flex-direction: column;
+  width: 66px;
+  padding: 14px 8px 12px;
+  background: var(--workbench-panel);
+  border-right: 1px solid var(--workbench-divider);
+}
+
+.app-navigation-logo {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto 18px;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px -12px rgba(22, 119, 255, 0.8);
+}
+
+.app-navigation-items {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: 0;
+  padding-right: 2px;
+  overflow-y: auto;
+  scrollbar-color: var(--workbench-divider) transparent;
+  scrollbar-width: thin;
+}
+
+.app-navigation-items::-webkit-scrollbar {
+  width: 4px;
+}
+
+.app-navigation-items::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-navigation-items::-webkit-scrollbar-thumb {
+  background: var(--workbench-divider);
+  border-radius: 999px;
+}
+
+.app-navigation-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 8px 2px;
+  color: var(--workbench-secondary);
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.app-navigation-item:hover {
+  color: var(--app-text);
+  background: var(--workbench-hover);
+}
+
+.app-navigation-item.is-active {
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.09);
+}
+
+.app-navigation-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  font-size: 16px;
+}
+
+.app-navigation-label {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+:root[data-theme="dark"] .app-navigation-item.is-active {
+  color: #69b1ff;
+  background: rgba(96, 165, 250, 0.14);
+}

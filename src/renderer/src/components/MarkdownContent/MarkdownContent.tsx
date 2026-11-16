@@ -14,6 +14,7 @@ import CodeBlock from './CodeBlock'
 import EChartBlock from './EChartBlock'
 import MermaidDiagram from './MermaidDiagram'
 import { trimUrlTrailingText } from '../../../../utils'
+import './MarkdownContent.css'
 
 interface MarkdownNode {
   type: string

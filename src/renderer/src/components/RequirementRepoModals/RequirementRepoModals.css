@@ -1,0 +1,151 @@
+/* 需求关联仓库弹窗。 */
+
+.requirement-mr-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.requirement-mr-form p {
+  margin: 0 0 4px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.requirement-mr-form label {
+  margin-top: 4px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.requirement-mr-branch {
+  width: 100%;
+}
+
+.requirement-mr-form .ant-alert {
+  margin-top: 2px;
+}
+
+.requirement-branch-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.requirement-branch-choice p {
+  margin: 0;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.requirement-branch-choice .ant-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.requirement-branch-choice .ant-radio-wrapper {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+}
+
+.requirement-branch-choice .ant-radio-wrapper-checked {
+  background: rgba(22, 119, 255, 0.06);
+  border-color: rgba(22, 119, 255, 0.3);
+}
+
+.requirement-branch-choice-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.requirement-branch-choice-name {
+  display: block;
+  overflow: hidden;
+  color: var(--workbench-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-branch-create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.requirement-branch-create-form label {
+  margin-top: 4px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.requirement-branch-create-repo {
+  color: var(--app-text);
+  font-size: 13px;
+}
+
+.requirement-branch-create-form p {
+  margin: 4px 0 0;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.requirement-ide-session-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.requirement-ide-open-confirm .requirement-ide-session-option {
+  margin-top: 16px;
+}
+
+.requirement-ide-open-confirm p {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.requirement-ide-open-confirm .settings-help {
+  margin-top: 8px;
+  text-align: left;
+}
+
+.requirement-ide-open-branch {
+  margin-top: 4px !important;
+  color: var(--workbench-secondary) !important;
+  font-size: 12px !important;
+}
+
+.requirement-branch-choice .settings-help {
+  text-align: left;
+}
+
+.requirement-branch-choice .settings-help,
+.requirement-ide-open-confirm .settings-help {
+  margin: 8px 0 0;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: left;
+}
+
+.requirement-ide-session-option .settings-help {
+  margin: 0;
+}

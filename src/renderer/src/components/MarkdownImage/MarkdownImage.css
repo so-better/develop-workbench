@@ -1,0 +1,52 @@
+/* Markdown 图片。 */
+
+.markdown-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.markdown-image-wrapper {
+  max-width: 100%;
+}
+
+.markdown-image-wrapper,
+.markdown-image-wrapper .ant-image,
+.markdown-image-wrapper .ant-image-img {
+  max-width: 100%;
+}
+
+.markdown-image-wrapper .ant-image-img {
+  height: auto;
+}
+
+.markdown-image-loading {
+  display: inline-flex;
+  align-items: center;
+  min-height: 80px;
+  padding: 10px 12px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  background: var(--workbench-soft);
+  border: 1px dashed var(--workbench-divider);
+  border-radius: 6px;
+}
+
+.markdown-image-error {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  padding: 7px 9px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 6px;
+}
+
+.markdown-image-error .ant-btn {
+  height: auto;
+  padding: 0;
+  font-size: 12px;
+}

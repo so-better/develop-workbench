@@ -23,6 +23,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Modal } from 'antd'
 import RobotMark from '../RobotMark/RobotMark'
+import './ProductGuide.css'
 
 interface ProductGuideProps {
   open: boolean

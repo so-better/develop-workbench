@@ -1,0 +1,369 @@
+/* 需求工作台左侧栏与筛选。 */
+
+/* 左侧：当前用户需求列表。 */
+.workbench-sidebar {
+  display: flex;
+  flex: 0 0 368px;
+  flex-direction: column;
+  width: 368px;
+  min-height: 0;
+  padding: 18px 12px 12px;
+  background: var(--workbench-sidebar);
+  border-right: 1px solid var(--workbench-divider);
+  backdrop-filter: blur(16px);
+}
+
+.workbench-brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 0 8px 20px;
+}
+
+.workbench-brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.workbench-brand-text strong {
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.workbench-project-select {
+  width: fit-content;
+  max-width: 220px;
+}
+
+.workbench-project-select .ant-select-selector {
+  min-height: 18px !important;
+  padding: 0 16px 0 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.workbench-project-select .ant-select-selection-item {
+  padding-inline-end: 0 !important;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.workbench-project-select .ant-select-selection-search-input {
+  font-size: 12px;
+}
+
+.workbench-project-select .ant-select-arrow {
+  inset-inline-end: 0;
+  color: var(--workbench-secondary);
+  font-size: 9px;
+}
+
+.workbench-brand-text span {
+  overflow: hidden;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-sidebar-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 8px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.workbench-sidebar-title {
+  display: flex;
+  gap: 7px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.workbench-sidebar-heading-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  align-items: center;
+}
+
+.workbench-sidebar-count {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+
+.workbench-toggle-all,
+.workbench-sidebar-refresh {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--workbench-secondary) !important;
+}
+
+.workbench-toggle-all:hover,
+.workbench-sidebar-refresh:hover {
+  color: var(--app-text) !important;
+  background: var(--workbench-hover) !important;
+}
+
+.workbench-sidebar-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+  margin: 0 6px 8px;
+}
+
+.workbench-sidebar-actions .ant-dropdown-trigger {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.workbench-sidebar-actions .ant-dropdown-trigger .workbench-add-local {
+  width: 100%;
+}
+
+.workbench-add-local {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  color: var(--workbench-secondary) !important;
+  font-size: 12px;
+  border-color: var(--workbench-divider) !important;
+  border-radius: 7px;
+}
+
+.workbench-add-local:hover {
+  color: #1677ff !important;
+  border-color: rgba(22, 119, 255, 0.45) !important;
+}
+
+.workbench-repository-summary {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  color: var(--workbench-secondary) !important;
+  font-size: 12px;
+  border-color: var(--workbench-divider) !important;
+  border-radius: 7px;
+}
+
+.workbench-repository-summary:hover {
+  color: var(--app-text) !important;
+  background: var(--workbench-hover) !important;
+  border-color: var(--workbench-divider) !important;
+}
+
+.workbench-filter-stack {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 6px 8px;
+}
+
+.workbench-filter-stack.is-collapsed {
+  padding-bottom: 4px;
+}
+
+.workbench-filter-toggle {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  height: 22px;
+  padding: 0 2px;
+  color: var(--workbench-secondary);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.workbench-filter-toggle:hover {
+  color: var(--app-text);
+}
+
+.workbench-filter-toggle:focus-visible {
+  outline: 2px solid rgba(22, 119, 255, 0.55);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.workbench-filter-toggle-label {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.workbench-filter-toggle-meta {
+  margin-left: auto;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+
+.workbench-filter-toggle-chevron {
+  transition: transform 0.15s ease;
+}
+
+.workbench-filter-toggle-chevron.is-collapsed {
+  transform: rotate(-90deg);
+}
+
+.workbench-requirement-search {
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  background: var(--workbench-panel) !important;
+  border-color: var(--workbench-divider) !important;
+  border-radius: 8px;
+  box-shadow: none !important;
+}
+
+.workbench-requirement-search .ant-input {
+  color: var(--app-text);
+  font-size: 13px;
+  background: transparent;
+}
+
+.workbench-requirement-search .ant-input-prefix {
+  color: var(--workbench-secondary);
+}
+
+.workbench-filter-select.ant-select {
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+}
+
+.workbench-filter-select .ant-select-selector {
+  display: flex;
+  align-items: center;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 11px !important;
+  font-size: 13px;
+  background: var(--workbench-panel) !important;
+  border-color: var(--workbench-divider) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+
+.workbench-filter-select.ant-select-single .ant-select-selection-item,
+.workbench-filter-select.ant-select-single .ant-select-selection-placeholder {
+  line-height: 30px !important;
+}
+
+.workbench-filter-select.ant-select-multiple .ant-select-selection-overflow {
+  flex-wrap: nowrap;
+  align-items: center;
+  height: 30px;
+}
+
+.workbench-filter-select.ant-select-multiple .ant-select-selection-placeholder {
+  inset-inline-start: 0 !important;
+  padding-inline-start: 0 !important;
+}
+
+.workbench-filter-select.ant-select-multiple .ant-select-selection-search {
+  margin-inline-start: 0 !important;
+}
+
+.workbench-filter-select.ant-select-multiple .ant-select-selection-overflow-item {
+  align-self: center;
+}
+
+.workbench-filter-select.ant-select-multiple .ant-select-selection-item {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  margin-block: 0 !important;
+  color: var(--app-text);
+  font-size: 11px;
+  line-height: 20px !important;
+}
+
+.workbench-filter-select .ant-select-selection-placeholder {
+  color: var(--app-text);
+  font-size: 13px;
+  line-height: 30px !important;
+}
+
+.workbench-filter-select .ant-select-arrow {
+  color: var(--workbench-secondary);
+}
+
+.workbench-requirement-groups {
+  flex: 1;
+  min-height: 0;
+  padding: 0 2px 6px;
+  overflow-y: auto;
+}
+
+.workbench-requirement-groups::-webkit-scrollbar,
+
+.workbench-requirement-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 8px;
+}
+
+.workbench-requirement-skeleton .ant-skeleton-title {
+  height: 12px !important;
+  margin: 0 !important;
+}
+
+.workbench-requirement-groups .ant-empty {
+  margin: 36px 0;
+}
+
+.workbench-requirement-groups .ant-empty-description {
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.workbench-sidebar-footnote {
+  margin: 0 8px;
+  padding-top: 10px;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+/* 显示已结束选项。 */
+
+.workbench-show-closed {
+  padding-left: 2px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.workbench-show-closed .ant-checkbox + span {
+  font-size: 12px;
+}

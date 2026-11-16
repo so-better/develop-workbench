@@ -1,0 +1,67 @@
+/* 更新提示。 */
+
+.update-install-confirm {
+  z-index: 10000 !important;
+}
+
+.update-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.update-prompt-versions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 9px;
+}
+
+.update-prompt-versions strong {
+  color: var(--app-text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.update-prompt-versions .update-prompt-latest {
+  color: #1677ff;
+}
+
+.update-prompt-arrow {
+  color: var(--app-muted);
+}
+
+.update-prompt-package {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.update-prompt-package span {
+  flex: 0 0 auto;
+  color: var(--workbench-secondary);
+}
+
+.update-prompt-package strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-prompt-hint {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.65;
+}

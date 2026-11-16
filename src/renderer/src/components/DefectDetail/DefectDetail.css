@@ -1,0 +1,41 @@
+/* 缺陷详情。 */
+
+/* 缺陷工作台。 */
+
+.defect-info-link {
+  text-decoration: none;
+}
+
+.defect-muted {
+  margin: 0;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.defect-info-group-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.defect-info-group-heading h4 {
+  margin: 0;
+}
+
+.defect-assignee-select {
+  width: 260px;
+  max-width: 100%;
+}
+
+.defect-description-card {
+  margin-bottom: 12px;
+}
+
+.defect-description-box {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}

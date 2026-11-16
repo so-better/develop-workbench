@@ -1,0 +1,67 @@
+.auto-start-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.auto-start-card {
+  overflow: hidden;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 12px;
+}
+
+.auto-start-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 15px 16px;
+}
+
+.auto-start-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--app-muted);
+  font-size: 15px;
+  background: var(--workbench-soft);
+  border-radius: 8px;
+}
+
+.auto-start-row-copy {
+  min-width: 0;
+}
+
+.auto-start-row-copy strong {
+  display: block;
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.auto-start-row-copy p {
+  margin: 3px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.auto-start-row-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.auto-start-state {
+  color: var(--app-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.auto-start-state.is-on {
+  color: #1677ff;
+}

@@ -49,6 +49,7 @@ import type {
   AdbScreenshotResult
 } from '../types/adb'
 import type { PowerSettingKey, PowerSettingsState } from '../types/power'
+import type { AutoStartState } from '../types/auto-start'
 import type {
   TerminalCreateInput,
   TerminalDataEvent,
@@ -582,6 +583,14 @@ const electronAPI = {
    */
   selectTerminalShell: (): Promise<string | null> =>
     ipcRenderer.invoke('terminal:select-shell'),
+
+  /** 读取开机自启状态。 */
+  getAutoStart: (): Promise<AutoStartState> =>
+    ipcRenderer.invoke('auto-start:get'),
+
+  /** 开启或关闭开机自启。 */
+  setAutoStart: (enabled: boolean): Promise<AutoStartState> =>
+    ipcRenderer.invoke('auto-start:set', enabled),
 
   /** 读取电源设置。 */
   getPowerSettings: (): Promise<PowerSettingsState> =>

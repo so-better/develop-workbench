@@ -1,0 +1,65 @@
+/* 技能目录设置。 */
+
+.skill-directory-add {
+  display: flex;
+  gap: 8px;
+}
+
+.skill-directory-add .ant-input {
+  flex: 1;
+  min-width: 0;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.skill-directory-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 18px;
+}
+
+.skill-directory-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+}
+
+.skill-directory-path {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--app-text);
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.skill-directory-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  align-items: center;
+}
+
+.skill-directory-open.ant-btn {
+  color: #1677ff !important;
+}
+
+.skill-directory-open.ant-btn:hover {
+  color: #4096ff !important;
+  background: rgba(22, 119, 255, 0.08) !important;
+}
+
+.skill-directory-empty {
+  padding: 18px;
+  color: var(--app-muted);
+  font-size: 12px;
+  text-align: center;
+  background: var(--workbench-panel);
+  border: 1px dashed var(--workbench-divider);
+  border-radius: 8px;
+}

@@ -47,6 +47,7 @@ import type {
   AdbScreenshotResult
 } from '../types/adb'
 import type { PowerSettingKey, PowerSettingsState } from '../types/power'
+import type { AutoStartState } from '../types/auto-start'
 import type {
   TerminalCreateInput,
   TerminalDataEvent,
@@ -327,6 +328,10 @@ export interface ElectronAPI {
   ) => Promise<TerminalSettings>
   /** 选择自定义 shell 可执行文件。 */
   selectTerminalShell: () => Promise<string | null>
+  /** 读取开机自启状态。 */
+  getAutoStart: () => Promise<AutoStartState>
+  /** 开启或关闭开机自启。 */
+  setAutoStart: (enabled: boolean) => Promise<AutoStartState>
   /** 读取电源设置。 */
   getPowerSettings: () => Promise<PowerSettingsState>
   /** 更新运行期间或系统电源设置。 */

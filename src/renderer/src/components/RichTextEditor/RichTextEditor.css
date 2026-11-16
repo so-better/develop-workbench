@@ -1,0 +1,214 @@
+/* 富文本编辑器。 */
+
+/* 通用富文本编辑器。 */
+.rich-text-editor {
+  position: relative;
+  min-width: 0;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 9px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.rich-text-editor:focus-within {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 2px rgba(22, 119, 255, 0.1);
+}
+
+.rich-text-editor .ql-toolbar.ql-snow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  min-height: 38px;
+  padding: 5px 8px;
+  background: var(--workbench-soft);
+  border: 0;
+  border-bottom: 1px solid var(--workbench-divider);
+  border-radius: 9px 9px 0 0;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow .ql-formats {
+  display: inline-flex;
+  gap: 1px;
+  align-items: center;
+  height: 28px;
+  padding: 0 7px;
+  margin: 0;
+  border-right: 1px solid var(--workbench-divider);
+}
+
+.rich-text-editor .ql-toolbar.ql-snow .ql-formats:first-child {
+  padding-left: 0;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow .ql-formats:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border-radius: 6px;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow button:hover,
+.rich-text-editor .ql-toolbar.ql-snow button:focus,
+.rich-text-editor .ql-toolbar.ql-snow button.ql-active {
+  background: var(--workbench-hover);
+}
+
+.rich-text-editor .ql-toolbar.ql-snow .ql-picker {
+  height: 26px;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow .ql-picker.ql-color-picker,
+.rich-text-editor .ql-toolbar.ql-snow .ql-picker.ql-background {
+  width: 28px;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow .ql-picker-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border: 0;
+  border-radius: 6px;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow .ql-picker-label svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rich-text-editor .ql-toolbar.ql-snow .ql-picker-label:hover {
+  background: var(--workbench-hover);
+}
+
+.rich-text-editor .ql-container.ql-snow {
+  font-family: inherit;
+  font-size: 14px;
+  border: 0;
+  border-radius: 0 0 9px 9px;
+}
+
+.rich-text-editor .ql-editor {
+  min-height: var(--rich-text-min-height, 160px);
+  padding: 12px 14px;
+  color: var(--app-text);
+  line-height: 1.7;
+}
+
+.rich-text-editor .ql-editor.ql-blank::before {
+  right: 14px;
+  left: 14px;
+  color: var(--workbench-secondary);
+  font-style: normal;
+}
+
+.rich-text-editor .ql-snow .ql-stroke {
+  stroke: var(--workbench-secondary);
+}
+
+.rich-text-editor .ql-snow .ql-fill,
+.rich-text-editor .ql-snow .ql-stroke.ql-fill {
+  fill: var(--workbench-secondary);
+}
+
+.rich-text-editor .ql-snow .ql-picker {
+  color: var(--workbench-secondary);
+}
+
+.rich-text-editor .ql-snow .ql-picker-options {
+  padding: 5px;
+  background: var(--workbench-panel);
+  border-color: var(--workbench-divider);
+  border-radius: 7px;
+  box-shadow: var(--workbench-shadow);
+}
+
+.rich-text-editor .ql-snow .ql-picker-item {
+  color: var(--app-text);
+}
+
+.rich-text-editor .ql-snow .ql-picker-item:hover,
+.rich-text-editor .ql-snow .ql-picker-item.ql-selected {
+  color: #1677ff;
+}
+
+.rich-text-editor .ql-snow .ql-tooltip {
+  color: var(--app-text);
+  background: var(--workbench-panel);
+  border-color: var(--workbench-divider);
+  box-shadow: var(--workbench-shadow);
+  border-radius: 7px;
+}
+
+.rich-text-editor .ql-snow .ql-tooltip input[type="text"] {
+  color: var(--app-text);
+  background: var(--workbench-soft);
+  border-color: var(--workbench-divider);
+}
+
+.rich-text-editor .ql-editor a {
+  color: #1677ff;
+}
+
+:root[data-theme="dark"] .rich-text-editor .ql-toolbar.ql-snow {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:hover,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:focus,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button.ql-active,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-picker-label:hover,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-picker-label.ql-active {
+  color: #4096ff;
+}
+
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:hover .ql-stroke,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:focus .ql-stroke,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button.ql-active .ql-stroke,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-picker-label:hover .ql-stroke,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-picker-label.ql-active .ql-stroke {
+  stroke: #4096ff;
+}
+
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button:hover .ql-fill,
+:root[data-theme="dark"] .rich-text-editor .ql-snow .ql-toolbar button.ql-active .ql-fill {
+  fill: #4096ff;
+}
+
+.rich-text-editor .ql-snow .ql-tooltip::before {
+  content: "链接：";
+}
+
+.rich-text-editor .ql-snow .ql-tooltip[data-mode="link"]::before {
+  content: "输入链接：";
+}
+
+.rich-text-editor .ql-snow .ql-tooltip a.ql-action::after {
+  content: "编辑";
+}
+
+.rich-text-editor .ql-snow .ql-tooltip.ql-editing a.ql-action::after {
+  content: "保存";
+}
+
+.rich-text-editor .ql-snow .ql-tooltip a.ql-remove::before {
+  content: "移除";
+}

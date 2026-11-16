@@ -1,6 +1,7 @@
 import appIcon from '../../../../../build/icon.svg'
 import { APP_PAGES } from '../../navigation'
 import type { AppPage } from '../../navigation'
+import './AppNavigation.css'
 
 interface AppNavigationProps {
   activePage: AppPage

@@ -1,0 +1,68 @@
+/* 存储清理。 */
+
+.storage-cleanup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.storage-cleanup-card {
+  padding: 14px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 12px;
+}
+
+.storage-cleanup-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.storage-cleanup-icon {
+  display: grid;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  color: #1677ff;
+  font-size: 18px;
+  background: rgba(22, 119, 255, 0.08);
+  border: 1px solid rgba(22, 119, 255, 0.12);
+  border-radius: 10px;
+  place-items: center;
+}
+
+.storage-cleanup-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.storage-cleanup-copy strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.storage-cleanup-copy span {
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.storage-cleanup-meta {
+  padding-top: 10px;
+  margin-top: 10px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.storage-cleanup-error {
+  margin-bottom: 12px;
+}

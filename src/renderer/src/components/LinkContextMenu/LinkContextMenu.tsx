@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { CopyOutlined, GlobalOutlined, PlusOutlined } from '@ant-design/icons'
 import { App, Popconfirm } from 'antd'
 import { getErrorMessage } from '../../../../utils'
+import './LinkContextMenu.css'
 
 interface LinkMenuState {
   x: number

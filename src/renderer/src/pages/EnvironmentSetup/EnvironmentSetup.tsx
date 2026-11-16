@@ -9,6 +9,7 @@ import type { AuthProvider } from '../../../../types/auth'
 import type { LarkCliInfo, LarkUser } from '../../../../types/lark'
 import type { MeegleState } from '../../../../types/meegle'
 import type { SettingsSection } from '../../../../types/settings'
+import './EnvironmentSetup.css'
 
 interface EnvironmentSetupProps {
   /** Meegle CLI 与授权状态。 */

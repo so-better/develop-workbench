@@ -4,6 +4,7 @@ import dagre from '@dagrejs/dagre'
 import type { Point } from '@dagrejs/dagre'
 import type { MeegleWorkflowNode } from '../../../../types/requirements'
 import { findScheduleConflicts } from '../../utils/schedule-conflicts'
+import './RequirementFlowchart.css'
 
 interface RequirementFlowchartProps {
   /** 流程节点。 */

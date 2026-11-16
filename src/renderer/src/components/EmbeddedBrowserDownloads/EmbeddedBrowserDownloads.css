@@ -1,0 +1,271 @@
+/* 内置浏览器下载管理。 */
+
+.download-manager-modal .ant-modal-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 240px;
+}
+
+.embedded-browser-download-panel {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  max-height: 45%;
+  min-height: 0;
+  padding: 8px 10px 10px;
+  background: var(--workbench-panel);
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.embedded-browser-download-panel-head {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+}
+
+.embedded-browser-download-panel-head strong {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.embedded-browser-download-summary {
+  margin-left: auto;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.embedded-browser-download-panel .ant-empty,
+.embedded-browser-download-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: auto 0;
+  text-align: center;
+}
+
+.embedded-browser-download-empty .ant-empty-description {
+  max-width: 260px;
+  margin: 0 auto;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.embedded-browser-downloads {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.embedded-browser-downloads-list {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.download-manager-modal .embedded-browser-downloads {
+  height: min(60vh, 520px);
+  max-height: none;
+}
+
+.embedded-browser-download {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+}
+
+.embedded-browser-download-status {
+  display: grid;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 1px;
+  font-size: 14px;
+  border-radius: 7px;
+  place-items: center;
+}
+
+.embedded-browser-download.is-progressing .embedded-browser-download-status {
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.1);
+}
+
+.embedded-browser-download.is-paused .embedded-browser-download-status {
+  color: #d97706;
+  background: rgba(217, 119, 6, 0.12);
+}
+
+.embedded-browser-download.is-completed .embedded-browser-download-status {
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.embedded-browser-download.is-cancelled .embedded-browser-download-status {
+  color: #98a2b3;
+  background: rgba(152, 162, 179, 0.12);
+}
+
+.embedded-browser-download.is-interrupted .embedded-browser-download-status {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.embedded-browser-download-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.embedded-browser-download-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.embedded-browser-download-head strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embedded-browser-download-head .ant-tag {
+  flex-shrink: 0;
+  margin-inline-end: 0;
+}
+
+.embedded-browser-download-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  margin-top: 4px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.embedded-browser-download-size {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.embedded-browser-download-speed {
+  flex-shrink: 0;
+  color: #1677ff;
+  font-variant-numeric: tabular-nums;
+}
+
+.embedded-browser-download-path-row {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  margin-top: 2px;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+}
+
+.embedded-browser-download-path-row > span:first-child {
+  flex-shrink: 0;
+}
+
+.embedded-browser-download-path {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embedded-browser-download .ant-progress {
+  margin: 6px 0 2px;
+}
+
+.embedded-browser-download-pause,
+.embedded-browser-download-resume,
+.embedded-browser-download-retry {
+  padding: 0 5px !important;
+  font-size: 11px !important;
+}
+
+.embedded-browser-download-resume,
+.embedded-browser-download-retry {
+  color: #1677ff !important;
+}
+
+.embedded-browser-download-cancel {
+  padding: 0 5px !important;
+  font-size: 11px !important;
+}
+
+.embedded-browser-download-clear {
+  height: 26px;
+  padding: 0 9px !important;
+  color: var(--workbench-secondary) !important;
+  font-size: 12px !important;
+}
+
+.embedded-browser-download-clear:hover {
+  color: var(--app-text) !important;
+  background: var(--workbench-hover) !important;
+}
+
+.embedded-browser-download-footer {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  padding: 9px 0 0;
+  margin-top: auto;
+  background: var(--workbench-panel);
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.download-manager-modal .embedded-browser-download-footer {
+  background: var(--modal-panel);
+}
+
+.embedded-browser-download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 7px;
+}
+
+.embedded-browser-download-open,
+.embedded-browser-download-install {
+  height: 24px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.embedded-browser-download-show {
+  height: 24px;
+  padding: 0 5px;
+  color: var(--workbench-secondary) !important;
+  font-size: 11px;
+}

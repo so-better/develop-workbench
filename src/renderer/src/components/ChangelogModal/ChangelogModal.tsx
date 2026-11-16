@@ -1,5 +1,6 @@
 import { Button, Modal } from 'antd'
 import MarkdownContent from '../MarkdownContent/MarkdownContent'
+import './ChangelogModal.css'
 
 interface ChangelogModalProps {
   open: boolean

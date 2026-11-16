@@ -1,0 +1,86 @@
+/* 一键迁移。 */
+
+.migration-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding-top: 10px;
+  margin-top: 10px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.migration-result code {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--app-text);
+  font-size: 11px;
+}
+
+.migration-import-result {
+  padding: 12px 14px;
+  margin-top: 12px;
+  background-color: var(--workbench-panel);
+  background-image: linear-gradient(
+    rgba(22, 163, 74, 0.07),
+    rgba(22, 163, 74, 0.07)
+  );
+  border: 1px solid rgba(22, 163, 74, 0.24);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px -18px rgba(15, 23, 42, 0.5);
+}
+
+.migration-import-head {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.migration-import-icon {
+  flex-shrink: 0;
+  color: #16a34a;
+  font-size: 20px;
+}
+
+.migration-import-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.migration-import-copy strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.migration-import-copy span {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.migration-import-meta {
+  padding-top: 10px;
+  margin-top: 10px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+  border-top: 1px solid var(--workbench-divider);
+  word-break: break-all;
+}
+
+.migration-import-meta span {
+  display: block;
+}
+
+.migration-import-meta span + span {
+  margin-top: 4px;
+}

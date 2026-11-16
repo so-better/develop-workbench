@@ -1,4 +1,5 @@
 import { Button, Input } from 'antd'
+import './ExecutablePathField.css'
 
 interface ExecutablePathFieldProps {
   /** 输入框 id。 */

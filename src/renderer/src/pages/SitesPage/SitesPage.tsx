@@ -49,6 +49,7 @@ import type { SiteEnv, SiteInput, SiteLink } from '../../../../types/sites'
 import RobotMark from '../../components/RobotMark/RobotMark'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import { getErrorMessage, normalizeHttpUrl } from '../../../../utils'
+import './SitesPage.css'
 
 interface SiteFormValues {
   name: string

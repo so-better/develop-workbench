@@ -1,0 +1,256 @@
+/* 代码仓库设置。 */
+
+.repository-merge-conflict p {
+  margin: 0 0 8px;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.repository-merge-conflict p:last-child {
+  margin-bottom: 0;
+}
+
+.repository-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  align-items: center;
+}
+
+.repository-action-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--workbench-divider);
+}
+
+.repository-action-button {
+  height: 26px !important;
+  padding: 0 6px !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  border-radius: 6px !important;
+  white-space: nowrap;
+}
+
+.repository-action-button:not(:disabled) {
+  color: var(--workbench-secondary) !important;
+}
+
+.repository-action-button:not(:disabled):hover {
+  color: var(--app-text) !important;
+  background: var(--workbench-hover) !important;
+}
+
+.repository-action-button .anticon {
+  font-size: 13px;
+}
+
+.repository-table {
+  overflow: clip;
+  border-radius: 8px;
+}
+
+.repository-table .ant-table-thead > tr > th {
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--workbench-soft);
+}
+
+.repository-table .ant-table-tbody > tr > td {
+  font-size: 12px;
+}
+
+.repository-section {
+  margin-bottom: 16px;
+}
+
+.repository-field-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.repository-path-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.repository-path-row .ant-input {
+  flex: 1;
+  min-width: 0;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.repository-path-row .ant-btn {
+  height: 32px;
+}
+
+.repository-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.repository-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.repository-search {
+  width: 240px;
+}
+
+.repository-name-cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 360px;
+  gap: 3px;
+}
+
+.repository-name-cell strong {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-path-line {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.repository-path-text {
+  max-width: 280px;
+  overflow: hidden;
+  color: var(--app-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-path-line .ant-tag {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 9px;
+  line-height: 17px;
+}
+
+.repository-clone-target {
+  margin: 0 0 14px;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  background: var(--control-hover);
+  border-radius: 6px;
+}
+
+.repository-branch-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.repository-branch-tag {
+  display: inline-flex;
+  align-items: center;
+  max-width: 150px;
+  padding: 0 6px;
+  margin: 0;
+  overflow: hidden;
+  line-height: 18px;
+  border-radius: 4px;
+}
+
+.repository-branch-tag .repository-branch-text {
+  color: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-branch-text {
+  overflow: hidden;
+  color: var(--app-text);
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-copy-button {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--app-muted) !important;
+  opacity: 0.7;
+}
+
+.repository-copy-button:hover {
+  color: var(--app-text) !important;
+  background: var(--control-hover) !important;
+  opacity: 1;
+}
+
+.repository-clone-progress {
+  margin-top: 16px;
+}
+
+.repository-clone-progress-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.repository-clone-progress-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.repository-clone-log {
+  max-height: 140px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  overflow-y: auto;
+  color: var(--app-text);
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 10px;
+  line-height: 1.6;
+  background: var(--log-bg);
+  border: 1px solid var(--log-border);
+  border-radius: 6px;
+}
+
+.repository-clone-log > div {
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.repository-clone-cancel {
+  height: 22px;
+  padding: 0 4px;
+  font-size: 11px;
+}

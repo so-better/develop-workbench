@@ -14,6 +14,7 @@ import type {
   StorageCleanupStats
 } from '../../../../types/storage-cleanup'
 import { getErrorMessage } from '../../../../utils'
+import './StorageCleanup.css'
 
 interface CleanupDefinition {
   kind: StorageCleanupKind

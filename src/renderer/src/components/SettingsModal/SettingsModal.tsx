@@ -22,6 +22,8 @@ import TerminalSettings from '../TerminalSettings/TerminalSettings'
 import MigrationSettings from '../MigrationSettings/MigrationSettings'
 import ClipboardSettings from '../ClipboardSettings/ClipboardSettings'
 import PowerSettings from '../PowerSettings/PowerSettings'
+import AutoStartSettings from '../AutoStartSettings/AutoStartSettings'
+import './SettingsModal.css'
 
 const CodeEditor = lazy(() => import('../CodeEditor/CodeEditor'))
 
@@ -451,6 +453,14 @@ export default function SettingsModal({
           </button>
           <button
             type="button"
+            className={`settings-nav-item${activeSection === 'auto-start' ? ' is-active' : ''}`}
+            aria-current={activeSection === 'auto-start' ? 'page' : undefined}
+            onClick={() => setActiveSection('auto-start')}
+          >
+            <span className="settings-nav-label">开机自启</span>
+          </button>
+          <button
+            type="button"
             className={`settings-nav-item${activeSection === 'repositories' ? ' is-active' : ''}`}
             aria-current={activeSection === 'repositories' ? 'page' : undefined}
             onClick={() => setActiveSection('repositories')}
@@ -709,6 +719,8 @@ export default function SettingsModal({
           {activeSection === 'terminal' ? <TerminalSettings /> : null}
 
           {activeSection === 'power' ? <PowerSettings /> : null}
+
+          {activeSection === 'auto-start' ? <AutoStartSettings /> : null}
 
           {activeSection === 'cleanup' ? <StorageCleanup /> : null}
           {activeSection === 'clipboard' ? <ClipboardSettings /> : null}

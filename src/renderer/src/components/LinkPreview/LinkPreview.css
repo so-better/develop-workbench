@@ -1,0 +1,26 @@
+/* 链接预览。 */
+
+.link-preview-inline {
+  display: inline-flex;
+  gap: 4px;
+  align-items: baseline;
+  max-width: 100%;
+  color: #1677ff;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+
+.link-preview-inline:hover {
+  color: #4096ff;
+  text-decoration: underline;
+}
+
+.link-preview-inline-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.link-preview-inline-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

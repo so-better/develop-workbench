@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons'
 
 import type { EmbeddedBrowserDownload } from '../../../../types/embedded-browser'
+import './EmbeddedBrowserDownloads.css'
 
 interface EmbeddedBrowserDownloadsProps {
   /** 下载列表。 */

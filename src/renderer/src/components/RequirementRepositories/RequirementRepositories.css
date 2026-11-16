@@ -1,0 +1,500 @@
+/* 关联代码仓库。 */
+
+.requirement-repo-description {
+  display: inline-flex;
+  flex: 1;
+  gap: 5px;
+  align-items: center;
+  min-width: 0;
+  padding-left: 8px;
+  overflow: hidden;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-left: 1px solid var(--workbench-divider);
+}
+
+.requirement-repo-description .anticon {
+  flex-shrink: 0;
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.requirement-repo-heading-title h2 {
+  margin: 0;
+  color: var(--workbench-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.requirement-repo-refresh,
+.requirement-repo-add-toggle {
+  height: 26px;
+  padding: 0 7px;
+  color: var(--workbench-secondary) !important;
+  font-size: 12px;
+}
+
+.requirement-repo-refresh {
+  padding: 0 7px;
+}
+
+.requirement-repo-submit.ant-btn {
+  height: 24px;
+  min-width: 52px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+.requirement-repo-add .ant-skeleton {
+  width: 100%;
+}
+
+.requirement-repo-add .ant-skeleton-paragraph {
+  margin: 0;
+}
+
+.requirement-repo-refresh:hover,
+.requirement-repo-add-toggle:hover {
+  color: var(--app-text) !important;
+  background: var(--workbench-hover) !important;
+}
+
+.requirement-repo-alert {
+  margin-bottom: 12px;
+}
+
+.requirement-repo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.requirement-repo-row {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 9px;
+  transition: border-color 0.15s ease;
+}
+
+.requirement-repo-row:hover {
+  border-color: rgba(22, 119, 255, 0.25);
+}
+
+.requirement-repo-info {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  width: 240px;
+}
+
+.requirement-repo-icon {
+  display: grid;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  color: #1570ef;
+  font-size: 14px;
+  background: rgba(22, 119, 255, 0.08);
+  border-radius: 7px;
+  place-items: center;
+}
+
+.requirement-repo-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.requirement-repo-copy strong {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-repo-copy > span {
+  overflow: hidden;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-repo-qingzhou-link .anticon {
+  color: inherit;
+  font-size: inherit;
+}
+
+.requirement-repo-qingzhou-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.requirement-repo-qingzhou-link {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  width: fit-content;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.requirement-repo-qingzhou-link:hover {
+  text-decoration: underline;
+}
+
+.requirement-repo-mr-link {
+  padding: 0;
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.requirement-repo-mr-link .anticon {
+  color: inherit;
+  font-size: inherit;
+}
+
+.requirement-repo-info .ant-tag {
+  flex-shrink: 0;
+  margin-inline-end: 0;
+  font-size: 10px;
+}
+
+.requirement-repo-branch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.requirement-repo-branch {
+  width: 100%;
+}
+
+.requirement-repo-qingzhou {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 28px;
+}
+
+.requirement-repo-qingzhou .ant-tag {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 7px;
+  margin-inline-end: 0;
+  font-size: 11px;
+  line-height: 18px;
+  border-radius: 4px;
+}
+
+.requirement-repo-single-branch {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 28px;
+  padding: 4px 8px;
+  background: linear-gradient(
+    90deg,
+    rgba(18, 183, 106, 0.1) 0%,
+    rgba(18, 183, 106, 0.02) 100%
+  );
+  border-radius: 7px;
+}
+
+:root[data-theme="dark"] .requirement-repo-single-branch {
+  background: linear-gradient(
+    90deg,
+    rgba(18, 183, 106, 0.18) 0%,
+    rgba(18, 183, 106, 0.03) 100%
+  );
+}
+
+.requirement-repo-single-branch-icon {
+  flex-shrink: 0;
+  color: #12915b;
+  font-size: 13px;
+}
+
+:root[data-theme="dark"] .requirement-repo-single-branch-icon {
+  color: #5dd9a4;
+}
+
+.requirement-repo-single-branch-label {
+  flex-shrink: 0;
+  color: #12915b;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+:root[data-theme="dark"] .requirement-repo-single-branch-label {
+  color: #5dd9a4;
+}
+
+.requirement-repo-single-branch-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-repo-single-branch .requirement-repo-branch-empty {
+  flex: 0 1 auto;
+}
+
+.requirement-repo-single-branch .ant-tag {
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 7px;
+  margin-inline-end: 0;
+  font-size: 11px;
+  line-height: 18px;
+  border-radius: 4px;
+}
+
+.requirement-repo-copy-branch,
+.requirement-repo-edit-branch {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--workbench-secondary) !important;
+  font-size: 11px;
+}
+
+.requirement-repo-copy-branch:hover,
+.requirement-repo-edit-branch:hover {
+  color: var(--app-text) !important;
+  background: var(--workbench-hover) !important;
+}
+
+.requirement-repo-qingzhou-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+  min-height: 20px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.requirement-repo-qingzhou-state.is-pending {
+  color: #b54708;
+}
+
+:root[data-theme="dark"] .requirement-repo-qingzhou-state.is-pending {
+  color: #fdb022;
+}
+
+.requirement-repo-sync-qingzhou {
+  height: 28px;
+  padding: 0 6px;
+  color: #7c3aed !important;
+  font-size: 12px;
+}
+
+.requirement-repo-row-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.requirement-repo-branch .ant-select-selector,
+.requirement-repo-select .ant-select-selector {
+  height: 28px !important;
+  background: var(--workbench-panel) !important;
+  border-color: var(--workbench-divider) !important;
+  border-radius: 6px !important;
+}
+
+.requirement-repo-branch .ant-select-selection-item,
+.requirement-repo-branch .ant-select-selection-placeholder,
+.requirement-repo-select .ant-select-selection-item,
+.requirement-repo-select .ant-select-selection-placeholder {
+  font-size: 13px;
+  line-height: 26px !important;
+}
+
+.requirement-repo-remove {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+}
+
+.requirement-repo-open-ide {
+  height: 28px;
+  padding: 0 7px;
+  color: #1677ff !important;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.requirement-repo-open-ide:hover {
+  color: #4096ff !important;
+  background: rgba(22, 119, 255, 0.06) !important;
+}
+
+.requirement-repo-hint {
+  margin: 8px 0 0;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.requirement-repo-empty {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 4px 2px;
+}
+
+.requirement-repo-empty-icon {
+  flex-shrink: 0;
+  color: var(--workbench-secondary);
+  font-size: 20px;
+}
+
+.requirement-repo-empty > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.requirement-repo-empty strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.requirement-repo-empty span {
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.requirement-repo-empty .ant-btn {
+  margin-left: auto;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
+.requirement-repo-hint .ant-btn {
+  height: auto;
+  padding: 0 3px;
+  font-size: 12px;
+}
+
+.requirement-repo-create-branch {
+  height: 28px;
+  padding: 0 7px;
+  color: #1677ff !important;
+  font-size: 12px;
+}
+
+.requirement-repo-create-branch:disabled {
+  color: var(--workbench-secondary) !important;
+}
+
+.requirement-repo-add {
+  padding: 12px;
+  margin-top: 10px;
+  background: var(--workbench-soft);
+  border: 1px dashed var(--workbench-divider);
+  border-radius: 9px;
+}
+
+.requirement-repo-add-title {
+  margin-bottom: 10px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.requirement-repo-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.requirement-repo-add-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.requirement-repo-add-field label {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.requirement-repo-add-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.requirement-repo-select {
+  width: 100%;
+}
+
+.requirement-repo-add-field .requirement-repo-branch {
+  width: 100%;
+}
+
+.requirement-repo-qingzhou-workitem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  min-height: 28px;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.requirement-repo-qingzhou-workitem code {
+  padding: 1px 5px;
+  color: var(--app-text);
+  font-family: inherit;
+  font-size: 11px;
+  background: var(--workbench-soft);
+  border-radius: 4px;
+}
+
+.requirement-repo-add-hint {
+  grid-column: 1 / -1;
+  margin: -4px 0 0;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}

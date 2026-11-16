@@ -7,6 +7,7 @@ import type {
   MeegleLoginSession,
   MeegleState
 } from '../../../../types/meegle'
+import './MeegleSettings.css'
 
 const CLI_SOURCE_NAMES: Record<MeegleCliPathSource, string> = {
   settings: '应用设置',

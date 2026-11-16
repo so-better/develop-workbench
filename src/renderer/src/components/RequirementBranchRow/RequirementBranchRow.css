@@ -1,0 +1,119 @@
+/* 需求分支行。 */
+
+.requirement-repo-branch-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.requirement-repo-branch-row.is-requirement {
+  background: linear-gradient(
+    90deg,
+    rgba(18, 183, 106, 0.1) 0%,
+    rgba(18, 183, 106, 0.02) 100%
+  );
+}
+
+.requirement-repo-branch-row.is-iteration {
+  background: linear-gradient(
+    90deg,
+    rgba(22, 119, 255, 0.1) 0%,
+    rgba(22, 119, 255, 0.02) 100%
+  );
+}
+
+:root[data-theme="dark"] .requirement-repo-branch-row.is-requirement {
+  background: linear-gradient(
+    90deg,
+    rgba(18, 183, 106, 0.18) 0%,
+    rgba(18, 183, 106, 0.03) 100%
+  );
+}
+
+:root[data-theme="dark"] .requirement-repo-branch-row.is-iteration {
+  background: linear-gradient(
+    90deg,
+    rgba(22, 119, 255, 0.18) 0%,
+    rgba(22, 119, 255, 0.03) 100%
+  );
+}
+
+.requirement-repo-branch-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  font-size: 12px;
+}
+
+.requirement-repo-branch-row.is-requirement .requirement-repo-branch-icon,
+.requirement-repo-branch-row.is-requirement .requirement-repo-branch-label {
+  color: #12915b;
+}
+
+.requirement-repo-branch-row.is-iteration .requirement-repo-branch-icon,
+.requirement-repo-branch-row.is-iteration .requirement-repo-branch-label {
+  color: #1677ff;
+}
+
+:root[data-theme="dark"] .requirement-repo-branch-row.is-requirement .requirement-repo-branch-icon,
+:root[data-theme="dark"] .requirement-repo-branch-row.is-requirement .requirement-repo-branch-label {
+  color: #5dd9a4;
+}
+
+:root[data-theme="dark"] .requirement-repo-branch-row.is-iteration .requirement-repo-branch-icon,
+:root[data-theme="dark"] .requirement-repo-branch-row.is-iteration .requirement-repo-branch-label {
+  color: #84b9ff;
+}
+
+.requirement-repo-branch-label {
+  flex: 0 0 58px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.requirement-repo-branch-name,
+.requirement-repo-branch-empty {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.requirement-repo-branch-name {
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.requirement-repo-branch-empty {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.requirement-repo-copy-slot {
+  flex: 0 0 20px;
+  width: 20px;
+}
+
+.requirement-repo-branch-status {
+  flex: 0 0 auto;
+}
+
+.requirement-repo-branch-row .ant-tag {
+  flex-shrink: 0;
+  height: 18px;
+  padding: 0 6px;
+  margin-inline-end: 0;
+  font-size: 11px;
+  line-height: 16px;
+  border-radius: 4px;
+}

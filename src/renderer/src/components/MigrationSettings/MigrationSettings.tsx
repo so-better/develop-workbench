@@ -11,6 +11,8 @@ import type {
   MigrationImportResult
 } from '../../../../types/migration'
 import { getErrorMessage } from '../../../../utils'
+import '../StorageCleanup/StorageCleanup.css'
+import './MigrationSettings.css'
 
 const formatBytes = (bytes: number | undefined): string => {
   if (!bytes) return '0 B'

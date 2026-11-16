@@ -43,6 +43,7 @@ import type {
   EmbeddedBrowserFindResult,
   EmbeddedBrowserState
 } from '../../../../types/embedded-browser'
+import './EmbeddedBrowserPanel.css'
 
 const PANEL_WIDTH_KEY = 'embedded-browser-panel-width'
 const MIN_PANEL_WIDTH = 360

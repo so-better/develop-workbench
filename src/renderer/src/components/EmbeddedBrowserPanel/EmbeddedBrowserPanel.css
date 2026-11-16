@@ -1,0 +1,414 @@
+/* 内置浏览器面板。 */
+
+/* 页面标签独立于原生视图，切换时只改变可见页，不重建页面。 */
+.embedded-browser-tabbar {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-width: 0;
+  border-bottom: 1px solid var(--workbench-divider);
+  background: var(--workbench-soft);
+}
+
+.embedded-browser-close-all {
+  flex-shrink: 0;
+  margin-right: 10px;
+  font-size: 12px;
+  color: var(--workbench-secondary);
+}
+
+.embedded-browser-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 7px 10px;
+  /* 背景由父级 tabbar 统一提供，避免深色半透明背景叠加后颜色不一致。 */
+  /* 保留横向滚动能力，隐藏滚动条，避免标签栏高度随溢出变化。 */
+  scrollbar-width: none;
+}
+
+.embedded-browser-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.embedded-browser-tab {
+  display: flex;
+  align-items: center;
+  position: relative;
+  flex: 0 1 200px;
+  min-width: 140px;
+  max-width: 220px;
+  height: 30px;
+  padding-right: 4px;
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+  background: var(--workbench-panel);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.embedded-browser-tab:hover {
+  background: var(--workbench-hover);
+}
+
+.embedded-browser-tab.is-active {
+  background: var(--workbench-selected-bg);
+  border-color: rgba(22, 119, 255, 0.45);
+}
+
+.embedded-browser-tab > button[role="tab"] {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--workbench-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.embedded-browser-tab-handle {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  width: 18px;
+  padding: 0;
+  margin-left: 3px;
+  color: var(--workbench-secondary);
+  background: transparent;
+  border: 0;
+  opacity: 0.55;
+  cursor: grab;
+}
+
+.embedded-browser-tab-handle:hover {
+  color: var(--app-text);
+  opacity: 1;
+}
+
+.embedded-browser-tab.is-dragging {
+  z-index: 1;
+}
+
+.embedded-browser-tab.is-dragging .embedded-browser-tab-handle {
+  cursor: grabbing;
+}
+
+.embedded-browser-tab.is-active > button[role="tab"] {
+  color: var(--app-text);
+  font-weight: 500;
+}
+
+.embedded-browser-tab > button[role="tab"] > .anticon {
+  flex-shrink: 0;
+  color: var(--workbench-secondary);
+}
+
+.embedded-browser-tab.is-active > button[role="tab"] > .anticon {
+  color: #1677ff;
+}
+
+/* 操作槽位始终保留，悬停时不挤压标题或改变标签宽度。 */
+.embedded-browser-tab > .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  line-height: 1;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0;
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--workbench-secondary);
+  border-radius: 50%;
+}
+
+.embedded-browser-tab > .ant-btn .ant-btn-icon,
+.embedded-browser-tab > .ant-btn .anticon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.embedded-browser-tab > .ant-btn .anticon {
+  font-size: 10px;
+}
+
+.embedded-browser-tab:hover > .ant-btn,
+.embedded-browser-tab:focus-within > .ant-btn,
+.embedded-browser-tab.is-active > .ant-btn {
+  opacity: 1;
+}
+
+.embedded-browser-tab > button:focus-visible {
+  outline: 2px solid #1677ff;
+  outline-offset: -3px;
+  border-radius: 8px;
+}
+
+@media (hover: none) {
+  .embedded-browser-tab > .ant-btn { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .embedded-browser-tab { transition: none; }
+}
+
+.embedded-browser-tab > button[role="tab"] > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 应用内浏览器。 */
+.embedded-browser-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 9998;
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.12),
+    rgba(15, 23, 42, 0.32)
+  );
+  backdrop-filter: blur(2px);
+  animation: embedded-browser-mask-in 160ms ease-out;
+}
+
+@keyframes embedded-browser-mask-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+:root[data-theme="dark"] .embedded-browser-mask {
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.embedded-browser-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  width: 66.6667%;
+  min-width: 0;
+  padding-left: 8px;
+  overflow: hidden;
+  background: var(--app-bg);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(16, 24, 40, 0.22);
+}
+
+.embedded-browser-panel.is-expanded {
+  inset: 12px;
+  width: auto;
+  padding-left: 0;
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(16, 24, 40, 0.22);
+}
+
+.embedded-browser-panel.is-opening {
+  animation: embedded-browser-panel-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes embedded-browser-panel-in {
+  from {
+    transform: translateX(100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+.embedded-browser-panel.is-closing {
+  animation: embedded-browser-panel-out 200ms cubic-bezier(0.32, 0, 0.67, 0)
+    forwards;
+}
+
+@keyframes embedded-browser-panel-out {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.embedded-browser-mask.is-closing {
+  animation: embedded-browser-mask-out 200ms ease-in forwards;
+}
+
+@keyframes embedded-browser-mask-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .embedded-browser-panel.is-opening,
+  .embedded-browser-panel.is-closing,
+  .embedded-browser-mask,
+  .embedded-browser-mask.is-closing {
+    animation: none;
+  }
+}
+
+.embedded-browser-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.embedded-browser-resize-handle::after {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 2px;
+  height: 40px;
+  content: '';
+  background: var(--workbench-divider);
+  border-radius: 2px;
+  opacity: 0.65;
+  transform: translateY(-50%);
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.embedded-browser-resize-handle:hover::after {
+  background: var(--workbench-secondary);
+  opacity: 1;
+}
+
+.embedded-browser-findbar {
+  display: flex;
+  flex: 0 0 40px;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 10px;
+  background: var(--workbench-soft);
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.embedded-browser-findbar .ant-input-affix-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.embedded-browser-find-count {
+  flex-shrink: 0;
+  min-width: 44px;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  text-align: right;
+}
+
+.embedded-browser-toolbar {
+  display: flex;
+  flex: 0 0 48px;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 8px;
+  background: var(--workbench-panel);
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.embedded-browser-nav,
+.embedded-browser-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+  align-items: center;
+}
+
+.embedded-browser-location {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 0 8px;
+  color: var(--workbench-secondary);
+}
+
+.embedded-browser-location-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.embedded-browser-title,
+.embedded-browser-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embedded-browser-title {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.embedded-browser-host {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.embedded-browser-error {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  color: #b42318;
+  font-size: 12px;
+  background: #fef3f2;
+  border-bottom: 1px solid #fecdca;
+}
+
+:root[data-theme="dark"] .embedded-browser-error {
+  color: #fda29b;
+  background: #3b1d1b;
+  border-bottom-color: #69332e;
+}
+
+.embedded-browser-viewport {
+  flex: 1;
+  min-height: 0;
+  background: #ffffff;
+}
+
+.embedded-browser-actions {
+  gap: 8px;
+}

@@ -3,6 +3,7 @@ import { Alert, App, Input, Select, Spin } from 'antd'
 import { IDE_PRESETS } from '../../../../types/ide'
 import type { IdeConfigState, IdePresetId } from '../../../../types/ide'
 import ExecutablePathField from '../ExecutablePathField/ExecutablePathField'
+import './IdeSettings.css'
 
 /**
  * 内置 IDE 启动配置。

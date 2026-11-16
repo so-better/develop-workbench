@@ -40,6 +40,7 @@ import { getErrorMessage } from '../../../../utils'
 import MarkdownContent from '../MarkdownContent/MarkdownContent'
 import RobotMark from '../RobotMark/RobotMark'
 import { useSettingsDialog } from '../SettingsModal/SettingsDialogProvider'
+import './AiChatDialog.css'
 
 interface AiChatDialogProps {
   open: boolean

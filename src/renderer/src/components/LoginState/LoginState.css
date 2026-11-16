@@ -1,0 +1,55 @@
+/* Lark Cli 登录态页面。 */
+
+.login-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 380px;
+  text-align: center;
+}
+
+.login-state-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  color: #1677ff;
+  font-size: 22px;
+  background: rgba(22, 119, 255, 0.1);
+  border-radius: 14px;
+  place-items: center;
+}
+
+.login-state h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.login-state p {
+  max-width: 360px;
+  margin: 8px 0 18px;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.login-state-loading {
+  display: grid;
+  min-height: 240px;
+  place-items: center;
+}
+
+.login-state .ant-alert {
+  width: 100%;
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.login-state-hint {
+  margin: 12px 0 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}

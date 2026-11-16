@@ -1,0 +1,468 @@
+/* 设置弹窗及设置项共享样式。 */
+
+.settings-dialog {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  gap: 24px;
+  height: min(760px, calc(100vh - 160px));
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+  min-height: 0;
+  padding-right: 16px;
+  overflow-y: auto;
+  border-right: 1px solid var(--control-border);
+  scrollbar-color: var(--control-border) transparent;
+  scrollbar-width: thin;
+}
+
+.settings-nav-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 12px;
+  color: var(--app-muted);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.settings-nav-item::after {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  background: transparent;
+  border-radius: 50%;
+  content: '';
+}
+
+.settings-nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-nav-item:hover {
+  color: var(--app-text);
+  background: var(--control-hover);
+}
+
+.settings-nav-item.is-active {
+  color: #1677ff;
+  font-weight: 600;
+  background: rgba(22, 119, 255, 0.08);
+  border-color: rgba(22, 119, 255, 0.18);
+}
+
+.settings-nav-item.is-active::after {
+  background: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.12);
+}
+
+:root[data-theme="dark"] .settings-nav-item.is-active {
+  background: rgba(22, 119, 255, 0.16);
+  border-color: rgba(22, 119, 255, 0.3);
+}
+
+.settings-panel {
+  min-width: 0;
+  height: 100%;
+  min-height: 0;
+  padding-right: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-color: var(--control-border) transparent;
+  scrollbar-width: thin;
+}
+
+.settings-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settings-panel::-webkit-scrollbar-thumb {
+  background: var(--control-border);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.settings-panel-header {
+  margin-bottom: 16px;
+}
+
+.settings-panel-header h3 {
+  margin: 0 0 5px;
+  color: var(--app-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.settings-panel-header p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+/* 模型与技能合并页签。 */
+.settings-ai-tabs .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.settings-ai-tabs .ant-tabs-tab {
+  padding: 10px 0;
+}
+
+.settings-autosave-status {
+  margin: 6px 0 0;
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.settings-autosave-status.is-saved {
+  color: #16a34a;
+}
+
+.settings-autosave-status.is-invalid,
+.settings-autosave-status.is-error {
+  color: #d92d20;
+}
+
+.settings-loading {
+  display: grid;
+  min-height: 260px;
+  place-items: center;
+}
+
+.config-editor {
+  border-radius: 8px;
+}
+
+.settings-info-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-info-row {
+  display: flex;
+  gap: 24px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 7px 2px;
+}
+
+.settings-info-row span {
+  flex-shrink: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.settings-info-value {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.settings-info-value strong {
+  min-width: 0;
+  color: var(--app-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.settings-copy-button {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--app-muted);
+  font-size: 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.settings-copy-button:hover:not(:disabled) {
+  color: #1677ff;
+  background: var(--control-hover);
+  opacity: 1;
+}
+
+.settings-copy-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.meegle-section {
+  margin-bottom: 20px;
+}
+
+.meegle-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.meegle-section-title {
+  color: var(--app-muted);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.meegle-qr {
+  width: 200px;
+  height: 200px;
+  margin: 12px auto 0;
+}
+
+.meegle-qr img {
+  width: 168px;
+  height: 168px;
+}
+
+.lark-status {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.lark-status-main {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+.lark-status-dot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.lark-status-dot.is-available {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+.lark-status-dot.is-unavailable {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.lark-status-main strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.lark-status-main .is-available {
+  color: #16a34a;
+}
+
+.lark-status-main .is-unavailable {
+  color: #ef4444;
+}
+
+.lark-status-version {
+  color: var(--app-muted);
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+}
+
+.settings-panel .ant-alert {
+  margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .settings-dialog {
+    grid-template-columns: 140px minmax(0, 1fr);
+  }
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.settings-field > label {
+  color: var(--app-muted);
+  font-size: 12px;
+}
+
+/* AI 模型配置：编辑器与字段说明并排，降低首次配置门槛。 */
+.ai-config-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 272px;
+  gap: 14px;
+  align-items: start;
+}
+
+.ai-config-editor {
+  min-width: 0;
+}
+
+.ai-config-guide {
+  display: flex;
+  flex-direction: column;
+  height: 360px;
+  overflow: hidden;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 9px;
+}
+
+.ai-config-guide-heading {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 11px 12px;
+  background: var(--workbench-panel);
+  border-bottom: 1px solid var(--workbench-divider);
+}
+
+.ai-config-guide-heading strong {
+  display: block;
+  color: var(--app-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ai-config-guide-heading span {
+  display: block;
+  margin-top: 3px;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.ai-config-guide-heading .ant-btn {
+  flex: 0 0 auto;
+  padding-inline: 6px;
+  font-size: 11px;
+}
+
+.ai-config-guide-body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.ai-config-guide-section + .ai-config-guide-section {
+  margin-top: 14px;
+}
+
+.ai-config-guide-section h4 {
+  margin: 0 0 7px;
+  color: var(--app-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.ai-config-guide-section dl,
+.ai-config-field {
+  margin: 0;
+}
+
+.ai-config-field + .ai-config-field {
+  margin-top: 8px;
+}
+
+.ai-config-field dt {
+  margin: 0;
+  line-height: 1;
+}
+
+.ai-config-field dt code {
+  padding: 1px 4px;
+  color: #1677ff;
+  font-family: "SFMono-Regular", Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  background: rgba(22, 119, 255, 0.08);
+  border-radius: 4px;
+}
+
+.ai-config-field dd {
+  margin: 4px 0 0;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1100px) {
+  .ai-config-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-config-guide {
+    height: auto;
+    max-height: 260px;
+  }
+}
+
+.settings-update-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  margin-top: 14px;
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.settings-update-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.settings-update-copy strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.settings-update-copy span {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}

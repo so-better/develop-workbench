@@ -1,0 +1,112 @@
+/* 本地临时需求详情。 */
+
+.requirement-info-section.local-requirement-section {
+  padding: 20px 22px 22px;
+}
+
+.requirement-info-grid.local-requirement-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 28px;
+  padding-top: 16px;
+}
+
+.local-requirement-grid .ant-tag {
+  margin-inline-end: 0;
+}
+
+.local-requirement-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px;
+  margin-inline-end: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  border-radius: 999px;
+}
+
+.local-requirement-status .requirement-status-dot {
+  width: 6px;
+  height: 6px;
+  box-shadow: none;
+}
+
+.local-requirement-status.is-active {
+  color: #1570ef;
+  background: rgba(22, 119, 255, 0.1);
+}
+
+.local-requirement-status.is-testing {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.local-requirement-status.is-done {
+  color: #12915b;
+  background: rgba(18, 183, 106, 0.1);
+}
+
+.local-requirement-status.is-danger {
+  color: #d92d20;
+  background: rgba(240, 68, 56, 0.1);
+}
+
+.local-requirement-status.is-idle,
+.local-requirement-status.is-neutral {
+  color: var(--workbench-secondary);
+  background: var(--workbench-soft);
+}
+
+:root[data-theme="dark"] .local-requirement-status.is-active {
+  color: #84b9ff;
+  background: rgba(22, 119, 255, 0.18);
+}
+
+:root[data-theme="dark"] .local-requirement-status.is-testing {
+  color: #c4a7ff;
+  background: rgba(124, 58, 237, 0.2);
+}
+
+:root[data-theme="dark"] .local-requirement-status.is-done {
+  color: #5dd9a4;
+  background: rgba(18, 183, 106, 0.18);
+}
+
+:root[data-theme="dark"] .local-requirement-status.is-danger {
+  color: #ff9b94;
+  background: rgba(240, 68, 56, 0.2);
+}
+
+@media (max-width: 900px) {
+  .requirement-info-grid.local-requirement-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.local-requirement-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.local-requirement-product {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.local-requirement-product .ant-avatar {
+  flex-shrink: 0;
+  color: #1570ef;
+  font-size: 9px;
+  font-weight: 600;
+  background: #e8f2ff;
+}
+
+:root[data-theme="dark"] .local-requirement-product .ant-avatar {
+  color: #e6e7e9;
+  background: #2b2e34;
+}

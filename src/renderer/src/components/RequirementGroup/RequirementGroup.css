@@ -1,0 +1,185 @@
+/* 需求列表分组。 */
+
+.workbench-requirement-group {
+  padding-bottom: 4px;
+}
+
+.workbench-requirement-group + .workbench-requirement-group {
+  margin-top: 10px;
+}
+
+.workbench-requirement-group-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 9px 10px;
+  color: var(--app-text);
+  font-family: inherit;
+  text-align: left;
+  background: var(--workbench-group-bg);
+  border: 1px solid rgba(22, 119, 255, 0.08);
+  border-radius: 9px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.workbench-requirement-group-heading:hover {
+  background: var(--workbench-group-hover);
+  border-color: rgba(22, 119, 255, 0.16);
+}
+
+.workbench-requirement-group-heading:focus-visible {
+  outline: 2px solid rgba(22, 119, 255, 0.55);
+  outline-offset: -2px;
+}
+
+.workbench-requirement-group-title {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+}
+
+.workbench-requirement-group-chevron {
+  flex-shrink: 0;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.workbench-requirement-group-heading.is-collapsed .workbench-requirement-group-chevron {
+  transform: rotate(-90deg);
+}
+
+.workbench-requirement-group-name {
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-requirement-group-count {
+  display: inline-flex;
+  flex-shrink: 0;
+  gap: 2px;
+  align-items: baseline;
+  color: var(--workbench-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.workbench-requirement-group-count-unit {
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  opacity: 0.72;
+}
+
+.workbench-requirement-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.workbench-requirement-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workbench-requirement-subgroup + .workbench-requirement-subgroup {
+  margin-top: 2px;
+}
+
+.workbench-requirement-subgroup-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 26px;
+  padding: 4px 8px;
+  color: var(--workbench-secondary);
+  font-family: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.workbench-requirement-subgroup-heading:hover {
+  color: var(--app-text);
+  background: var(--workbench-hover);
+}
+
+.workbench-requirement-subgroup-heading:focus-visible {
+  outline: 2px solid rgba(22, 119, 255, 0.55);
+  outline-offset: -2px;
+}
+
+.workbench-requirement-subgroup-title {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.workbench-requirement-subgroup-chevron {
+  flex-shrink: 0;
+  color: var(--workbench-secondary);
+  font-size: 9px;
+  transition: transform 0.15s ease;
+}
+
+.workbench-requirement-subgroup-heading.is-collapsed
+  .workbench-requirement-subgroup-chevron {
+  transform: rotate(-90deg);
+}
+
+.workbench-requirement-subgroup-name {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workbench-requirement-subgroup-count {
+  flex-shrink: 0;
+  color: var(--workbench-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.78;
+}
+
+.workbench-requirement-subgroup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 8px;
+  margin-left: 7px;
+  border-left: 1px solid var(--workbench-divider);
+}
+
+:root[data-theme="dark"] .workbench-requirement-group-heading {
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}

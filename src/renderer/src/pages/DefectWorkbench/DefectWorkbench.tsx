@@ -1,37 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import dayjs from 'dayjs'
-import {
-  EditOutlined,
-  ExportOutlined,
-  InfoCircleOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-  SwapOutlined
-} from '@ant-design/icons'
 import {
   Alert,
   App,
-  Avatar,
   Button,
-  Checkbox,
   Empty,
-  Input,
-  Modal,
-  Select,
   Skeleton,
-  Spin,
-  Tabs,
-  Tooltip,
   Typography
 } from 'antd'
-import { DEFECT_ROLES } from '../../../../types/defects'
 import type {
   DefectRole,
   DefectTransition,
   DefectTransitionFieldValue,
   DefectTransitions,
-  MeegleDefect,
   MeegleDefectComment,
   MeegleDefectComments,
   MeegleDefectOwner,
@@ -40,190 +20,30 @@ import type {
 } from '../../../../types/defects'
 import type { MeegleProject } from '../../../../types/requirements'
 import type { SettingsSection } from '../../../../types/settings'
-import { getErrorMessage, parseReleaseDate } from '../../../../utils'
-import MarkdownContent from '../../components/MarkdownContent/MarkdownContent'
-import MarkdownEditor from '../../components/MarkdownEditor/MarkdownEditor'
-import RobotMark from '../../components/RobotMark/RobotMark'
+import { getErrorMessage } from '../../../../utils'
+import DefectSidebar from '../../components/DefectSidebar/DefectSidebar'
+import DefectHeader from '../../components/DefectHeader/DefectHeader'
+import DefectDetail from '../../components/DefectDetail/DefectDetail'
+import type { DefectInfoGroup } from '../../components/DefectDetail/DefectDetail'
+import DefectTransitionModal from '../../components/DefectTransitionModal/DefectTransitionModal'
+import DefectStatusTag from '../../components/DefectStatusTag/DefectStatusTag'
+import DefectPeople from '../../components/DefectPeople/DefectPeople'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
+import '../RequirementWorkbench/RequirementWorkbench.css'
+import {
+  cleanDescription,
+  formatDate,
+  getDefectProductLine,
+  getDefectVersionEntries,
+  getDefectVersionKeys,
+  getDefectVersionLabel,
+  getPriorityTone,
+  getSeverityTone,
+  getStatusTone
+} from './defect-utils'
 
 interface DefectWorkbenchProps {
   onOpenSettings: (section: SettingsSection) => void
-}
-
-const formatDate = (value: string | null): string =>
-  value && dayjs(value).isValid() ? dayjs(value).format('YYYY-MM-DD') : '未填写'
-
-const formatFetchedAt = (value: string): string =>
-  dayjs(value).isValid() ? dayjs(value).format('MM-DD HH:mm') : value
-
-const formatCommentTime = (value: string | null): string =>
-  value && dayjs(value).isValid() ? dayjs(value).format('MM-DD HH:mm') : (value ?? '')
-
-/** 清理飞书描述里的内部注释标记。 */
-const cleanDescription = (content: string): string =>
-  content
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/[ \t]+\n/g, '\n')
-    .trim()
-
-const getStatusTone = (status: string | null): string => {
-  const value = status ?? ''
-
-  // “未完成/未关闭/未解决”等不是完成态，必须先于完成态判断。
-  if (/^未|未完成|未关闭|未解决/.test(value)) return 'idle'
-  // 完成态优先判断，避免“测试通过”被归到测试中。
-  if (/测试通过|已解决|已修复|关闭|完成|结束|done|closed|resolved/i.test(value)) {
-    return 'done'
-  }
-  if (/终止|取消|打回|拒绝|重新打开|reopen/i.test(value)) return 'danger'
-  if (/待验证|待测试|待验收|验证中|测试中|review/i.test(value)) return 'testing'
-  if (/挂起|暂缓|暂停|on hold/i.test(value)) return 'idle'
-  if (/新建|打开|open/i.test(value)) return 'active'
-  if (/未开始|待开始|待处理|idle/i.test(value)) return 'idle'
-  if (/开发|进行|处理中|修复中|doing|progress/i.test(value)) return 'active'
-
-  return 'neutral'
-}
-
-const getPriorityTone = (priority: string | null): string => {
-  switch (priority) {
-    case 'P0':
-      return 'p0'
-    case 'P1':
-      return 'p1'
-    case 'P2':
-      return 'p2'
-    default:
-      return 'default'
-  }
-}
-
-const getSeverityTone = (severity: string | null): string => {
-  const value = severity ?? ''
-
-  if (/致命|严重/.test(value)) return 'p0'
-  if (/一般/.test(value)) return 'p1'
-  if (/轻微|提示/.test(value)) return 'p2'
-
-  return 'default'
-}
-
-/** 缺陷按规划版本归并；缺少规划版本时回退到规划迭代。 */
-const getDefectVersionEntries = (
-  defect: MeegleDefect
-): Array<{ key: string; label: string }> => {
-  const versions = Array.from(
-    new Set(
-      defect.planningVersions
-        .map((version) => version.trim())
-        .filter(Boolean)
-    )
-  )
-
-  if (versions.length > 0) {
-    return versions.map((version) => {
-      const date = parseReleaseDate(version)
-      return {
-        key: date ? `date:${date}` : `version:${version}`,
-        label: version
-      }
-    })
-  }
-
-  if (defect.iterationDate) {
-    return [
-      {
-        key: `date:${defect.iterationDate}`,
-        label: defect.iterationDate.replace(/-/g, '')
-      }
-    ]
-  }
-
-  if (defect.iterationId) {
-    return [
-      {
-        key: defect.iterationId,
-        label: defect.iterationName ?? '未规划版本'
-      }
-    ]
-  }
-
-  if (defect.iterationName) {
-    return [
-      {
-        key: `version:${defect.iterationName}`,
-        label: defect.iterationName
-      }
-    ]
-  }
-
-  return [{ key: 'unplanned', label: '未规划版本' }]
-}
-
-const getDefectVersionKeys = (defect: MeegleDefect): string[] =>
-  getDefectVersionEntries(defect).map((entry) => entry.key)
-
-const getDefectVersionLabel = (defect: MeegleDefect): string =>
-  defect.planningVersions[0] ?? defect.iterationName ?? '未规划版本'
-
-const getDefectProductLine = (defect: MeegleDefect): string => {
-  const segments = defect.productLines
-    .map((line) => line.trim())
-    .filter(Boolean)
-
-  return segments[segments.length - 1] ?? '未设置产线'
-}
-
-/** 与需求详情一致的人员头像 + 名称。 */
-const renderPerson = (person: MeegleDefectOwner): JSX.Element => (
-  <span
-    className="requirement-info-person"
-    key={person.userKey ?? person.email ?? person.name}
-  >
-    <Avatar size={20} src={person.avatarUrl ?? undefined}>
-      {person.name.slice(0, 1)}
-    </Avatar>
-    <span>{person.name}</span>
-  </span>
-)
-
-const renderPeople = (people: MeegleDefectOwner[]): ReactNode => {
-  if (people.length === 0) return '未填写'
-
-  return <div className="requirement-info-people">{people.map(renderPerson)}</div>
-}
-
-const renderAssigneeOption = (owner: MeegleDefectOwner): JSX.Element => (
-  <span className="requirement-node-owner-option">
-    <Avatar size={24} src={owner.avatarUrl ?? undefined}>
-      {owner.name.slice(0, 1)}
-    </Avatar>
-    <span className="requirement-node-owner-option-copy">
-      <span className="requirement-node-owner-option-name">{owner.name}</span>
-      {owner.email ? (
-        <span className="requirement-node-owner-option-email">{owner.email}</span>
-      ) : null}
-    </span>
-  </span>
-)
-
-const renderAssigneeLabel = (owner: MeegleDefectOwner): JSX.Element => (
-  <span className="requirement-node-owner-tag-label">
-    <Avatar size={16} src={owner.avatarUrl ?? undefined}>
-      {owner.name.slice(0, 1)}
-    </Avatar>
-    <span>{owner.name}</span>
-  </span>
-)
-
-function StatusTag({
-  value,
-  tone
-}: {
-  value: string | null
-  tone: string
-}): JSX.Element {
-  return <span className={`requirement-header-tag is-${tone}`}>{value ?? '未知'}</span>
 }
 
 /**
@@ -536,6 +356,19 @@ export default function DefectWorkbench({
     filteredDefects[0] ??
     null
 
+  /** 切换缺陷时重置详情、评论和流转状态。 */
+  const handleSelectDefect = (defectId: string): void => {
+    setSelectedId(defectId)
+    setDescriptionExpanded(false)
+    setAssigneesEditing(false)
+    setActiveTab('basic')
+    setCommentDraft('')
+    setReplyToComment(null)
+    setTransitionOpen(false)
+    setSelectedTransitionId(undefined)
+    setTransitionValues({})
+  }
+
   useEffect(() => {
     if (!selectedDefect || activeTab !== 'comments') return
 
@@ -630,15 +463,7 @@ export default function DefectWorkbench({
       ]
     : []
 
-  const infoGroups: Array<{
-    title: string
-    fields: Array<{
-      label: string
-      value: ReactNode
-      wide?: boolean
-      hideLabel?: boolean
-    }>
-  }> = selectedDefect
+  const infoGroups: DefectInfoGroup[] = selectedDefect
     ? [
         {
           title: '基础信息',
@@ -646,7 +471,7 @@ export default function DefectWorkbench({
             {
               label: '当前状态',
               value: (
-                <StatusTag
+                <DefectStatusTag
                   value={selectedDefect.status}
                   tone={getStatusTone(selectedDefect.status)}
                 />
@@ -655,7 +480,7 @@ export default function DefectWorkbench({
             {
               label: '优先级',
               value: selectedDefect.priority ? (
-                <StatusTag
+                <DefectStatusTag
                   value={selectedDefect.priority}
                   tone={getPriorityTone(selectedDefect.priority)}
                 />
@@ -666,7 +491,7 @@ export default function DefectWorkbench({
             {
               label: '缺陷等级',
               value: selectedDefect.severity ? (
-                <StatusTag
+                <DefectStatusTag
                   value={selectedDefect.severity}
                   tone={getSeverityTone(selectedDefect.severity)}
                 />
@@ -728,7 +553,7 @@ export default function DefectWorkbench({
                         {group.role}
                       </span>
                       <div className="requirement-info-collaborator-members">
-                        {renderPeople(group.members)}
+                        <DefectPeople people={group.members} />
                       </div>
                     </div>
                   ))}
@@ -1094,238 +919,34 @@ export default function DefectWorkbench({
 
   return (
     <div className="workbench">
-      <aside className="workbench-sidebar">
-        <div className="workbench-brand">
-          <div className="workbench-brand-text">
-            <strong>缺陷工作台</strong>
-            <Select
-              size="small"
-              variant="borderless"
-              showSearch
-              className="workbench-project-select"
-              value={data?.project.projectKey}
-              placeholder="选择空间"
-              options={projectOptions}
-              loading={projectsLoading || projectSwitching}
-              disabled={projectSwitching}
-              optionFilterProp="label"
-              popupMatchSelectWidth={220}
-              onChange={(value: string) => handleProjectChange(value)}
-            />
-          </div>
-        </div>
-
-        <div className="workbench-sidebar-heading">
-          <span className="workbench-sidebar-title">
-            <span>我参与的缺陷</span>
-            <span className="workbench-sidebar-count">
-              共 {data?.total ?? 0} 项
-            </span>
-          </span>
-          <span className="workbench-sidebar-heading-actions">
-            <Tooltip title="刷新数据">
-              <Button
-                type="text"
-                size="small"
-                className="workbench-sidebar-refresh"
-                icon={<ReloadOutlined />}
-                loading={loading}
-                aria-label="刷新缺陷"
-                onClick={handleRefresh}
-              />
-            </Tooltip>
-            <Checkbox
-              className="workbench-show-closed"
-              checked={showClosedDefects}
-              disabled={loading}
-              onChange={(event) => setShowClosedDefects(event.target.checked)}
-            >
-              显示已结束
-            </Checkbox>
-          </span>
-        </div>
-
-        <div className="workbench-filter-stack">
-          <Input
-            className="workbench-requirement-search"
-            prefix={<SearchOutlined />}
-            placeholder="搜索缺陷、状态、版本或产线"
-            value={search}
-            allowClear
-            disabled={loading && !data}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <Select
-            className="workbench-filter-select"
-            value={role ?? undefined}
-            allowClear
-            options={DEFECT_ROLES.map((item) => ({ value: item, label: item }))}
-            placeholder="全部角色"
-            aria-label="按缺陷角色筛选"
-            onChange={handleRoleChange}
-          />
-          <Select
-            className="workbench-filter-select"
-            value={versionFilter ?? undefined}
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            options={versionOptions}
-            placeholder={`全部版本（${versionOptions.length}）`}
-            aria-label="按缺陷版本筛选"
-            onChange={(value?: string) => setVersionFilter(value ?? null)}
-          />
-          {productLineOptions.length > 1 ? (
-            <Select
-              mode="multiple"
-              allowClear
-              maxTagCount="responsive"
-              maxTagPlaceholder={(omitted) => `+${omitted.length}`}
-              className="workbench-filter-select workbench-product-line-filter"
-              value={productLineFilters}
-              options={productLineOptions}
-              placeholder={`全部产线（${productLineOptions.length}）`}
-              aria-label="按缺陷产线筛选"
-              onChange={(values: string[]) => setProductLineFilters(values)}
-            />
-          ) : null}
-          <Select
-            mode="multiple"
-            allowClear
-            maxTagCount="responsive"
-            maxTagPlaceholder={(omitted) => `+${omitted.length}`}
-            className="workbench-filter-select workbench-status-filter"
-            value={statusFilters}
-            options={statusOptions}
-            placeholder={`全部状态（${defects.length}）`}
-            aria-label="按缺陷状态筛选"
-            onChange={(values: string[]) => setStatusFilters(values)}
-          />
-        </div>
-
-        <div className="workbench-requirement-groups">
-          {loading && !data ? (
-            <div className="workbench-requirement-skeleton">
-              {Array.from({ length: 5 }).map((_, index) => (
-                <Skeleton key={index} active paragraph={false} title={{ width: '86%' }} />
-              ))}
-            </div>
-          ) : filteredDefects.length > 0 ? (
-            <div className="workbench-requirement-group">
-              <div className="workbench-requirement-group-list">
-                {filteredDefects.map((defect) => (
-                  <button
-                    key={defect.id}
-                    type="button"
-                    className={`workbench-requirement-item${
-                      selectedDefect?.id === defect.id ? ' is-active' : ''
-                    }`}
-                    onClick={() => {
-                      setSelectedId(defect.id)
-                      setDescriptionExpanded(false)
-                      setAssigneesEditing(false)
-                      setActiveTab('basic')
-                      setCommentDraft('')
-                      setReplyToComment(null)
-                      setTransitionOpen(false)
-                      setSelectedTransitionId(undefined)
-                      setTransitionValues({})
-                    }}
-                  >
-                    <span className="workbench-requirement-item-title-row">
-                      {defect.priority ? (
-                        <span
-                          className={`requirement-priority is-${getPriorityTone(
-                            defect.priority
-                          )}`}
-                        >
-                          {defect.priority}
-                        </span>
-                      ) : null}
-                      <span
-                        className="workbench-requirement-item-name"
-                        title={defect.name}
-                      >
-                        {defect.name}
-                      </span>
-                    </span>
-                    <span className="workbench-requirement-item-top">
-                      <span className="workbench-requirement-item-state">
-                        <StatusTag
-                          value={defect.status}
-                          tone={getStatusTone(defect.status)}
-                        />
-                      </span>
-                      <span
-                        className={`workbench-requirement-item-owner${
-                          defect.owners.length ? '' : ' is-empty'
-                        }`}
-                      >
-                        {defect.owners.length ? (
-                          <>
-                            <Avatar
-                              size={20}
-                              src={defect.owners[0].avatarUrl ?? undefined}
-                              className="workbench-requirement-contact-avatar"
-                            >
-                              {defect.owners[0].name.slice(0, 1)}
-                            </Avatar>
-                            <span className="workbench-requirement-item-owner-text">
-                              {defect.owners[0].name}
-                            </span>
-                            {defect.owners.length > 1 ? (
-                              <span className="workbench-requirement-item-owner-extra">
-                                等 {defect.owners.length} 人
-                              </span>
-                            ) : null}
-                          </>
-                        ) : (
-                          '待补充负责人'
-                        )}
-                      </span>
-                    </span>
-                    <span className="workbench-requirement-item-footer">
-                      <span className="workbench-requirement-item-tags">
-                        {defect.severity ? (
-                          <span
-                            className={`requirement-priority is-${getSeverityTone(
-                              defect.severity
-                            )}`}
-                          >
-                            {defect.severity}
-                          </span>
-                        ) : null}
-                        <span className="workbench-requirement-type">
-                          {getDefectVersionLabel(defect)}
-                        </span>
-                      </span>
-                      <span className="workbench-requirement-item-updated">
-                        {formatDate(defect.updatedAt)}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                data?.total === 0
-                  ? showClosedDefects
-                    ? '当前没有缺陷'
-                    : '当前没有未解决缺陷'
-                  : '没有匹配的缺陷'
-              }
-            />
-          )}
-        </div>
-
-        <p className="workbench-sidebar-footnote">
-          数据来自 Meegle 我参与的缺陷
-          {data ? ` · 同步于 ${formatFetchedAt(data.fetchedAt)}` : ''}
-        </p>
-      </aside>
+      <DefectSidebar
+        data={data}
+        loading={loading}
+        projectOptions={projectOptions}
+        projectsLoading={projectsLoading}
+        projectSwitching={projectSwitching}
+        showClosedDefects={showClosedDefects}
+        search={search}
+        role={role}
+        versionFilter={versionFilter}
+        versionOptions={versionOptions}
+        productLineOptions={productLineOptions}
+        productLineFilters={productLineFilters}
+        statusOptions={statusOptions}
+        statusFilters={statusFilters}
+        defectsCount={defects.length}
+        filteredDefects={filteredDefects}
+        selectedDefectId={selectedDefect?.id ?? null}
+        onProjectChange={handleProjectChange}
+        onRefresh={handleRefresh}
+        onShowClosedDefectsChange={setShowClosedDefects}
+        onSearchChange={setSearch}
+        onRoleChange={handleRoleChange}
+        onVersionFilterChange={setVersionFilter}
+        onProductLineFiltersChange={setProductLineFilters}
+        onStatusFiltersChange={setStatusFilters}
+        onSelectDefect={handleSelectDefect}
+      />
 
       <section className="workbench-main">
         {error && !data ? (
@@ -1357,92 +978,15 @@ export default function DefectWorkbench({
           </header>
         ) : selectedDefect && data ? (
           <>
-            <header className="workbench-header">
-              <div className="workbench-heading">
-                <span className="workbench-eyebrow">
-                  {data.project.name} / {getDefectVersionLabel(selectedDefect)}
-                </span>
-                <div className="workbench-title-row">
-                  <Tooltip title="刷新数据">
-                    <Button
-                      type="text"
-                      size="small"
-                      className="workbench-refresh-icon"
-                      icon={<ReloadOutlined />}
-                      loading={loading}
-                      aria-label="刷新数据"
-                      onClick={handleRefresh}
-                    />
-                  </Tooltip>
-                  <h1>{selectedDefect.name}</h1>
-                </div>
-                <div className="workbench-heading-meta">
-                  <StatusTag
-                    value={selectedDefect.status}
-                    tone={getStatusTone(selectedDefect.status)}
-                  />
-                  {selectedDefect.priority ? (
-                    <StatusTag
-                      value={selectedDefect.priority}
-                      tone={getPriorityTone(selectedDefect.priority)}
-                    />
-                  ) : null}
-                  {selectedDefect.severity ? (
-                    <StatusTag
-                      value={selectedDefect.severity}
-                      tone={getSeverityTone(selectedDefect.severity)}
-                    />
-                  ) : null}
-                  <span className="workbench-updated-at">
-                    更新于 {formatDate(selectedDefect.updatedAt)}
-                  </span>
-                </div>
-                <div className="workbench-header-actions">
-                  <div className="workbench-scope-note">
-                    <span className="workbench-scope-note-icon">
-                      <InfoCircleOutlined />
-                    </span>
-                    <div className="workbench-scope-note-copy">
-                      <strong>研发执行视图</strong>
-                      <span>
-                        {defectUrl
-                          ? '完整字段、附件、评论和复杂流程请前往飞书处理。'
-                          : '这里展示研发处理所需的缺陷字段和流程操作。'}
-                      </span>
-                    </div>
-                    <div className="workbench-scope-note-actions">
-                      {defectUrl ? (
-                        <Button
-                          type="primary"
-                          icon={<ExportOutlined />}
-                          onClick={() =>
-                            window.electron.openEmbeddedBrowser(defectUrl)
-                          }
-                        >
-                          在飞书中处理
-                        </Button>
-                      ) : null}
-                      <Button
-                        type="primary"
-                        ghost
-                        icon={<RobotMark />}
-                        onClick={handleAnalyzeDefect}
-                      >
-                        AI 分析
-                      </Button>
-                      <Button
-                        type="primary"
-                        danger
-                        icon={<SwapOutlined />}
-                        onClick={handleOpenTransition}
-                      >
-                        处理缺陷
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </header>
+            <DefectHeader
+              projectName={data.project.name}
+              defect={selectedDefect}
+              defectUrl={defectUrl}
+              loading={loading}
+              onRefresh={handleRefresh}
+              onAnalyze={handleAnalyzeDefect}
+              onOpenTransition={handleOpenTransition}
+            />
 
             <div className="workbench-content">
               {error ? (
@@ -1457,351 +1001,40 @@ export default function DefectWorkbench({
                 />
               ) : null}
 
-            <section className="requirement-info-section">
-              <Tabs
-                className="requirement-info-tabs"
-                activeKey={activeTab}
-                onChange={setActiveTab}
-                items={[
-                  {
-                    key: 'basic',
-                    label: '基本信息',
-                    children: (
-                      <div className="requirement-info-tab">
-                        <section className="requirement-info-group defect-description-card">
-                          <div className="defect-info-group-heading">
-                            <h4>详细描述</h4>
-                          </div>
-                          {description ? (
-                            <>
-                              <div
-                                className={`requirement-description-box defect-description-box${
-                                  descriptionCollapsed ? ' is-collapsed' : ''
-                                }`}
-                              >
-                                <MarkdownContent
-                                  content={description}
-                                  className="requirement-description-markdown"
-                                />
-                              </div>
-                              {description.length > 420 ||
-                              description.split('\n').length > 12 ? (
-                                <Button
-                                  type="link"
-                                  size="small"
-                                  className="requirement-description-toggle"
-                                  onClick={() =>
-                                    setDescriptionExpanded((value) => !value)
-                                  }
-                                >
-                                  {descriptionExpanded ? '收起' : '展开'}
-                                </Button>
-                              ) : null}
-                            </>
-                          ) : (
-                            <p className="defect-muted">暂无详细描述</p>
-                          )}
-                        </section>
-
-                        <div className="requirement-info-groups">
-                                  <section
-                                    className="requirement-info-group"
-                                    aria-label="BUG处理人"
-                                  >
-                                    <div className="defect-info-group-heading">
-                                      <h4>BUG处理人</h4>
-                                      {assigneesEditing ? (
-                                        <span className="requirement-info-description-actions">
-                                          <Button
-                                            size="small"
-                                            onClick={handleCancelAssigneesEdit}
-                                          >
-                                            取消
-                                          </Button>
-                                          <Button
-                                            type="primary"
-                                            size="small"
-                                            loading={assigneesSaving}
-                                            onClick={() => handleSaveAssignees()}
-                                          >
-                                            保存
-                                          </Button>
-                                        </span>
-                                      ) : (
-                                        <Button
-                                          type="text"
-                                          size="small"
-                                          className="requirement-info-description-edit"
-                                          icon={<EditOutlined />}
-                                          onClick={handleStartAssigneesEdit}
-                                        >
-                                          编辑
-                                        </Button>
-                                      )}
-                                    </div>
-                                    <div className="requirement-info-collaborators">
-                                      <div className="requirement-info-collaborator">
-                                        <span className="requirement-info-collaborator-role">
-                                          BUG经办人
-                                        </span>
-                                        <div className="requirement-info-collaborator-members">
-                                          {assigneesEditing ? (
-                                            <Select
-                                              className="defect-assignee-select"
-                                              allowClear
-                                              showSearch
-                                              filterOption={false}
-                                              loading={usersLoading}
-                                              value={operatorKey}
-                                              options={userOptions.map((user) => ({
-                                                value: user.userKey,
-                                                label: user.name
-                                              }))}
-                                              placeholder="搜索或选择成员"
-                                              notFoundContent={
-                                                usersLoading ? '搜索中...' : '未找到用户'
-                                              }
-                                              optionRender={(option) => {
-                                                const owner = userOptions.find(
-                                                  (item) =>
-                                                    item.userKey === String(option.value)
-                                                )
-
-                                                return owner
-                                                  ? renderAssigneeOption(owner)
-                                                  : option.label
-                                              }}
-                                              labelRender={(props) => {
-                                                const owner = userOptions.find(
-                                                  (item) =>
-                                                    item.userKey === String(props.value)
-                                                )
-
-                                                return owner
-                                                  ? renderAssigneeLabel(owner)
-                                                  : props.label
-                                              }}
-                                              onSearch={handleSearchAssignees}
-                                              onChange={(value?: string) =>
-                                                setOperatorKey(value)
-                                              }
-                                            />
-                                          ) : (
-                                            renderPeople(operatorMembers)
-                                          )}
-                                        </div>
-                                      </div>
-                                      <div className="requirement-info-collaborator">
-                                        <span className="requirement-info-collaborator-role">
-                                          BUG责任人
-                                        </span>
-                                        <div className="requirement-info-collaborator-members">
-                                          {assigneesEditing ? (
-                                            <Select
-                                              className="defect-assignee-select"
-                                              allowClear
-                                              showSearch
-                                              filterOption={false}
-                                              loading={usersLoading}
-                                              value={bugOwnerKey}
-                                              options={userOptions.map((user) => ({
-                                                value: user.userKey,
-                                                label: user.name
-                                              }))}
-                                              placeholder="搜索或选择成员"
-                                              notFoundContent={
-                                                usersLoading ? '搜索中...' : '未找到用户'
-                                              }
-                                              optionRender={(option) => {
-                                                const owner = userOptions.find(
-                                                  (item) =>
-                                                    item.userKey === String(option.value)
-                                                )
-
-                                                return owner
-                                                  ? renderAssigneeOption(owner)
-                                                  : option.label
-                                              }}
-                                              labelRender={(props) => {
-                                                const owner = userOptions.find(
-                                                  (item) =>
-                                                    item.userKey === String(props.value)
-                                                )
-
-                                                return owner
-                                                  ? renderAssigneeLabel(owner)
-                                                  : props.label
-                                              }}
-                                              onSearch={handleSearchAssignees}
-                                              onChange={(value?: string) =>
-                                                setBugOwnerKey(value)
-                                              }
-                                            />
-                                          ) : selectedDefect.bugOwner ? (
-                                            renderPeople([selectedDefect.bugOwner])
-                                          ) : (
-                                            '未填写'
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    {assigneesEditing ? (
-                                      <p className="requirement-description-edit-hint">
-                                        保存后会直接同步到飞书项目。
-                                      </p>
-                                    ) : null}
-                                  </section>
-
-                          {infoGroups.map((group) => (
-                              <section className="requirement-info-group">
-                                <div className="defect-info-group-heading">
-                                  <h4>{group.title}</h4>
-                                </div>
-                                <dl className="requirement-info-grid">
-                                  {group.fields.map((field) => (
-                                    <div
-                                      key={field.label}
-                                      className={field.wide ? 'is-wide' : undefined}
-                                    >
-                                      {field.hideLabel ? null : <dt>{field.label}</dt>}
-                                      <dd>{field.value}</dd>
-                                    </div>
-                                  ))}
-                                </dl>
-                              </section>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  },
-                  {
-                    key: 'comments',
-                    label: '评论/备注',
-                    children: (
-                      <div className="requirement-info-tab">
-                        <div className="requirement-comments-heading">
-                          <h3>评论</h3>
-                          <span>共 {comments?.total ?? 0} 条</span>
-                        </div>
-                        {commentsError ? (
-                          <Alert
-                            type="error"
-                            showIcon
-                            message="评论加载失败"
-                            description={commentsError}
-                            action={
-                              <Button
-                                size="small"
-                                onClick={() =>
-                                  setCommentsVersion((version) => version + 1)
-                                }
-                              >
-                                重试
-                              </Button>
-                            }
-                          />
-                        ) : commentsLoading && !comments ? (
-                          <Skeleton active paragraph={{ rows: 3 }} />
-                        ) : comments ? (
-                          <>
-                            <div className="requirement-comment-list">
-                              {comments.comments.length > 0 ? (
-                                comments.comments.map((comment) => (
-                                  <article
-                                    className="requirement-comment"
-                                    key={comment.id}
-                                  >
-                                    <Avatar
-                                      size={24}
-                                      src={comment.creator?.avatarUrl ?? undefined}
-                                    >
-                                      {comment.creator?.name.slice(0, 1) ?? '?'}
-                                    </Avatar>
-                                    <div className="requirement-comment-body">
-                                      <div className="requirement-comment-head">
-                                        <strong>
-                                          {comment.creator?.name ?? '未知成员'}
-                                        </strong>
-                                        <div className="requirement-comment-meta">
-                                          <span>
-                                            {formatCommentTime(comment.createdAt)}
-                                          </span>
-                                          <Button
-                                            type="text"
-                                            size="small"
-                                            className="requirement-comment-reply-button"
-                                            onClick={() => handleStartReply(comment)}
-                                          >
-                                            回复
-                                          </Button>
-                                        </div>
-                                      </div>
-                                      <MarkdownContent
-                                        content={cleanDescription(comment.content)}
-                                        className="requirement-comment-markdown"
-                                      />
-                                    </div>
-                                  </article>
-                                ))
-                              ) : (
-                                <Empty
-                                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                  description="暂无评论"
-                                />
-                              )}
-                            </div>
-                            {comments.total > comments.comments.length ? (
-                              <p className="requirement-comment-note">
-                                仅展示最新 {comments.comments.length} 条评论，共{' '}
-                                {comments.total} 条。
-                              </p>
-                            ) : null}
-                          </>
-                        ) : null}
-                        <div className="requirement-comment-editor">
-                          {replyToComment ? (
-                            <div className="requirement-comment-reply-banner">
-                              <span>
-                                正在回复 {replyToComment.creator?.name ?? '未知成员'}
-                              </span>
-                              <Button
-                                type="text"
-                                size="small"
-                                onClick={handleCancelReply}
-                              >
-                                取消
-                              </Button>
-                            </div>
-                          ) : null}
-                          <MarkdownEditor
-                            rows={4}
-                            value={commentDraft}
-                            placeholder={
-                              replyToComment
-                                ? `回复 ${replyToComment.creator?.name ?? '未知成员'}`
-                                : '写下评论，支持 Markdown'
-                            }
-                            disabled={commentSubmitting}
-                            onChange={setCommentDraft}
-                          />
-                          <div className="requirement-comment-editor-footer">
-                            <span>评论会直接同步到飞书项目</span>
-                            <Button
-                              type="primary"
-                              size="small"
-                              loading={commentSubmitting}
-                              onClick={() => handleAddComment()}
-                            >
-                              {replyToComment ? '发表回复' : '发表评论'}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  }
-                ]}
+              <DefectDetail
+                defect={selectedDefect}
+                activeTab={activeTab}
+                description={description}
+                descriptionExpanded={descriptionExpanded}
+                descriptionCollapsed={descriptionCollapsed}
+                infoGroups={infoGroups}
+                operatorMembers={operatorMembers}
+                assigneesEditing={assigneesEditing}
+                assigneesSaving={assigneesSaving}
+                usersLoading={usersLoading}
+                operatorKey={operatorKey}
+                bugOwnerKey={bugOwnerKey}
+                userOptions={userOptions}
+                comments={comments}
+                commentsLoading={commentsLoading}
+                commentsError={commentsError}
+                replyToComment={replyToComment}
+                commentDraft={commentDraft}
+                commentSubmitting={commentSubmitting}
+                onTabChange={setActiveTab}
+                onToggleDescription={() => setDescriptionExpanded((value) => !value)}
+                onStartAssigneesEdit={handleStartAssigneesEdit}
+                onCancelAssigneesEdit={handleCancelAssigneesEdit}
+                onSaveAssignees={() => handleSaveAssignees()}
+                onOperatorKeyChange={(value) => setOperatorKey(value)}
+                onBugOwnerKeyChange={(value) => setBugOwnerKey(value)}
+                onSearchAssignees={handleSearchAssignees}
+                onRetryComments={() => setCommentsVersion((version) => version + 1)}
+                onStartReply={handleStartReply}
+                onCancelReply={handleCancelReply}
+                onCommentDraftChange={setCommentDraft}
+                onAddComment={() => handleAddComment()}
               />
-            </section>
             </div>
           </>
         ) : (
@@ -1814,139 +1047,21 @@ export default function DefectWorkbench({
         )}
       </section>
 
-      <Modal
-        title="处理缺陷"
+      <DefectTransitionModal
         open={transitionOpen}
-        width={620}
-        okText="确认流转"
-        cancelText="取消"
-        okButtonProps={{
-          disabled: !selectedTransition || missingTransitionRoles.length > 0
-        }}
-        confirmLoading={transitionSubmitting}
-        onOk={() => handleSubmitTransition()}
-        onCancel={() => {
-          if (!transitionSubmitting) setTransitionOpen(false)
-        }}
-      >
-        <div className="defect-transition-form">
-          {transitionLoading ? (
-            <div className="defect-transition-loading">
-              <Spin />
-            </div>
-          ) : transitionError ? (
-            <Alert type="error" showIcon message={transitionError} />
-          ) : transitions ? (
-            <>
-              <div className="defect-transition-current">
-                <span>当前状态</span>
-                <StatusTag
-                  value={transitions.currentStateName}
-                  tone={getStatusTone(transitions.currentStateName)}
-                />
-              </div>
-              {transitions.transitions.length > 0 ? (
-                <>
-                  {selectedTransition?.requiredRoles.length ? (
-                    <div className="defect-transition-roles">
-                      <div className="defect-transition-role-values">
-                        <span className="defect-transition-role-label">需要角色</span>
-                        {selectedTransition.requiredRoles.map((role) => (
-                          <span
-                            key={role.key}
-                            className="requirement-info-tag is-blue"
-                          >
-                            {role.name}
-                          </span>
-                        ))}
-                      </div>
-                      {missingTransitionRoles.length > 0 ? (
-                        <p className="defect-transition-role-warning">
-                          当前缺陷缺少：
-                          {missingTransitionRoles.map((role) => role.name).join('、')}
-                          ，请先在飞书补齐后再流转
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                  <label>
-                    <span>目标状态</span>
-                    <Select
-                      value={selectedTransitionId}
-                      options={transitions.transitions.map((transition) => ({
-                        value: transition.id,
-                        label: transition.stateName
-                      }))}
-                      placeholder="请选择目标状态"
-                      onChange={(value?: string) => handleSelectTransition(value)}
-                    />
-                  </label>
-                  {selectedTransition?.fields.map((field) => (
-                    <label key={field.key}>
-                      <span>{field.name}</span>
-                      {(field.type === 'tree-multi-select' ||
-                      field.type === 'multi-select') ? (
-                        <Select
-                          mode="multiple"
-                          value={
-                            Array.isArray(transitionValues[field.key])
-                              ? (transitionValues[field.key] as string[])
-                              : []
-                          }
-                          options={field.options}
-                          placeholder="请选择"
-                          onChange={(value: string[]) =>
-                            handleTransitionValueChange(field.key, value)
-                          }
-                        />
-                      ) : field.type === 'select' ? (
-                        <Select
-                          value={
-                            typeof transitionValues[field.key] === 'string'
-                              ? (transitionValues[field.key] as string)
-                              : undefined
-                          }
-                          options={field.options}
-                          placeholder="请选择"
-                          onChange={(value?: string) =>
-                            handleTransitionValueChange(field.key, value ?? '')
-                          }
-                        />
-                      ) : (
-                        <Input.TextArea
-                          rows={3}
-                          value={
-                            typeof transitionValues[field.key] === 'string'
-                              ? (transitionValues[field.key] as string)
-                              : ''
-                          }
-                          placeholder={`请输入${field.name}`}
-                          onChange={(event) =>
-                            handleTransitionValueChange(
-                              field.key,
-                              event.target.value
-                            )
-                          }
-                        />
-                      )}
-                    </label>
-                  ))}
-                  {selectedTransition?.fields.length === 0 ? (
-                    <p className="defect-transition-hint">
-                      该状态不需要额外填写字段，确认后会直接流转。
-                    </p>
-                  ) : null}
-                </>
-              ) : (
-                <Empty
-                  image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  description="当前状态没有可流转的目标状态"
-                />
-              )}
-            </>
-          ) : null}
-        </div>
-      </Modal>
+        loading={transitionLoading}
+        error={transitionError}
+        submitting={transitionSubmitting}
+        transitions={transitions}
+        selectedTransition={selectedTransition}
+        selectedTransitionId={selectedTransitionId}
+        transitionValues={transitionValues}
+        missingTransitionRoles={missingTransitionRoles.map((role) => role.name)}
+        onClose={() => setTransitionOpen(false)}
+        onSelectTransition={handleSelectTransition}
+        onTransitionValueChange={handleTransitionValueChange}
+        onSubmit={() => handleSubmitTransition()}
+      />
     </div>
   )
 }

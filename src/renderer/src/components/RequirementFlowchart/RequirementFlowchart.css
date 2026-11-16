@@ -1,0 +1,141 @@
+/* 需求流程图。 */
+
+.requirement-flowchart-scroll {
+  padding-bottom: 6px;
+  overflow-x: auto;
+}
+
+.requirement-flowchart-scroll::-webkit-scrollbar {
+  height: 8px;
+}
+
+.requirement-flowchart-scroll::-webkit-scrollbar-thumb {
+  background: var(--workbench-divider);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.requirement-flowchart-canvas {
+  position: relative;
+  min-width: 100%;
+}
+
+.requirement-flowchart-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.requirement-flowchart-edges path {
+  fill: none;
+  stroke: #d0d5dd;
+  stroke-width: 1.2;
+}
+
+.requirement-flowchart-edges path.is-schedule-conflict {
+  stroke: #f04438;
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+:root[data-theme="dark"] .requirement-flowchart-edges path {
+  stroke: #3b3d43;
+}
+
+:root[data-theme="dark"] .requirement-flowchart-edges path.is-schedule-conflict {
+  stroke: #ff7b72;
+}
+
+.requirement-flow-node {
+  position: absolute;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--app-text);
+  font-family: inherit;
+  text-align: left;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.requirement-flow-node:hover {
+  background: var(--workbench-hover);
+}
+
+.requirement-flow-node.is-doing {
+  border-color: #1677ff;
+  box-shadow: 0 0 0 1px rgba(22, 119, 255, 0.12);
+}
+
+.requirement-flow-node.is-done {
+  background: rgba(18, 183, 106, 0.06);
+  border-color: rgba(18, 183, 106, 0.38);
+}
+
+.requirement-flow-node.is-schedule-conflict {
+  background: rgba(240, 68, 56, 0.06);
+  border-color: #f04438;
+  box-shadow: 0 0 0 3px rgba(240, 68, 56, 0.14);
+}
+
+.requirement-flow-node.is-schedule-conflict .requirement-flow-node-dot {
+  background: #f04438;
+  box-shadow: 0 0 0 3px rgba(240, 68, 56, 0.16);
+}
+
+.requirement-flow-node.is-selected {
+  z-index: 2;
+  outline: 2px solid #1677ff;
+  outline-offset: 2px;
+}
+
+.requirement-flow-node.is-selected .requirement-flow-node-name {
+  font-weight: 600;
+}
+
+:root[data-theme="dark"] .requirement-flow-node.is-selected {
+  outline-color: #69b1ff;
+}
+
+.requirement-flow-node-warning {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: #f04438;
+  font-size: 12px;
+}
+
+.requirement-flow-node-dot {
+  flex-shrink: 0;
+  width: 9px;
+  height: 9px;
+  background: #c4c9d4;
+  border-radius: 50%;
+}
+
+.requirement-flow-node.is-doing .requirement-flow-node-dot {
+  background: #f5b301;
+  box-shadow: 0 0 0 3px rgba(245, 179, 1, 0.18);
+}
+
+.requirement-flow-node.is-done .requirement-flow-node-dot {
+  background: #12b76a;
+}
+
+.requirement-flow-node-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

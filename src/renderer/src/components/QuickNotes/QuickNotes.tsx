@@ -29,6 +29,7 @@ import type { QuickNote } from '../../../../types/quick-note'
 import { getErrorMessage, getQuickNoteSummary } from '../../../../utils'
 import MarkdownContent from '../MarkdownContent/MarkdownContent'
 import { hasRichTextFormatting, htmlToMarkdown } from './html-to-markdown'
+import './QuickNotes.css'
 
 const MAX_DRAFT_LENGTH = 5000
 const MAX_CLIPBOARD_HTML_LENGTH = 200_000

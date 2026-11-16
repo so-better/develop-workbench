@@ -9,6 +9,7 @@ export type SettingsSection =
   | 'ide'
   | 'terminal'
   | 'power'
+  | 'auto-start'
   | 'repositories'
   | 'ai'
   | 'skills'

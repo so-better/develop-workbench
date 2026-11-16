@@ -1,0 +1,136 @@
+/* 环境检测与初始化页。 */
+
+.environment-setup {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 32px;
+}
+
+.environment-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(560px, 100%);
+  padding: 28px;
+  background: var(--workbench-panel);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 16px;
+  box-shadow: var(--workbench-shadow);
+}
+
+.environment-icon {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 700;
+  background: linear-gradient(145deg, #2b8cff, #1165e8);
+  border-radius: 12px;
+  place-items: center;
+}
+
+.environment-card h2 {
+  margin: 0;
+  color: var(--app-text);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.environment-card > p {
+  margin: 0;
+  color: var(--app-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.environment-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.environment-status-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 9px;
+}
+
+.environment-status-copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.environment-status-copy strong {
+  color: var(--app-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.environment-status-copy span {
+  color: var(--workbench-secondary);
+  font-size: 11px;
+}
+
+.environment-settings-button {
+  height: 24px;
+  padding: 0 2px;
+  color: #1677ff !important;
+  font-size: 12px;
+}
+
+.environment-status-tag {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  height: auto;
+  padding: 0 !important;
+  font-size: 11px;
+  font-weight: 600;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.environment-status-tag .anticon {
+  font-size: 11px;
+}
+
+.environment-status-tag.is-success {
+  color: #16a34a !important;
+}
+
+.environment-status-tag.is-warning {
+  color: #d97706 !important;
+}
+
+.environment-status-tag.is-error {
+  color: #dc2626 !important;
+}
+
+:root[data-theme="dark"] .environment-status-tag.is-success {
+  color: #4ade80 !important;
+}
+
+:root[data-theme="dark"] .environment-status-tag.is-warning {
+  color: #fbbf24 !important;
+}
+
+:root[data-theme="dark"] .environment-status-tag.is-error {
+  color: #f87171 !important;
+}
+
+.environment-status-row .ant-tag {
+  flex-shrink: 0;
+  margin-inline-end: 0;
+}

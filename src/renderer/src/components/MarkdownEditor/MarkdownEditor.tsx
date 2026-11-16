@@ -14,6 +14,7 @@ import {
 import { Button, Input, Segmented, Tooltip } from 'antd'
 import type { TextAreaRef } from 'antd/es/input/TextArea'
 import MarkdownContent from '../MarkdownContent/MarkdownContent'
+import './MarkdownEditor.css'
 
 type MarkdownEditorMode = 'edit' | 'preview'
 

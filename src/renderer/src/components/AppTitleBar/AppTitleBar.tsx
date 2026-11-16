@@ -1,4 +1,5 @@
 import appIcon from '../../../../../build/icon.svg'
+import './AppTitleBar.css'
 
 /**
  * Windows 原生标题栏覆盖层下的拖拽区。

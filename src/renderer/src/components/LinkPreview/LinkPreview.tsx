@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { FileTextOutlined, LinkOutlined } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 import type { LinkPreview as LinkPreviewData } from '../../../../types/link-preview'
+import './LinkPreview.css'
 
 interface LinkPreviewProps {
   /** 链接地址。 */

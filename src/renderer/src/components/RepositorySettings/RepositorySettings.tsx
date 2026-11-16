@@ -40,6 +40,7 @@ import {
   getMergeRequestUrl,
   getRemoteBranchesUrl
 } from '../../utils/git-remote'
+import './RepositorySettings.css'
 
 interface CloneFormValues {
   url: string

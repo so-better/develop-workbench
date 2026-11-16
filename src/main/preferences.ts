@@ -38,6 +38,8 @@ export interface AppPreferences {
   productGuideSeenVersion?: number
   skippedUpdateVersion?: string
   powerRuntimeKeepAwake?: boolean
+  /** 是否已完成开机自启的首次初始化，用于“默认开启”只执行一次。 */
+  autoStartInitialized?: boolean
   terminal: TerminalSettings
 }
 
@@ -195,6 +197,7 @@ const readPreferences = (): AppPreferences => {
     productGuideSeenVersion?: unknown
     skippedUpdateVersion?: unknown
     powerRuntimeKeepAwake?: unknown
+    autoStartInitialized?: unknown
     terminal?: unknown
   }
 
@@ -224,6 +227,10 @@ const readPreferences = (): AppPreferences => {
       typeof value.powerRuntimeKeepAwake === 'boolean'
         ? value.powerRuntimeKeepAwake
         : false,
+    autoStartInitialized:
+      typeof value.autoStartInitialized === 'boolean'
+        ? value.autoStartInitialized
+        : undefined,
     terminal: normalizeTerminalSettings(value.terminal)
   }
 

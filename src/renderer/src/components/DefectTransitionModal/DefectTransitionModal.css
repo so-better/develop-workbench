@@ -1,0 +1,74 @@
+/* 缺陷状态流转弹窗。 */
+
+.defect-transition-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.defect-transition-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.defect-transition-form label > span {
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.defect-transition-form .ant-select {
+  width: 100%;
+}
+
+.defect-transition-current {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.defect-transition-loading {
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+}
+
+.defect-transition-hint {
+  margin: 0;
+  color: var(--workbench-secondary);
+  font-size: 12px;
+}
+
+.defect-transition-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--workbench-soft);
+  border: 1px solid var(--workbench-divider);
+  border-radius: 8px;
+}
+
+.defect-transition-role-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.defect-transition-role-label {
+  color: var(--workbench-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.defect-transition-role-warning {
+  margin: 0;
+  color: #d92d20;
+  font-size: 11px;
+  line-height: 1.6;
+}

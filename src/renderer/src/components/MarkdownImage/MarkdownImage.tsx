@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button, Image } from 'antd'
+import './MarkdownImage.css'
 
 interface MarkdownImageProps {
   src?: string
