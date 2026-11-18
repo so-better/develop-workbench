@@ -11,6 +11,7 @@ import {
 import { runMeegle } from './meegle'
 import { getPreferences, updatePreferences } from './preferences'
 import { parseReleaseDate } from '../utils'
+import { findScheduleConflicts } from '../utils/schedule-conflicts'
 import type {
   VersionSummaryRequirement,
   MeegleMyRequirements,
@@ -1727,7 +1728,8 @@ const computeRequirementNodeCompletion = async (
   return {
     completed: doneNodeNames.length > 0 && activeNodeNames.length === 0,
     doneNodeNames,
-    activeNodeNames
+    activeNodeNames,
+    scheduleConflictCount: findScheduleConflicts(nodes).length
   }
 }
 
@@ -2082,6 +2084,7 @@ export const updateRequirementNode = async (
     ensureWriteSuccess(ownerResult, '更新节点负责人')
   }
 
+  invalidateRequirementNodeCompletion(workItemId)
 }
 
 /** 需求终态，默认不进入待办列表。 */

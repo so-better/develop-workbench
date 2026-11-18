@@ -16,7 +16,7 @@ import type {
   MeegleRequirementOwner,
   MeegleWorkflowNode
 } from '../../../../types/requirements'
-import type { ScheduleConflict } from '../../utils/schedule-conflicts'
+import type { ScheduleConflict } from '../../../../utils/schedule-conflicts'
 import {
   formatActualWorkTime,
   formatNodeRange,

@@ -334,6 +334,9 @@ export interface MeegleRequirementNodeCompletion {
 
   /** 当前用户负责且仍在进行中的节点名称。 */
   activeNodeNames: string[]
+
+  /** 流程节点排期顺序异常数量。 */
+  scheduleConflictCount: number
 }
 
 /**

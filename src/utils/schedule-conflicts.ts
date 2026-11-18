@@ -1,4 +1,4 @@
-import type { MeegleWorkflowNode } from '../../../types/requirements'
+import type { MeegleWorkflowNode } from '../types/requirements'
 
 /** 流程图中前置节点与后续节点的排期顺序冲突。 */
 export interface ScheduleConflict {

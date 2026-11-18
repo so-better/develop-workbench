@@ -1,5 +1,5 @@
 import { Avatar, Tag, Tooltip } from 'antd'
-import { CheckCircleFilled } from '@ant-design/icons'
+import { CheckCircleFilled, WarningFilled } from '@ant-design/icons'
 import type {
   MeegleRequirement,
   MeegleRequirementNodeCompletion
@@ -31,6 +31,8 @@ export default function RequirementListItem({
   onSelect
 }: RequirementListItemProps): JSX.Element {
   const isMyNodeDone = nodeCompletion?.completed === true
+  const scheduleConflictCount = nodeCompletion?.scheduleConflictCount ?? 0
+  const scheduleConflictTitle = `流程节点排期异常 ${scheduleConflictCount} 处，打开需求查看`
 
   return (
     <button
@@ -51,6 +53,17 @@ export default function RequirementListItem({
           >
             {requirement.priority}
           </span>
+        ) : null}
+        {scheduleConflictCount > 0 ? (
+          <Tooltip title={scheduleConflictTitle}>
+            <span
+              className="workbench-requirement-item-conflict-icon"
+              role="img"
+              aria-label="流程节点排期异常"
+            >
+              <WarningFilled />
+            </span>
+          </Tooltip>
         ) : null}
         <span className="workbench-requirement-item-name" title={requirement.name}>
           {requirement.name}
@@ -118,6 +131,17 @@ export default function RequirementListItem({
       </span>
       <span className="workbench-requirement-item-footer">
         <span className="workbench-requirement-item-tags">
+          {scheduleConflictCount > 0 ? (
+            <Tooltip title={scheduleConflictTitle}>
+              <span
+                className="workbench-requirement-item-conflict"
+                aria-label="流程节点排期异常"
+              >
+                <WarningFilled />
+                排期异常
+              </span>
+            </Tooltip>
+          ) : null}
           {isMyNodeDone ? (
             <Tooltip
               title={`我负责的节点已完成：${nodeCompletion.doneNodeNames.join('、')}`}

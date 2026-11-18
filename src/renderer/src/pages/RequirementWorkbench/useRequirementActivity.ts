@@ -9,7 +9,7 @@ import type {
 import { getErrorMessage } from '../../../../utils'
 import {
   findScheduleConflicts
-} from '../../utils/schedule-conflicts'
+} from '../../../../utils/schedule-conflicts'
 import { isLocalRequirementId } from './workbench-utils'
 
 interface UseRequirementActivityOptions {
@@ -425,7 +425,7 @@ export const useRequirementActivity = ({
       )
       message.success('节点信息已更新')
       setNodeEditing(false)
-      refreshActivity()
+      await refreshWorkbench()
     } catch (saveError) {
       message.error(getErrorMessage(saveError))
     } finally {
