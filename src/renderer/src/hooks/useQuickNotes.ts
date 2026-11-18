@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { QuickNote } from '../../../types/quick-note'
+import type {
+  QuickNote,
+  QuickNoteRecurrence
+} from '../../../types/quick-note'
 import { getErrorMessage } from '../../../utils'
 
 interface QuickNotesController {
@@ -8,8 +11,16 @@ interface QuickNotesController {
   loading: boolean
   error: string | null
   reload: () => Promise<void>
-  add: (text: string, dueAt: string | null) => Promise<void>
-  setDueAt: (id: string, dueAt: string | null) => Promise<void>
+  add: (
+    text: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ) => Promise<void>
+  setDueAt: (
+    id: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ) => Promise<void>
   setDone: (id: string, done: boolean) => Promise<void>
   remove: (id: string) => Promise<void>
   clearCompleted: () => Promise<void>
@@ -70,12 +81,22 @@ export const useQuickNotes = (): QuickNotesController => {
       setError(null)
     }), [enqueue])
 
-  const add = useCallback(async (text: string, dueAt: string | null): Promise<void> => {
-    await mutate(() => window.electron.addQuickNote(text, dueAt))
+  const add = useCallback(async (
+    text: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ): Promise<void> => {
+    await mutate(() => window.electron.addQuickNote(text, dueAt, recurrence))
   }, [mutate])
 
-  const setDueAt = useCallback(async (id: string, dueAt: string | null): Promise<void> => {
-    await mutate(() => window.electron.setQuickNoteDueAt(id, dueAt))
+  const setDueAt = useCallback(async (
+    id: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ): Promise<void> => {
+    await mutate(() =>
+      window.electron.setQuickNoteDueAt(id, dueAt, recurrence)
+    )
   }, [mutate])
 
   const setDone = useCallback(async (id: string, done: boolean): Promise<void> => {

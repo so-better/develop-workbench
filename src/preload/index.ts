@@ -14,7 +14,11 @@ import type {
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
-import type { QuickNoteReminder, QuickNoteState } from '../types/quick-note'
+import type {
+  QuickNoteRecurrence,
+  QuickNoteReminder,
+  QuickNoteState
+} from '../types/quick-note'
 import type {
   MigrationExportResult,
   MigrationImportResult
@@ -234,12 +238,20 @@ const electronAPI = {
     ipcRenderer.invoke('quick-notes:get-state'),
 
   /** 新增一条待办简记。 */
-  addQuickNote: (text: string, dueAt: string | null): Promise<QuickNoteState> =>
-    ipcRenderer.invoke('quick-notes:add', text, dueAt),
+  addQuickNote: (
+    text: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:add', text, dueAt, recurrence),
 
   /** 更新待办截止时间。 */
-  setQuickNoteDueAt: (id: string, dueAt: string | null): Promise<QuickNoteState> =>
-    ipcRenderer.invoke('quick-notes:set-due-at', id, dueAt),
+  setQuickNoteDueAt: (
+    id: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:set-due-at', id, dueAt, recurrence),
 
   /** 更新待办完成状态。 */
   setQuickNoteDone: (id: string, done: boolean): Promise<QuickNoteState> =>
@@ -258,8 +270,11 @@ const electronAPI = {
     ipcRenderer.invoke('quick-notes:renderer-ready'),
 
   /** 确认应用内提醒已展示。 */
-  ackQuickNoteReminder: (id: string, dueAt: string): Promise<boolean> =>
-    ipcRenderer.invoke('quick-notes:ack-reminder', id, dueAt),
+  ackQuickNoteReminder: (
+    id: string,
+    occurrenceAt: string
+  ): Promise<boolean> =>
+    ipcRenderer.invoke('quick-notes:ack-reminder', id, occurrenceAt),
 
   /** 订阅主进程转发的待办提醒。 */
   onQuickNoteReminder: (listener: (reminder: QuickNoteReminder) => void): (() => void) => {

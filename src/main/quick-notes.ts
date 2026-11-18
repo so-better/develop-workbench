@@ -7,10 +7,16 @@ import { randomUUID } from 'node:crypto'
 import { readFile, rename, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getQuickNoteSummary } from '../utils'
+import {
+  formatQuickNoteRecurrence,
+  getNextRecurringReminderAt,
+  isQuickNoteRecurrence
+} from '../utils/quick-note-recurrence'
 import { backupCorruptStore } from './store-backup'
 import { focusMainWindow, getMainWindow } from './window'
 import type {
   QuickNote,
+  QuickNoteRecurrence,
   QuickNoteReminder,
   QuickNoteState
 } from '../types/quick-note'
@@ -19,6 +25,8 @@ const STORE_FILE = 'quick-notes.json'
 const MAX_TEXT_LENGTH = 5000
 const MAX_NOTES = 500
 const REMINDER_LEAD_MS = 5 * 60 * 1000
+const MINUTELY_REMINDER_LEAD_MS = 30 * 1000
+const IMMEDIATE_REMINDER_WINDOW_MS = 60 * 1000
 const MAX_TIMEOUT_MS = 2_147_000_000
 
 const getStorePath = (): string => join(app.getPath('userData'), STORE_FILE)
@@ -59,6 +67,16 @@ const parseDueAt = (value: unknown): string | null => {
   return new Date(timestamp).toISOString()
 }
 
+/** 校验并规范化重复规则；没有截止时间时不重复。 */
+const parseRecurrence = (
+  value: unknown,
+  dueAt: string | null
+): QuickNoteRecurrence => {
+  if (!dueAt || !isQuickNoteRecurrence(value)) return 'none'
+
+  return value
+}
+
 const formatDueAt = (value: string): string => {
   const date = new Date(value)
   const pad = (input: number): string => String(input).padStart(2, '0')
@@ -77,6 +95,20 @@ const normalizeStoredNote = (value: unknown): QuickNote | null => {
   const reminderSentAt = dueAt
     ? normalizeStoredTimestamp(note.reminderSentAt)
     : null
+  const recurrence = dueAt && isQuickNoteRecurrence(note.recurrence)
+    ? note.recurrence
+    : 'none'
+  const storedRecurrenceDay =
+    typeof note.recurrenceDay === 'number' &&
+    Number.isInteger(note.recurrenceDay) &&
+    note.recurrenceDay >= 1 &&
+    note.recurrenceDay <= 31
+      ? note.recurrenceDay
+      : null
+  const recurrenceDay =
+    recurrence === 'monthly' && dueAt
+      ? storedRecurrenceDay ?? new Date(dueAt).getDate()
+      : null
 
   if (
     typeof note.id !== 'string' ||
@@ -98,7 +130,9 @@ const normalizeStoredNote = (value: unknown): QuickNote | null => {
     updatedAt: note.updatedAt,
     completedAt: note.completedAt,
     dueAt,
-    reminderSentAt
+    reminderSentAt,
+    recurrence,
+    recurrenceDay
   }
 }
 
@@ -217,11 +251,17 @@ const flushPendingReminders = (): void => {
   }
 }
 
+/** 记录某次循环提醒已发送，并重新安排下一次提醒。 */
 const markReminderSent = async (
   id: string,
-  dueAt: string
+  occurrenceValue: string
 ): Promise<boolean> => {
-  const key = getReminderKey(id, dueAt)
+  const occurrence = normalizeStoredTimestamp(occurrenceValue)
+
+  if (!occurrence) return false
+
+  const key = getReminderKey(id, occurrence)
+  const occurrenceTime = Date.parse(occurrence)
 
   const marked = await mutateNotes(async () => {
     const notes = await readNotes()
@@ -231,8 +271,8 @@ const markReminderSent = async (
       !current ||
       current.done ||
       !current.dueAt ||
-      current.dueAt !== dueAt ||
-      current.reminderSentAt
+      current.reminderSentAt === occurrence ||
+      occurrenceTime > Date.parse(current.dueAt)
     ) {
       return false
     }
@@ -244,7 +284,7 @@ const markReminderSent = async (
         item.id === id
           ? {
               ...item,
-              reminderSentAt: now,
+              reminderSentAt: occurrence,
               updatedAt: now
             }
           : item
@@ -256,21 +296,31 @@ const markReminderSent = async (
 
   pendingReminders.delete(key)
 
+  if (marked) queueReminderCheck()
+
   return marked
 }
 
-const attemptReminder = (note: QuickNote): void => {
+const attemptReminder = (note: QuickNote, occurrenceAt: string): void => {
   if (!note.dueAt) return
 
-  const key = getReminderKey(note.id, note.dueAt)
+  const key = getReminderKey(note.id, occurrenceAt)
 
   if (pendingReminders.has(key)) return
 
   const reminder: QuickNoteReminder = {
     id: note.id,
     text: getQuickNoteSummary(note.text, 120),
-    dueAt: note.dueAt
+    dueAt: note.dueAt,
+    occurrenceAt,
+    recurrence: note.recurrence,
+    recurrenceDay: note.recurrenceDay
   }
+  const recurrenceLabel = formatQuickNoteRecurrence(
+    note.recurrence,
+    note.dueAt,
+    note.recurrenceDay
+  )
 
   pendingReminders.set(key, reminder)
 
@@ -283,8 +333,12 @@ const attemptReminder = (note: QuickNote): void => {
 
   try {
     notification = new Notification({
-      title: '待办即将截止',
-      body: `${reminder.text}\n截止时间：${formatDueAt(reminder.dueAt)}`
+      title: recurrenceLabel ? '循环待办提醒' : '待办即将截止',
+      body: recurrenceLabel
+        ? `${reminder.text}\n${recurrenceLabel}\n提醒时间：${formatDueAt(
+            occurrenceAt
+          )}\n最终截止：${formatDueAt(reminder.dueAt)}`
+        : `${reminder.text}\n截止时间：${formatDueAt(reminder.dueAt)}`
     })
   } catch (error) {
     console.warn('发送待办通知失败，改用应用内提醒：', error)
@@ -330,7 +384,7 @@ const attemptReminder = (note: QuickNote): void => {
       fallbackTimer = null
     }
 
-    void markReminderSent(note.id, note.dueAt as string).catch((error) => {
+    void markReminderSent(note.id, occurrenceAt).catch((error) => {
       console.warn('记录待办提醒状态失败，改用应用内提醒：', error)
       sendInAppReminder(reminder)
     })
@@ -365,6 +419,78 @@ const attemptReminder = (note: QuickNote): void => {
   }
 }
 
+/** 分钟级提醒使用更短的前置时间，避免同一提醒窗口覆盖多个周期。 */
+const getReminderLeadMs = (recurrence: QuickNoteRecurrence): number =>
+  recurrence === 'minutely' ? MINUTELY_REMINDER_LEAD_MS : REMINDER_LEAD_MS
+
+/**
+ * 新建循环待办时，如果下一次提醒会在一分钟内触发，则跳过当前周期。
+ * 最后一次提醒（最终截止时间）不跳过，避免临近截止时完全没有提醒。
+ */
+const getInitialReminderSentAt = (
+  dueAt: string | null,
+  recurrence: QuickNoteRecurrence,
+  recurrenceDay: number | null
+): string | null => {
+  if (!dueAt || recurrence === 'none') return null
+
+  const now = Date.now()
+  const occurrence = getNextRecurringReminderAt(
+    dueAt,
+    recurrence,
+    recurrenceDay,
+    now
+  )
+
+  if (!occurrence) return null
+
+  const nextAfter = getNextRecurringReminderAt(
+    dueAt,
+    recurrence,
+    recurrenceDay,
+    Date.parse(occurrence)
+  )
+
+  if (!nextAfter) return null
+
+  const triggerAt = Date.parse(occurrence) - getReminderLeadMs(recurrence)
+
+  return triggerAt - now <= IMMEDIATE_REMINDER_WINDOW_MS ? occurrence : null
+}
+
+/** 计算下一条待办提醒；循环待办从最终截止时间向前回溯。 */
+const getNextReminder = (
+  note: QuickNote,
+  now: number
+): { at: number; occurrence: string } | null => {
+  if (!note.dueAt) return null
+
+  if (note.recurrence === 'none') {
+    if (note.reminderSentAt) return null
+
+    const dueAt = Date.parse(note.dueAt)
+
+    if (!Number.isFinite(dueAt) || dueAt <= now) return null
+
+    return { at: dueAt, occurrence: note.dueAt }
+  }
+
+  const last = note.reminderSentAt ? Date.parse(note.reminderSentAt) : 0
+  const after = Math.max(now, Number.isFinite(last) ? last : 0)
+  const occurrence = getNextRecurringReminderAt(
+    note.dueAt,
+    note.recurrence,
+    note.recurrenceDay,
+    after
+  )
+
+  if (!occurrence) return null
+
+  const at = Date.parse(occurrence)
+
+  return Number.isFinite(at) ? { at, occurrence } : null
+}
+
 const scheduleNextReminder = async (): Promise<void> => {
   clearReminderTimer()
 
@@ -373,14 +499,14 @@ const scheduleNextReminder = async (): Promise<void> => {
   let nextAt = Number.POSITIVE_INFINITY
 
   for (const note of notes) {
-    if (note.done || !note.dueAt || note.reminderSentAt) continue
+    if (note.done) continue
 
-    const dueAt = Date.parse(note.dueAt)
+    const next = getNextReminder(note, now)
 
-    if (!Number.isFinite(dueAt) || dueAt <= now) continue
-    if (pendingReminders.has(getReminderKey(note.id, note.dueAt))) continue
+    if (!next) continue
+    if (pendingReminders.has(getReminderKey(note.id, next.occurrence))) continue
 
-    const triggerAt = dueAt - REMINDER_LEAD_MS
+    const triggerAt = next.at - getReminderLeadMs(note.recurrence)
 
     if (triggerAt <= now) {
       nextAt = now
@@ -407,15 +533,15 @@ const runReminderCheck = async (): Promise<void> => {
   const now = Date.now()
 
   for (const note of notes) {
-    if (note.done || !note.dueAt || note.reminderSentAt) continue
+    if (note.done) continue
 
-    const dueAt = Date.parse(note.dueAt)
+    const next = getNextReminder(note, now)
 
-    if (!Number.isFinite(dueAt) || dueAt <= now) continue
-    if (dueAt - now > REMINDER_LEAD_MS) continue
-    if (pendingReminders.has(getReminderKey(note.id, note.dueAt))) continue
+    if (!next) continue
+    if (next.at - now > getReminderLeadMs(note.recurrence)) continue
+    if (pendingReminders.has(getReminderKey(note.id, next.occurrence))) continue
 
-    attemptReminder(note)
+    attemptReminder(note, next.occurrence)
   }
 
   await scheduleNextReminder()
@@ -434,22 +560,31 @@ const queueReminderCheck = (): void => {
 
 export const acknowledgeQuickNoteReminder = async (
   idValue: unknown,
-  dueValue: unknown
+  occurrenceValue: unknown
 ): Promise<boolean> => {
   const id = requireNoteId(idValue)
-  const dueAt = parseDueAt(dueValue)
+  const occurrence = normalizeStoredTimestamp(occurrenceValue)
 
-  if (!dueAt) return false
+  if (!occurrence) return false
 
-  return markReminderSent(id, dueAt)
+  return markReminderSent(id, occurrence)
 }
 
 export const addQuickNote = async (
   value: unknown,
-  dueValue: unknown
+  dueValue: unknown,
+  recurrenceValue: unknown
 ): Promise<QuickNoteState> => {
   const text = normalizeText(value)
   const dueAt = parseDueAt(dueValue)
+  const recurrence = parseRecurrence(recurrenceValue, dueAt)
+  const recurrenceDay =
+    recurrence === 'monthly' && dueAt ? new Date(dueAt).getDate() : null
+  const reminderSentAt = getInitialReminderSentAt(
+    dueAt,
+    recurrence,
+    recurrenceDay
+  )
 
   if (!text) throw new Error('待办内容不能为空')
 
@@ -467,7 +602,9 @@ export const addQuickNote = async (
           updatedAt: now,
           completedAt: null,
           dueAt,
-          reminderSentAt: null
+          reminderSentAt,
+          recurrence,
+          recurrenceDay
         },
         ...notes
       ].slice(0, MAX_NOTES)
@@ -519,10 +656,14 @@ export const setQuickNoteDone = async (
 
 export const setQuickNoteDueAt = async (
   idValue: unknown,
-  dueValue: unknown
+  dueValue: unknown,
+  recurrenceValue: unknown
 ): Promise<QuickNoteState> => {
   const id = requireNoteId(idValue)
   const dueAt = parseDueAt(dueValue)
+  const recurrence = parseRecurrence(recurrenceValue, dueAt)
+  const recurrenceDay =
+    recurrence === 'monthly' && dueAt ? new Date(dueAt).getDate() : null
 
   const state = await mutateNotes(async () => {
     const notes = await readNotes()
@@ -534,7 +675,14 @@ export const setQuickNoteDueAt = async (
           ? {
               ...note,
               dueAt,
-              reminderSentAt: note.dueAt === dueAt ? note.reminderSentAt : null,
+              recurrence,
+              recurrenceDay,
+              reminderSentAt:
+                note.dueAt === dueAt &&
+                note.recurrence === recurrence &&
+                note.recurrenceDay === recurrenceDay
+                  ? note.reminderSentAt
+                  : null,
               updatedAt: now
             }
           : note
@@ -583,8 +731,10 @@ export const clearCompletedQuickNotes = async (): Promise<QuickNoteState> => {
  */
 export const initializeQuickNotes = (): void => {
   ipcMain.handle('quick-notes:get-state', () => getQuickNoteState())
-  ipcMain.handle('quick-notes:add', (_event, text: unknown, dueAt: unknown) =>
-    addQuickNote(text, dueAt)
+  ipcMain.handle(
+    'quick-notes:add',
+    (_event, text: unknown, dueAt: unknown, recurrence: unknown) =>
+      addQuickNote(text, dueAt, recurrence)
   )
   ipcMain.handle(
     'quick-notes:set-done',
@@ -592,7 +742,8 @@ export const initializeQuickNotes = (): void => {
   )
   ipcMain.handle(
     'quick-notes:set-due-at',
-    (_event, id: unknown, dueAt: unknown) => setQuickNoteDueAt(id, dueAt)
+    (_event, id: unknown, dueAt: unknown, recurrence: unknown) =>
+      setQuickNoteDueAt(id, dueAt, recurrence)
   )
   ipcMain.handle('quick-notes:remove', (_event, id: unknown) => removeQuickNote(id))
   ipcMain.handle('quick-notes:clear-completed', () => clearCompletedQuickNotes())

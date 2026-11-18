@@ -12,7 +12,11 @@ import type {
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
 import type { ProductGuideState } from '../types/product-guide'
-import type { QuickNoteReminder, QuickNoteState } from '../types/quick-note'
+import type {
+  QuickNoteRecurrence,
+  QuickNoteReminder,
+  QuickNoteState
+} from '../types/quick-note'
 import type {
   MigrationExportResult,
   MigrationImportResult
@@ -184,9 +188,17 @@ export interface ElectronAPI {
   /** 读取待办简记。 */
   getQuickNoteState: () => Promise<QuickNoteState>
   /** 新增一条待办简记。 */
-  addQuickNote: (text: string, dueAt: string | null) => Promise<QuickNoteState>
+  addQuickNote: (
+    text: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ) => Promise<QuickNoteState>
   /** 更新待办截止时间。 */
-  setQuickNoteDueAt: (id: string, dueAt: string | null) => Promise<QuickNoteState>
+  setQuickNoteDueAt: (
+    id: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ) => Promise<QuickNoteState>
   /** 更新待办完成状态。 */
   setQuickNoteDone: (id: string, done: boolean) => Promise<QuickNoteState>
   /** 删除一条待办。 */
@@ -196,7 +208,10 @@ export interface ElectronAPI {
   /** 通知主进程待办渲染器已就绪，补发未送达的提醒。 */
   notifyQuickNotesRendererReady: () => Promise<boolean>
   /** 确认应用内提醒已展示。 */
-  ackQuickNoteReminder: (id: string, dueAt: string) => Promise<boolean>
+  ackQuickNoteReminder: (
+    id: string,
+    occurrenceAt: string
+  ) => Promise<boolean>
   /** 订阅主进程转发的待办提醒。 */
   onQuickNoteReminder: (listener: (reminder: QuickNoteReminder) => void) => () => void
   /** 订阅主进程转发的待办简记打开事件。 */

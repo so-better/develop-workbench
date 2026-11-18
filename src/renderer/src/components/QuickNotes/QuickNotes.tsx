@@ -10,7 +10,8 @@ import {
   CloseOutlined,
   DeleteOutlined,
   DownOutlined,
-  PlusOutlined
+  PlusOutlined,
+  SyncOutlined
 } from '@ant-design/icons'
 import {
   App,
@@ -20,24 +21,57 @@ import {
   Input,
   Modal,
   Popconfirm,
+  Select,
   Spin
 } from 'antd'
 import type { TextAreaRef } from 'antd/es/input/TextArea'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
-import type { QuickNote } from '../../../../types/quick-note'
+import type {
+  QuickNote,
+  QuickNoteRecurrence
+} from '../../../../types/quick-note'
 import { getErrorMessage, getQuickNoteSummary } from '../../../../utils'
+import { formatQuickNoteRecurrence } from '../../../../utils/quick-note-recurrence'
 import MarkdownContent from '../MarkdownContent/MarkdownContent'
 import { hasRichTextFormatting, htmlToMarkdown } from './html-to-markdown'
 import './QuickNotes.css'
 
 const MAX_DRAFT_LENGTH = 5000
 const MAX_CLIPBOARD_HTML_LENGTH = 200_000
+const RECURRENCE_OPTIONS: Array<{
+  value: QuickNoteRecurrence
+  label: string
+}> = [
+  { value: 'none', label: '不重复' },
+  { value: 'minutely', label: '每分钟' },
+  { value: 'hourly', label: '每小时' },
+  { value: 'daily', label: '每天' },
+  { value: 'weekly', label: '每周' },
+  { value: 'monthly', label: '每月' }
+]
 const PANEL_WIDTH = 560
 const PANEL_Z_INDEX = 1100
 const OVERLAY_Z_INDEX = 1000
 const DUE_MODAL_Z_INDEX = 1300
 const DATE_POPUP_Z_INDEX = 1400
+
+const getRecurrenceHint = (recurrence: QuickNoteRecurrence): string => {
+  switch (recurrence) {
+    case 'none':
+      return '提前 5 分钟提醒'
+    case 'minutely':
+      return '每分钟提醒一次（提前 30 秒）'
+    case 'hourly':
+      return '每小时提醒一次，提前 5 分钟'
+    case 'daily':
+      return '每天提醒一次，提前 5 分钟'
+    case 'weekly':
+      return '每周提醒一次，提前 5 分钟'
+    case 'monthly':
+      return '每月提醒一次，提前 5 分钟'
+  }
+}
 
 const isOverlayTarget = (target: Element): boolean => {
   let element: Element | null = target
@@ -76,8 +110,16 @@ interface QuickNotesProps {
   onOpen: () => void
   onReload: () => void
   onClose: () => void
-  onAdd: (text: string, dueAt: string | null) => Promise<void>
-  onSetDueAt: (id: string, dueAt: string | null) => Promise<void>
+  onAdd: (
+    text: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ) => Promise<void>
+  onSetDueAt: (
+    id: string,
+    dueAt: string | null,
+    recurrence: QuickNoteRecurrence
+  ) => Promise<void>
   onSetDone: (id: string, done: boolean) => Promise<void>
   onRemove: (id: string) => Promise<void>
   onClearCompleted: () => Promise<void>
@@ -104,12 +146,16 @@ export default function QuickNotes({
   const { message, notification } = App.useApp()
   const [draft, setDraft] = useState('')
   const [composerDueAt, setComposerDueAt] = useState<Dayjs | null>(null)
+  const [composerRecurrence, setComposerRecurrence] =
+    useState<QuickNoteRecurrence>('none')
   const [composerDueOpen, setComposerDueOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [showCompleted, setShowCompleted] = useState(false)
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set())
   const [editingDueNoteId, setEditingDueNoteId] = useState<string | null>(null)
   const [editingDueValue, setEditingDueValue] = useState<Dayjs | null>(null)
+  const [editingDueRecurrence, setEditingDueRecurrence] =
+    useState<QuickNoteRecurrence>('none')
   const [dueSaving, setDueSaving] = useState(false)
   const [panelPosition, setPanelPosition] = useState<{
     left: number
@@ -184,18 +230,30 @@ export default function QuickNotes({
 
   useEffect(() => {
     const unsubscribe = window.electron.onQuickNoteReminder((reminder) => {
+      const recurrenceLabel = formatQuickNoteRecurrence(
+        reminder.recurrence,
+        reminder.dueAt,
+        reminder.recurrenceDay
+      )
+
       notification.warning({
-        message: '待办即将截止',
-        description: `${reminder.text} · 截止 ${dayjs(reminder.dueAt).format(
-          'MM-DD HH:mm'
-        )}`,
+        message: recurrenceLabel ? '循环待办提醒' : '待办即将截止',
+        description: recurrenceLabel
+          ? `${reminder.text} · ${recurrenceLabel} · 提醒 ${dayjs(
+              reminder.occurrenceAt
+            ).format('MM-DD HH:mm')} · 最终截止 ${dayjs(reminder.dueAt).format(
+              'MM-DD HH:mm'
+            )}`
+          : `${reminder.text} · 截止 ${dayjs(reminder.dueAt).format(
+              'MM-DD HH:mm'
+            )}`,
         duration: 12,
         placement: 'topLeft',
-        key: `quick-note-reminder-${reminder.id}-${reminder.dueAt}`,
+        key: `quick-note-reminder-${reminder.id}-${reminder.occurrenceAt}`,
         onClick: onOpen
       })
       void window.electron
-        .ackQuickNoteReminder(reminder.id, reminder.dueAt)
+        .ackQuickNoteReminder(reminder.id, reminder.occurrenceAt)
         .catch(() => undefined)
     })
 
@@ -212,6 +270,7 @@ export default function QuickNotes({
     setComposerDueOpen(false)
     setEditingDueNoteId(null)
     setEditingDueValue(null)
+    setEditingDueRecurrence('none')
     setDueSaving(false)
   }, [open])
 
@@ -323,9 +382,14 @@ export default function QuickNotes({
     setSubmitting(true)
 
     try {
-      await onAdd(text, composerDueAt?.toISOString() ?? null)
+      await onAdd(
+        text,
+        composerDueAt?.toISOString() ?? null,
+        composerRecurrence
+      )
       setDraft('')
       setComposerDueAt(null)
+      setComposerRecurrence('none')
       window.requestAnimationFrame(() => inputRef.current?.focus())
     } catch (addError) {
       message.error(getErrorMessage(addError, '添加待办失败'))
@@ -337,6 +401,7 @@ export default function QuickNotes({
   const openDueEditor = (note: QuickNote): void => {
     setEditingDueNoteId(note.id)
     setEditingDueValue(note.dueAt ? dayjs(note.dueAt) : null)
+    setEditingDueRecurrence(note.recurrence)
   }
 
   const closeDueEditor = (): void => {
@@ -344,6 +409,7 @@ export default function QuickNotes({
 
     setEditingDueNoteId(null)
     setEditingDueValue(null)
+    setEditingDueRecurrence('none')
   }
 
   const handleSaveDue = async (): Promise<void> => {
@@ -359,10 +425,12 @@ export default function QuickNotes({
     try {
       await onSetDueAt(
         editingDueNoteId,
-        editingDueValue?.toISOString() ?? null
+        editingDueValue?.toISOString() ?? null,
+        editingDueValue ? editingDueRecurrence : 'none'
       )
       setEditingDueNoteId(null)
       setEditingDueValue(null)
+      setEditingDueRecurrence('none')
     } catch (dueError) {
       message.error(getErrorMessage(dueError, '更新截止时间失败'))
     } finally {
@@ -476,6 +544,11 @@ export default function QuickNotes({
     const summary = getQuickNoteSummary(note.text, 80)
     const dueAt = note.dueAt ? dayjs(note.dueAt) : null
     const dueOverdue = Boolean(dueAt && !note.done && dueAt.isBefore(dayjs()))
+    const recurrenceLabel = formatQuickNoteRecurrence(
+      note.recurrence,
+      note.dueAt,
+      note.recurrenceDay
+    )
 
     return (
       <div
@@ -486,7 +559,9 @@ export default function QuickNotes({
           checked={note.done}
           disabled={busy}
           aria-label={
-            note.done ? `标记「${summary}」为未完成` : `完成「${summary}」`
+            note.done
+              ? `标记「${summary}」为未完成`
+              : `完成「${summary}」`
           }
           onChange={() => handleToggle(note)}
         />
@@ -497,15 +572,25 @@ export default function QuickNotes({
               className="quick-note-markdown"
             />
           </div>
-          {dueAt ? (
-            <button
-              type="button"
-              className={`quick-note-due${dueOverdue ? ' is-overdue' : ''}`}
-              onClick={() => openDueEditor(note)}
-            >
-              <ClockCircleOutlined />
-              截止 {dueAt.format('MM-DD HH:mm')}
-            </button>
+          {dueAt || recurrenceLabel ? (
+            <div className="quick-note-meta">
+              {dueAt ? (
+                <button
+                  type="button"
+                  className={`quick-note-due${dueOverdue ? ' is-overdue' : ''}`}
+                  onClick={() => openDueEditor(note)}
+                >
+                  <ClockCircleOutlined />
+                  截止 {dueAt.format('MM-DD HH:mm')}
+                </button>
+              ) : null}
+              {recurrenceLabel ? (
+                <span className="quick-note-recurrence">
+                  <SyncOutlined />
+                  {recurrenceLabel}
+                </span>
+              ) : null}
+            </div>
           ) : null}
         </div>
         <div className="quick-note-actions">
@@ -632,9 +717,33 @@ export default function QuickNotes({
                     current && current.endOf('day').isBefore(dayjs(), 'day')
                   )
                 }
-                onChange={(value) => setComposerDueAt(value)}
+                onChange={(value) => {
+                  setComposerDueAt(value)
+                  if (!value) setComposerRecurrence('none')
+                }}
               />
-              <span className="quick-notes-composer-hint">提前 5 分钟提醒</span>
+              <Select
+                className="quick-notes-recurrence-select"
+                size="small"
+                variant="borderless"
+                value={composerRecurrence}
+                options={RECURRENCE_OPTIONS}
+                disabled={loading || !composerDueAt}
+                popupMatchSelectWidth={120}
+                styles={{
+                  popup: { root: { zIndex: DATE_POPUP_Z_INDEX } }
+                }}
+                title={!composerDueAt ? '先选择截止时间后设置重复' : undefined}
+                aria-label="重复规则"
+                onChange={(value: QuickNoteRecurrence) =>
+                  setComposerRecurrence(value)
+                }
+              />
+              <span className="quick-notes-composer-hint">
+                {!composerDueAt
+                  ? '先选截止时间可设置重复'
+                  : getRecurrenceHint(composerRecurrence)}
+              </span>
             </div>
             <div className="quick-notes-composer-actions">
               {draft.length > 0 ? (
@@ -768,9 +877,31 @@ export default function QuickNotes({
             disabledDate={(current) =>
               Boolean(current && current.endOf('day').isBefore(dayjs(), 'day'))
             }
-            onChange={(value) => setEditingDueValue(value)}
+            onChange={(value) => {
+              setEditingDueValue(value)
+              if (!value) setEditingDueRecurrence('none')
+            }}
           />
-          <span>保存后会在截止前 5 分钟发送应用通知，清空日期可取消提醒。</span>
+          <Select
+            className="quick-notes-recurrence-select"
+            value={editingDueValue ? editingDueRecurrence : 'none'}
+            options={RECURRENCE_OPTIONS}
+            disabled={!editingDueValue}
+            popupMatchSelectWidth={120}
+            styles={{ popup: { root: { zIndex: DATE_POPUP_Z_INDEX } } }}
+            title={!editingDueValue ? '先选择截止时间后设置重复' : undefined}
+            aria-label="重复规则"
+            onChange={(value: QuickNoteRecurrence) =>
+              setEditingDueRecurrence(value)
+            }
+          />
+          <span>
+            {editingDueValue
+              ? `截止时间为最终期限；保存后会${getRecurrenceHint(
+                  editingDueRecurrence
+                )}。完成或删除待办后停止提醒，清空日期可取消。`
+              : '选择截止时间后可设置重复；清空日期可取消提醒。'}
+          </span>
         </div>
       </Modal>
 
