@@ -5,7 +5,6 @@
 import { BrowserWindow, session } from 'electron'
 import { BROWSER_PARTITION } from './embedded-browser'
 import { withBrowserAuth } from './browser-auth'
-import { persistSessionCookies } from './session-cookies'
 
 /** 查询轻舟工作项代码任务的接口。 */
 const CODE_TASKS_URL =
@@ -206,8 +205,6 @@ const requestCodeTasks = async (
   if (payload.code !== 0) {
     throw new Error(payload.msg?.trim() || '查询轻舟代码任务失败')
   }
-
-  await persistSessionCookies(browserSession, ['xlbsoft.com'])
 
   return (payload.data?.tasks ?? []).map((task) =>
     normalizeCodeTask(task, workItemId)

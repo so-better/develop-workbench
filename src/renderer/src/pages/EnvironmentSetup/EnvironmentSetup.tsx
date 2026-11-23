@@ -3,6 +3,7 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   ExclamationCircleFilled,
+  ReloadOutlined,
   SettingOutlined
 } from '@ant-design/icons'
 import type { AuthProvider } from '../../../../types/auth'
@@ -24,6 +25,12 @@ interface EnvironmentSetupProps {
   /** 最近一次触发过期的 CLI。 */
   authExpiredProvider: AuthProvider | null
 
+  /** 正在重新检测环境。 */
+  refreshing: boolean
+
+  /** 重新检测 CLI 和授权状态。 */
+  onRefresh: () => void
+
   /** 打开对应设置分类。 */
   onOpenSettings: (section: SettingsSection) => void
 }
@@ -37,6 +44,8 @@ export default function EnvironmentSetup({
   larkCliInfo,
   larkUser,
   authExpiredProvider,
+  refreshing,
+  onRefresh,
   onOpenSettings
 }: EnvironmentSetupProps): JSX.Element {
   const meegleAvailable = meegleState?.cli.available ?? false
@@ -171,6 +180,16 @@ export default function EnvironmentSetup({
             message="完成 Lark Cli 和 Meegle Cli 登录后即可进入需求工作台"
           />
         ) : null}
+
+        <div className="environment-actions">
+          <Button
+            icon={<ReloadOutlined />}
+            loading={refreshing}
+            onClick={onRefresh}
+          >
+            刷新状态
+          </Button>
+        </div>
       </div>
     </section>
   )

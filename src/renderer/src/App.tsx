@@ -49,6 +49,7 @@ export default function App(): JSX.Element {
   const [larkCliInfo, setLarkCliInfo] = useState<LarkCliInfo | null>(null)
   const [meegleState, setMeegleState] = useState<MeegleState | null>(null)
   const [environmentLoading, setEnvironmentLoading] = useState(true)
+  const [environmentRefreshing, setEnvironmentRefreshing] = useState(false)
   const [authExpiredNotice, setAuthExpiredNotice] = useState<AuthExpiredEvent | null>(null)
   const environmentRequestRef = useRef(0)
 
@@ -118,10 +119,32 @@ export default function App(): JSX.Element {
       )
       setEnvironmentLoading(false)
 
+      // 状态已恢复时清掉旧的授权过期提示，避免后续再次回到环境页时误显示。
+      setAuthExpiredNotice((current) => {
+        if (!current) return current
+        if (current.provider === 'meegle' && status.meegleAuthenticated) {
+          return null
+        }
+        if (current.provider === 'lark' && status.larkAuthenticated) {
+          return null
+        }
+        return current
+      })
+
       return status
     },
     []
   )
+
+  const handleRefreshEnvironment = useCallback(async (): Promise<void> => {
+    setEnvironmentRefreshing(true)
+
+    try {
+      await refreshEnvironment()
+    } finally {
+      setEnvironmentRefreshing(false)
+    }
+  }, [refreshEnvironment])
 
   const {
     open: settingsOpen,
@@ -439,6 +462,8 @@ export default function App(): JSX.Element {
               larkCliInfo={larkCliInfo}
               larkUser={larkUser}
               authExpiredProvider={authExpiredNotice?.provider ?? null}
+              refreshing={environmentRefreshing}
+              onRefresh={() => void handleRefreshEnvironment()}
               onOpenSettings={openSettings}
             />
           )}

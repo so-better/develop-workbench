@@ -134,3 +134,9 @@
   flex-shrink: 0;
   margin-inline-end: 0;
 }
+
+.environment-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
