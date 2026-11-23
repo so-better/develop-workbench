@@ -64,6 +64,37 @@ const remarkTrimAutolinkTrailingText = () => (tree: MarkdownNode): void => {
 }
 
 /**
+ * 把文本节点中的换行转换为 <br>。
+ * 用于待办简记等需要保留用户输入换行的场景，避免 Markdown 把软换行折叠成空格。
+ */
+const remarkPreserveLineBreaks = () => (tree: MarkdownNode): void => {
+  const walk = (node: MarkdownNode): void => {
+    if (!node.children?.length) return
+
+    const next: MarkdownNode[] = []
+
+    for (const child of node.children) {
+      if (child.type === 'text' && typeof child.value === 'string') {
+        const parts = child.value.split('\n')
+
+        parts.forEach((part, index) => {
+          if (index > 0) next.push({ type: 'break' })
+          if (part) next.push({ type: 'text', value: part })
+        })
+        continue
+      }
+
+      walk(child)
+      next.push(child)
+    }
+
+    node.children = next
+  }
+
+  walk(tree)
+}
+
+/**
  * 飞书导出的图片地址可能包含换行，导致 Markdown 图片语法失效。
  * 只处理确实跨行的图片地址，避免影响代码块中的示例。
  */
@@ -157,6 +188,9 @@ interface MarkdownContentProps {
 
   /** 流式输出期间先展示图表源码，避免不完整配置反复报错。 */
   streaming?: boolean
+
+  /** 保留用户输入中的单换行，例如待办简记。 */
+  breaks?: boolean
 }
 
 /**
@@ -166,7 +200,8 @@ interface MarkdownContentProps {
 const MarkdownContent = memo(function MarkdownContent({
   content,
   className,
-  streaming = false
+  streaming = false,
+  breaks = false
 }: MarkdownContentProps): JSX.Element {
   // components 必须保持稳定，否则 ReactMarkdown 会把图表/代码块当成新组件并重新挂载。
   const components = useMemo<Components>(
@@ -219,7 +254,12 @@ const MarkdownContent = memo(function MarkdownContent({
   return (
     <div className={`markdown-content${className ? ` ${className}` : ''}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkTrimAutolinkTrailingText, remarkMath]}
+        remarkPlugins={[
+          remarkGfm,
+          remarkTrimAutolinkTrailingText,
+          remarkMath,
+          ...(breaks ? [remarkPreserveLineBreaks] : [])
+        ]}
         rehypePlugins={[
           rehypeRaw,
           [rehypeSanitize, markdownSanitizeSchema],

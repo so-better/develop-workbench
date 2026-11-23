@@ -108,7 +108,9 @@ import type {
 import type {
   CloneRepositoryInput,
   RepositoryBindingStatus,
+  RepositoryBranchDeleteResult,
   RepositoryBranchList,
+  RepositoryBranchMergeStatus,
   RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
   RepositoryMergeResult,
@@ -199,6 +201,8 @@ export interface ElectronAPI {
     dueAt: string | null,
     recurrence: QuickNoteRecurrence
   ) => Promise<QuickNoteState>
+  /** 更新待办正文。 */
+  updateQuickNoteText: (id: string, text: string) => Promise<QuickNoteState>
   /** 更新待办完成状态。 */
   setQuickNoteDone: (id: string, done: boolean) => Promise<QuickNoteState>
   /** 删除一条待办。 */
@@ -663,6 +667,16 @@ export interface ElectronAPI {
     branchName: string,
     baseBranch: string
   ) => Promise<void>
+  /** 删除本地和远程分支。 */
+  deleteRepositoryBranch: (
+    repositoryId: string,
+    branchName: string
+  ) => Promise<RepositoryBranchDeleteResult>
+  /** 检查源分支是否已经合并到当前分支。 */
+  getRepositoryBranchMergeStatus: (
+    repositoryId: string,
+    sourceBranch: string
+  ) => Promise<RepositoryBranchMergeStatus>
   /** 把指定分支合并到当前分支。 */
   mergeRepositoryBranch: (
     repositoryId: string,

@@ -654,6 +654,51 @@ export const setQuickNoteDone = async (
   return state
 }
 
+export const updateQuickNoteText = async (
+  idValue: unknown,
+  textValue: unknown
+): Promise<QuickNoteState> => {
+  const id = requireNoteId(idValue)
+  const text = normalizeText(textValue)
+
+  if (!text) throw new Error('待办内容不能为空')
+
+  const state = await mutateNotes(async () => {
+    const notes = await readNotes()
+    const now = new Date().toISOString()
+    let found = false
+
+    const next = notes.map((note) => {
+      if (note.id !== id) return note
+
+      found = true
+      return {
+        ...note,
+        text,
+        updatedAt: now
+      }
+    })
+
+    if (!found) throw new Error('待办不存在')
+
+    await writeNotes(next)
+
+    return getQuickNoteState()
+  })
+
+  // 已有待发送提醒时同步正文，避免通知里仍是旧内容。
+  for (const [key, reminder] of pendingReminders) {
+    if (reminder.id === id) {
+      pendingReminders.set(key, {
+        ...reminder,
+        text: getQuickNoteSummary(text, 120)
+      })
+    }
+  }
+
+  return state
+}
+
 export const setQuickNoteDueAt = async (
   idValue: unknown,
   dueValue: unknown,
@@ -739,6 +784,10 @@ export const initializeQuickNotes = (): void => {
   ipcMain.handle(
     'quick-notes:set-done',
     (_event, id: unknown, done: unknown) => setQuickNoteDone(id, done)
+  )
+  ipcMain.handle(
+    'quick-notes:update-text',
+    (_event, id: unknown, text: unknown) => updateQuickNoteText(id, text)
   )
   ipcMain.handle(
     'quick-notes:set-due-at',

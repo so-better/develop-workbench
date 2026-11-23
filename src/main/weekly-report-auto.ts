@@ -1,6 +1,6 @@
 /**
  * 周报自动提交。
- * 在本地周一 07:50 检查上一周周报，未提交且内容为空时生成并提交。
+ * 在本地周一 00:00 检查上一周周报，未提交且内容为空时生成并提交。
  */
 import { app, ipcMain } from 'electron'
 import { generateText } from 'ai'
@@ -26,8 +26,8 @@ import type {
 import { sendLarkMessageToSelf } from './lark'
 import { isRecord } from '../utils'
 
-const AUTO_SUBMIT_HOUR = 7
-const AUTO_SUBMIT_MINUTE = 50
+const AUTO_SUBMIT_HOUR = 0
+const AUTO_SUBMIT_MINUTE = 0
 const MAX_OUTPUT_TOKENS = 4_096
 const TEXT_FIELD_TYPE = 'text'
 
@@ -181,6 +181,7 @@ const isCatchUpWindow = (now: Date): boolean => {
   const deadline = new Date(now)
   deadline.setHours(8, 0, 0, 0)
 
+  // 周一 00:00-08:00 允许补跑；实际运行时通常会在 00:00 或应用唤醒后立即执行。
   return now >= trigger && now < deadline
 }
 
@@ -397,7 +398,7 @@ const notifyWeeklyReportResult = async (
   detail?: string | null
 ): Promise<void> => {
   const message = success
-    ? '上一周周报已由工作台自动提交。'
+    ? '上一周周报已由工作台自动提交，无需重复提交。'
     : `上一周周报自动提交失败${detail ? `：${detail}` : ''}`
 
   try {

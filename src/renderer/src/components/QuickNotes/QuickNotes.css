@@ -232,6 +232,18 @@
   line-height: 1.6;
 }
 
+.quick-note-text-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.quick-note-text-editor > span {
+  color: var(--app-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
 .quick-notes-error {
   padding: 0 14px 8px;
   color: #d92d20;

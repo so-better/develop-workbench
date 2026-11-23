@@ -110,7 +110,9 @@ import type {
 import type {
   CloneRepositoryInput,
   RepositoryBindingStatus,
+  RepositoryBranchDeleteResult,
   RepositoryBranchList,
+  RepositoryBranchMergeStatus,
   RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
   RepositoryMergeResult,
@@ -252,6 +254,10 @@ const electronAPI = {
     recurrence: QuickNoteRecurrence
   ): Promise<QuickNoteState> =>
     ipcRenderer.invoke('quick-notes:set-due-at', id, dueAt, recurrence),
+
+  /** 更新待办正文。 */
+  updateQuickNoteText: (id: string, text: string): Promise<QuickNoteState> =>
+    ipcRenderer.invoke('quick-notes:update-text', id, text),
 
   /** 更新待办完成状态。 */
   setQuickNoteDone: (id: string, done: boolean): Promise<QuickNoteState> =>
@@ -1397,6 +1403,28 @@ const electronAPI = {
       repositoryId,
       branchName,
       baseBranch
+    ),
+
+  /**
+   * 删除本地和远程分支。
+   */
+  deleteRepositoryBranch: (
+    repositoryId: string,
+    branchName: string
+  ): Promise<RepositoryBranchDeleteResult> =>
+    ipcRenderer.invoke('repositories:delete-branch', repositoryId, branchName),
+
+  /**
+   * 检查源分支是否已经合并到当前分支。
+   */
+  getRepositoryBranchMergeStatus: (
+    repositoryId: string,
+    sourceBranch: string
+  ): Promise<RepositoryBranchMergeStatus> =>
+    ipcRenderer.invoke(
+      'repositories:branch-merge-status',
+      repositoryId,
+      sourceBranch
     ),
 
   /**

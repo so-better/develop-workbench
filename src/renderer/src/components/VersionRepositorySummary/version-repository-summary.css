@@ -167,7 +167,8 @@
 
 .version-summary-branch {
   display: flex;
-  gap: 6px;
+  flex-wrap: wrap;
+  gap: 4px 6px;
   align-items: center;
   min-width: 0;
   padding: 3px 6px;
@@ -211,6 +212,26 @@
   font-size: 11px;
   white-space: nowrap;
   cursor: default;
+}
+
+.version-summary-branch-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.version-summary-branch-link.ant-typography {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.version-summary-branch-link .anticon {
+  font-size: 11px;
 }
 
 .version-summary-branch-pending {

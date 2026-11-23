@@ -8,22 +8,36 @@ import {
   Select,
   Spin,
   Tag,
-  Tooltip
+  Tooltip,
+  Typography
 } from 'antd'
 import {
+  BranchesOutlined,
   CheckOutlined,
   CopyOutlined,
+  DeploymentUnitOutlined,
   FolderOpenOutlined,
+  LinkOutlined,
+  PullRequestOutlined,
   ReloadOutlined
 } from '@ant-design/icons'
-import type { RequirementBindingsMap } from '../../../../types/bindings'
+import type {
+  RequirementBindingsMap,
+  RequirementRepoBinding
+} from '../../../../types/bindings'
 import type { Repository } from '../../../../types/repository'
 import { getErrorMessage } from '../../../../utils'
+import {
+  getMergeRequestUrl,
+  getRemoteBranchesUrl
+} from '../../utils/git-remote'
 import {
   buildVersionRepositorySummary,
   getVersionSummaryProductLines,
   groupVersionSummaryRequirements,
   type RepositoryBranchKind,
+  type RepositoryBranchSummary,
+  type VersionRepositorySummary as VersionRepositorySummaryData,
   type VersionSummaryGroup
 } from '../../utils/version-repositories'
 import './version-repository-summary.css'
@@ -39,6 +53,30 @@ const BRANCH_KIND_COLORS: Record<RepositoryBranchKind, string | undefined> = {
   requirement: 'blue',
   iteration: 'purple'
 }
+
+/** 轻舟工作任务页地址。 */
+const getQingzhouTasksUrl = (binding: RequirementRepoBinding): string | null => {
+  if (!binding.qingzhouWorkItemId) return null
+
+  const query = new URLSearchParams({
+    workItemId: binding.qingzhouWorkItemId,
+    archiveStatus: 'all'
+  })
+
+  if (binding.qingzhouCodeRepositoryId) {
+    query.set('codeRepositoryId', binding.qingzhouCodeRepositoryId)
+  }
+
+  return `https://z.xlbsoft.com/workList/tasks?${query.toString()}`
+}
+
+/** 轻舟迭代分支构建页地址。 */
+const getQingzhouBuildUrl = (binding: RequirementRepoBinding): string | null =>
+  binding.qingzhouIterationBranchId
+    ? `https://z.xlbsoft.com/workList/branch/${encodeURIComponent(
+        binding.qingzhouIterationBranchId
+      )}`
+    : null
 
 interface CopyButtonProps {
   /** 要复制的文本。 */
@@ -310,6 +348,146 @@ export default function VersionRepositorySummary({
     [selectedRequirements]
   )
 
+  const repositoryConfigMap = useMemo(
+    () => new Map(repositories.map((repository) => [repository.id, repository])),
+    [repositories]
+  )
+
+  const bindingsByRepository = useMemo(() => {
+    const grouped = new Map<string, RequirementRepoBinding[]>()
+
+    for (const requirement of selectedRequirements) {
+      for (const binding of bindings[requirement.id] ?? []) {
+        const current = grouped.get(binding.repositoryId) ?? []
+        current.push(binding)
+        grouped.set(binding.repositoryId, current)
+      }
+    }
+
+    return grouped
+  }, [bindings, selectedRequirements])
+
+  /** 渲染分支对应的仓库快捷入口，和需求详情保持一致。 */
+  const renderBranchLinks = (
+    repository: VersionRepositorySummaryData,
+    branch: RepositoryBranchSummary
+  ): JSX.Element | null => {
+    const config = repositoryConfigMap.get(repository.repositoryId)
+    const repositoryBindings =
+      bindingsByRepository.get(repository.repositoryId) ?? []
+    const links: Array<{
+      key: string
+      label: string
+      icon: JSX.Element
+      href: string
+      embedded?: boolean
+    }> = []
+
+    if (branch.kinds.includes('development')) {
+      const hasDevelopmentBinding = repositoryBindings.some(
+        (binding) =>
+          binding.mode === 'normal' && binding.branchName === branch.name
+      )
+
+      if (hasDevelopmentBinding) {
+        const remoteUrl = getRemoteBranchesUrl(config?.remoteUrl)
+
+        if (remoteUrl) {
+          links.push({
+            key: 'remote',
+            label: '远程仓库',
+            icon: <BranchesOutlined />,
+            href: remoteUrl
+          })
+        }
+
+        const mergeRequestUrl =
+          config?.defaultBranch && branch.name !== config.defaultBranch
+            ? getMergeRequestUrl(
+                config.remoteUrl,
+                branch.name,
+                config.defaultBranch
+              )
+            : null
+
+        if (mergeRequestUrl) {
+          links.push({
+            key: 'merge-request',
+            label: '创建 MR',
+            icon: <PullRequestOutlined />,
+            href: mergeRequestUrl,
+            embedded: true
+          })
+        }
+      }
+    }
+
+    if (branch.kinds.includes('requirement')) {
+      const binding = repositoryBindings.find(
+        (item) =>
+          item.mode === 'qingzhou' &&
+          item.requirementBranch === branch.name &&
+          Boolean(getQingzhouTasksUrl(item))
+      )
+      const url = binding ? getQingzhouTasksUrl(binding) : null
+
+      if (url) {
+        links.push({
+          key: 'qingzhou-tasks',
+          label: '轻舟工作任务',
+          icon: <LinkOutlined />,
+          href: url
+        })
+      }
+    }
+
+    if (branch.kinds.includes('iteration')) {
+      const binding = repositoryBindings.find(
+        (item) =>
+          item.mode === 'qingzhou' &&
+          item.iterationBranch === branch.name &&
+          Boolean(getQingzhouBuildUrl(item))
+      )
+      const url = binding ? getQingzhouBuildUrl(binding) : null
+
+      if (url) {
+        links.push({
+          key: 'qingzhou-iteration-build',
+          label: '轻舟迭代分支构建',
+          icon: <DeploymentUnitOutlined />,
+          href: url
+        })
+      }
+    }
+
+    if (links.length === 0) return null
+
+    return (
+      <span className="version-summary-branch-actions">
+        {links.map((link) => (
+          <Typography.Link
+            key={link.key}
+            className="version-summary-branch-link"
+            href={link.href}
+            target={link.embedded ? undefined : '_blank'}
+            rel={link.embedded ? undefined : 'noopener noreferrer'}
+            onClick={
+              link.embedded
+                ? (event) => {
+                    event.preventDefault()
+                    window.electron.openEmbeddedBrowser(link.href)
+                  }
+                : undefined
+            }
+          >
+            {link.icon}
+            {link.label}
+          </Typography.Link>
+        ))}
+      </span>
+    )
+  }
+
   const versionOptions = useMemo(
     () =>
       (groups ?? []).map((group) => ({
@@ -521,6 +699,7 @@ export default function VersionRepositorySummary({
                                     {names.length} 个需求
                                   </span>
                                 </Tooltip>
+                                {renderBranchLinks(repository, branch)}
                               </div>
                             )
                           })}

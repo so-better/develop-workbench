@@ -21,6 +21,8 @@ import type {
   CloneRepositoryInput,
   Repository,
   RepositoryBindingStatus,
+  RepositoryBranchDeleteResult,
+  RepositoryBranchMergeStatus,
   RepositoryBranchList,
   RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
@@ -1770,6 +1772,24 @@ export const mergeRepositoryBranch = async (
     }
   }
 
+  const alreadyMerged = await runGit(
+    ['merge-base', '--is-ancestor', sourceRef, 'HEAD'],
+    { cwd }
+  )
+    .then(() => true)
+    .catch(() => false)
+
+  if (alreadyMerged) {
+    return {
+      conflicted: false,
+      conflicts: [],
+      pushed: false,
+      pushSkipped: false,
+      pushError: null,
+      alreadyMerged: true
+    }
+  }
+
   try {
     await runGit(['merge', '--no-edit', sourceRef], { cwd })
   } catch (error) {
@@ -1782,7 +1802,8 @@ export const mergeRepositoryBranch = async (
         conflicts,
         pushed: false,
         pushSkipped: false,
-        pushError: null
+        pushError: null,
+        alreadyMerged: false
       }
     }
 
@@ -1796,7 +1817,8 @@ export const mergeRepositoryBranch = async (
       conflicts: [],
       pushed: false,
       pushSkipped: true,
-      pushError: null
+      pushError: null,
+      alreadyMerged: false
     }
   }
 
@@ -1816,7 +1838,8 @@ export const mergeRepositoryBranch = async (
       conflicts: [],
       pushed: true,
       pushSkipped: false,
-      pushError: null
+      pushError: null,
+      alreadyMerged: false
     }
   } catch (error) {
     return {
@@ -1824,9 +1847,66 @@ export const mergeRepositoryBranch = async (
       conflicts: [],
       pushed: false,
       pushSkipped: false,
-      pushError: getGitErrorMessage(error)
+      pushError: getGitErrorMessage(error),
+      alreadyMerged: false
     }
   }
+}
+
+/**
+ * 检查源分支是否已经合并到当前分支。
+ * 只读取本地引用，调用方应先刷新远程分支。
+ */
+export const getRepositoryBranchMergeStatus = async (
+  repositoryId: string,
+  sourceBranch: string
+): Promise<RepositoryBranchMergeStatus> => {
+  const normalized = sourceBranch.trim()
+
+  if (!normalized) throw new Error('请选择要合并的分支')
+
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) throw new Error('仓库不存在')
+  if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
+
+  const cwd = repository.localPath
+  const currentBranch = (
+    await runGit(['branch', '--show-current'], { cwd })
+  ).trim()
+
+  if (!currentBranch) throw new Error('当前处于分离 HEAD 状态，无法合并')
+  if (currentBranch === normalized) {
+    return { merged: true, targetBranch: currentBranch }
+  }
+
+  const hasRemoteSource = await runGit(
+    ['rev-parse', '--verify', `refs/remotes/origin/${normalized}`],
+    { cwd }
+  )
+    .then(() => true)
+    .catch(() => false)
+  const hasLocalSource = await runGit(
+    ['rev-parse', '--verify', `refs/heads/${normalized}`],
+    { cwd }
+  )
+    .then(() => true)
+    .catch(() => false)
+
+  if (!hasRemoteSource && !hasLocalSource) {
+    throw new Error('源分支没有可用的本地或远程引用')
+  }
+
+  const sourceRef = hasRemoteSource ? `origin/${normalized}` : normalized
+  const merged = await runGit(
+    ['merge-base', '--is-ancestor', sourceRef, 'HEAD'],
+    { cwd }
+  )
+    .then(() => true)
+    .catch(() => false)
+
+  return { merged, targetBranch: currentBranch }
 }
 
 /**
@@ -1958,6 +2038,98 @@ export const createRepositoryBranch = async (
       (error instanceof Error ? error.message : '未知错误')
 
     throw new Error(`分支推送远程失败：${detail}`)
+  }
+}
+
+/**
+ * 删除仓库分支，同时删除本地分支和 origin 远程分支。
+ * 当前分支、主分支不允许删除；远程删除失败时保留本地分支。
+ */
+export const deleteRepositoryBranch = async (
+  repositoryId: string,
+  branchName: string
+): Promise<RepositoryBranchDeleteResult> => {
+  const normalized = branchName.trim()
+
+  if (!normalized) throw new Error('请选择要删除的分支')
+
+  const repositories = await readStore()
+  const repository = repositories.find((item) => item.id === repositoryId)
+
+  if (!repository) throw new Error('仓库不存在')
+  if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
+
+  const cwd = repository.localPath
+  const currentBranch = (
+    await runGit(['branch', '--show-current'], { cwd })
+  ).trim()
+
+  if (currentBranch === normalized) {
+    throw new Error('不能删除当前所在的分支，请先切换到其他分支')
+  }
+
+  if (repository.defaultBranch === normalized) {
+    throw new Error(`不能删除仓库主分支：${normalized}`)
+  }
+
+  // 删除前刷新远程引用，避免把已被远端删除的分支当作仍存在。
+  if (repository.remoteUrl) {
+    try {
+      await runGit(['fetch', '--prune', 'origin'], {
+        cwd,
+        timeout: GIT_NETWORK_TIMEOUT_MS
+      })
+    } catch (error) {
+      throw new Error(
+        `拉取远程分支失败，无法确认最新分支状态：${getGitErrorMessage(error)}`
+      )
+    }
+  }
+
+  const hasLocalBranch = await runGit(
+    ['show-ref', '--verify', '--quiet', `refs/heads/${normalized}`],
+    { cwd }
+  )
+    .then(() => true)
+    .catch(() => false)
+  const hasRemoteBranch = repository.remoteUrl
+    ? await runGit(
+        ['show-ref', '--verify', '--quiet', `refs/remotes/origin/${normalized}`],
+        { cwd }
+      )
+        .then(() => true)
+        .catch(() => false)
+    : false
+
+  if (!hasLocalBranch && !hasRemoteBranch) {
+    throw new Error(`分支不存在：${normalized}`)
+  }
+
+  if (hasRemoteBranch) {
+    try {
+      await runGit(['push', 'origin', '--delete', normalized], {
+        cwd,
+        timeout: GIT_NETWORK_TIMEOUT_MS
+      })
+    } catch (error) {
+      throw new Error(`删除远程分支失败：${getGitErrorMessage(error)}`)
+    }
+  }
+
+  if (hasLocalBranch) {
+    try {
+      await runGit(['branch', '-D', normalized], { cwd })
+    } catch (error) {
+      throw new Error(
+        `${hasRemoteBranch ? '远程分支已删除，' : ''}删除本地分支失败：${getGitErrorMessage(error)}`
+      )
+    }
+  }
+
+  return {
+    branchName: normalized,
+    localDeleted: hasLocalBranch,
+    remoteDeleted: hasRemoteBranch
   }
 }
 
@@ -2524,6 +2696,36 @@ export const initializeRepositories = (): void => {
       }
 
       return createRepositoryBranch(repositoryId, branchName, baseBranch)
+    }
+  )
+
+  // 删除本地和远程分支。
+  ipcMain.handle(
+    'repositories:delete-branch',
+    (_event, repositoryId: unknown, branchName: unknown) => {
+      if (
+        typeof repositoryId !== 'string' ||
+        typeof branchName !== 'string'
+      ) {
+        throw new Error('Invalid delete branch input')
+      }
+
+      return deleteRepositoryBranch(repositoryId, branchName)
+    }
+  )
+
+  // 检查源分支是否已经合并到当前分支。
+  ipcMain.handle(
+    'repositories:branch-merge-status',
+    (_event, repositoryId: unknown, sourceBranch: unknown) => {
+      if (
+        typeof repositoryId !== 'string' ||
+        typeof sourceBranch !== 'string'
+      ) {
+        throw new Error('Invalid branch merge status input')
+      }
+
+      return getRepositoryBranchMergeStatus(repositoryId, sourceBranch)
     }
   )
 

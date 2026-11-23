@@ -40,6 +40,12 @@ import {
   getMergeRequestUrl,
   getRemoteBranchesUrl
 } from '../../utils/git-remote'
+import {
+  getVersionSummaryProductLines,
+  groupVersionSummaryRequirements,
+  type VersionSummaryGroup
+} from '../../utils/version-repositories'
+import type { VersionSummaryRequirement } from '../../../../types/requirements'
 import './RepositorySettings.css'
 
 interface CloneFormValues {
@@ -70,6 +76,22 @@ export default function RepositorySettings({
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [allRequirements, setAllRequirements] = useState<
+    VersionSummaryRequirement[]
+  >([])
+  const [versionGroups, setVersionGroups] = useState<VersionSummaryGroup[] | null>(
+    null
+  )
+  const [versionLoading, setVersionLoading] = useState(false)
+  const [versionError, setVersionError] = useState<string | null>(null)
+  const [selectedVersionKey, setSelectedVersionKey] = useState<string | null>(
+    null
+  )
+  const [productLineFilters, setProductLineFilters] = useState<string[]>([])
+  const [filteredRepositoryIds, setFilteredRepositoryIds] = useState<Set<
+    string
+  > | null>(null)
+  const [filterLoading, setFilterLoading] = useState(false)
   const [openingIdeId, setOpeningIdeId] = useState<string | null>(null)
   const [openIdeConfirmRepository, setOpenIdeConfirmRepository] =
     useState<Repository | null>(null)
@@ -104,12 +126,23 @@ export default function RepositorySettings({
     null
   )
   const [mergeSource, setMergeSource] = useState<string | null>(null)
+  const [mergeSourceMerged, setMergeSourceMerged] = useState<boolean | null>(
+    null
+  )
+  const [mergeSourceChecking, setMergeSourceChecking] = useState(false)
+  const mergeCheckRef = useRef(0)
   const [merging, setMerging] = useState(false)
   const [switchRepository, setSwitchRepository] = useState<Repository | null>(
     null
   )
   const [switchTarget, setSwitchTarget] = useState<string | null>(null)
   const [switching, setSwitching] = useState(false)
+  const [deleteBranchRepository, setDeleteBranchRepository] =
+    useState<Repository | null>(null)
+  const [deleteBranchTarget, setDeleteBranchTarget] = useState<string | null>(
+    null
+  )
+  const [deleteBranchSaving, setDeleteBranchSaving] = useState(false)
 
   /**
    * 读取仓库根目录和仓库列表。
@@ -185,6 +218,151 @@ export default function RepositorySettings({
   }, [loadState])
 
   useEffect(() => {
+    if (mode !== 'list') return
+
+    let cancelled = false
+
+    setVersionLoading(true)
+    setVersionError(null)
+
+    window.electron
+      .getVersionSummaryRequirements()
+      .then((requirements) => {
+        if (cancelled) return
+        setAllRequirements(requirements)
+        setVersionGroups(groupVersionSummaryRequirements(requirements))
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setAllRequirements([])
+        setVersionGroups([])
+        setVersionError(getErrorMessage(error, '读取版本列表失败'))
+        message.warning({
+          content: getErrorMessage(error, '读取版本列表失败'),
+          duration: 5
+        })
+      })
+      .finally(() => {
+        if (!cancelled) setVersionLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [message, mode])
+
+  const selectedVersionGroup = useMemo(
+    () => versionGroups?.find((group) => group.key === selectedVersionKey) ?? null,
+    [selectedVersionKey, versionGroups]
+  )
+  const productLineScopeRequirements =
+    selectedVersionGroup?.requirements ?? allRequirements
+  const productLineOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+
+    for (const requirement of productLineScopeRequirements) {
+      for (const productLine of getVersionSummaryProductLines(requirement)) {
+        counts.set(productLine, (counts.get(productLine) ?? 0) + 1)
+      }
+    }
+
+    return Array.from(counts.entries())
+      .sort((left, right) => {
+        if (left[0] === '未设置产线') return 1
+        if (right[0] === '未设置产线') return -1
+
+        return left[0].localeCompare(right[0], 'zh-CN', { numeric: true })
+      })
+      .map(([productLine, count]) => ({
+        value: productLine,
+        label: `${productLine}（${count}）`
+      }))
+  }, [productLineScopeRequirements])
+
+  useEffect(() => {
+    const available = new Set(productLineOptions.map((option) => option.value))
+
+    setProductLineFilters((current) =>
+      current.every((value) => available.has(value))
+        ? current
+        : current.filter((value) => available.has(value))
+    )
+  }, [productLineOptions])
+
+  const hasRepositoryFilter =
+    Boolean(selectedVersionKey) || productLineFilters.length > 0
+
+  useEffect(() => {
+    if (mode !== 'list' || !hasRepositoryFilter) {
+      setFilteredRepositoryIds(null)
+      setFilterLoading(false)
+      return
+    }
+
+    const scopeRequirements =
+      selectedVersionGroup?.requirements ?? allRequirements
+    const lineRequirements =
+      productLineFilters.length > 0
+        ? scopeRequirements.filter((requirement) =>
+            getVersionSummaryProductLines(requirement).some((line) =>
+              productLineFilters.includes(line)
+            )
+          )
+        : scopeRequirements
+
+    if (lineRequirements.length === 0) {
+      setFilteredRepositoryIds(new Set())
+      setFilterLoading(false)
+      return
+    }
+
+    let cancelled = false
+
+    setFilteredRepositoryIds(new Set())
+    setFilterLoading(true)
+
+    window.electron
+      .getRequirementBindingsBatch(
+        lineRequirements.map((requirement) => requirement.id)
+      )
+      .then((next) => {
+        if (cancelled) return
+
+        const repositoryIds = new Set<string>()
+
+        for (const bindings of Object.values(next)) {
+          for (const binding of bindings) {
+            repositoryIds.add(binding.repositoryId)
+          }
+        }
+
+        setFilteredRepositoryIds(repositoryIds)
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setFilteredRepositoryIds(new Set())
+        message.warning({
+          content: getErrorMessage(error, '读取版本仓库失败'),
+          duration: 5
+        })
+      })
+      .finally(() => {
+        if (!cancelled) setFilterLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    allRequirements,
+    hasRepositoryFilter,
+    message,
+    mode,
+    productLineFilters,
+    selectedVersionGroup
+  ])
+
+  useEffect(() => {
     const unsubscribeProgress = window.electron.onRepositoryCloneProgress((progress) => {
       setCloneProgress(progress.percent)
       setCloneLogs((current) => [...current, progress.message].slice(-80))
@@ -206,9 +384,25 @@ export default function RepositorySettings({
   }, [cloneLogs])
 
   const root = state?.root ?? null
+  const versionOptions = useMemo(
+    () =>
+      (versionGroups ?? []).map((group) => ({
+        value: group.key,
+        label: `${group.versionName}（${group.requirements.length}）`
+      })),
+    [versionGroups]
+  )
   const filteredRepositories = useMemo(() => {
     const keyword = query.trim().toLowerCase()
-    const repositories = state?.repositories ?? []
+    let repositories = state?.repositories ?? []
+
+    if (hasRepositoryFilter) {
+      repositories = filteredRepositoryIds
+        ? repositories.filter((repository) =>
+            filteredRepositoryIds.has(repository.id)
+          )
+        : []
+    }
 
     if (!keyword) return repositories
 
@@ -218,7 +412,7 @@ export default function RepositorySettings({
         repository.localPath.toLowerCase().includes(keyword) ||
         repository.remoteUrl?.toLowerCase().includes(keyword)
     )
-  }, [query, state])
+  }, [filteredRepositoryIds, hasRepositoryFilter, query, state])
 
   /**
    * 设置代码根目录。
@@ -476,7 +670,36 @@ export default function RepositorySettings({
   const openMerge = async (repository: Repository): Promise<void> => {
     setMergeRepository(repository)
     setMergeSource(null)
+    setMergeSourceMerged(null)
+    setMergeSourceChecking(false)
+    mergeCheckRef.current += 1
     await loadBranches(repository.id, true)
+  }
+
+  const handleMergeSourceChange = async (value: string): Promise<void> => {
+    const repository = mergeRepository
+
+    setMergeSource(value)
+    setMergeSourceMerged(null)
+
+    if (!repository) return
+
+    const requestId = ++mergeCheckRef.current
+    setMergeSourceChecking(true)
+
+    try {
+      const status = await window.electron.getRepositoryBranchMergeStatus(
+        repository.id,
+        value
+      )
+
+      if (requestId !== mergeCheckRef.current) return
+      setMergeSourceMerged(status.merged)
+    } catch {
+      if (requestId === mergeCheckRef.current) setMergeSourceMerged(null)
+    } finally {
+      if (requestId === mergeCheckRef.current) setMergeSourceChecking(false)
+    }
   }
 
   const handleMerge = async (): Promise<void> => {
@@ -492,6 +715,16 @@ export default function RepositorySettings({
       return
     }
 
+    if (mergeSourceChecking) {
+      message.info('正在检查分支状态，请稍候')
+      return
+    }
+
+    if (mergeSourceMerged) {
+      message.info('该分支已经合并，无需重复合并')
+      return
+    }
+
     setMerging(true)
 
     try {
@@ -502,6 +735,7 @@ export default function RepositorySettings({
 
       if (result.conflicted) {
         setMergeRepository(null)
+        setMergeSourceMerged(null)
         await loadBranches(repository.id, true)
         await refreshRepositoryState(repository.id).catch(() => undefined)
 
@@ -539,6 +773,19 @@ export default function RepositorySettings({
 
       const mergeTarget = repository.currentBranch ?? '当前分支'
 
+      if (result.alreadyMerged) {
+        setMergeRepository(null)
+        setMergeSourceMerged(null)
+        message.info(
+          `分支 ${mergeSource} 已经合并到 ${mergeTarget}，无需重复合并`
+        )
+        await loadBranches(repository.id, true)
+        await refreshRepositoryState(repository.id).catch(() =>
+          message.warning('检查已完成，但刷新仓库信息失败')
+        )
+        return
+      }
+
       if (result.pushError) {
         message.warning({
           content: `已将 ${mergeSource} 合并到 ${mergeTarget}，但推送远程失败：${result.pushError}`,
@@ -559,6 +806,7 @@ export default function RepositorySettings({
       }
 
       setMergeRepository(null)
+      setMergeSourceMerged(null)
       await loadBranches(repository.id, true)
       await refreshRepositoryState(repository.id).catch(() =>
         message.warning('合并已完成，但刷新仓库信息失败')
@@ -613,6 +861,51 @@ export default function RepositorySettings({
       message.error(getErrorMessage(error, '切换分支失败'))
     } finally {
       setSwitching(false)
+    }
+  }
+
+  /** 打开删除分支弹窗。 */
+  const openDeleteBranch = async (repository: Repository): Promise<void> => {
+    setDeleteBranchRepository(repository)
+    setDeleteBranchTarget(null)
+    await loadBranches(repository.id, true)
+  }
+
+  const handleDeleteBranch = async (): Promise<void> => {
+    const repository = deleteBranchRepository
+
+    if (!repository || !deleteBranchTarget) {
+      message.warning('请选择要删除的分支')
+      return
+    }
+
+    setDeleteBranchSaving(true)
+
+    try {
+      const result = await window.electron.deleteRepositoryBranch(
+        repository.id,
+        deleteBranchTarget
+      )
+      const scope = [
+        result.localDeleted ? '本地' : '',
+        result.remoteDeleted ? '远程' : ''
+      ]
+        .filter(Boolean)
+        .join('和')
+
+      message.success(
+        `已删除${scope ? `${scope}分支` : '分支'} ${result.branchName}`
+      )
+      setDeleteBranchRepository(null)
+      setDeleteBranchTarget(null)
+      await loadBranches(repository.id, true)
+      await refreshRepositoryState(repository.id).catch(() =>
+        message.warning('分支已删除，但刷新仓库信息失败')
+      )
+    } catch (error) {
+      message.error(getErrorMessage(error, '删除分支失败'))
+    } finally {
+      setDeleteBranchSaving(false)
     }
   }
 
@@ -714,11 +1007,8 @@ export default function RepositorySettings({
       case 'merge-request':
         openMergeRequest(repository)
         break
-      case 'create-branch':
-        openCreateBranch(repository)
-        break
-      case 'merge':
-        openMerge(repository)
+      case 'delete-branch':
+        openDeleteBranch(repository)
         break
       case 'remove':
         modal.confirm({
@@ -750,19 +1040,14 @@ export default function RepositorySettings({
         label: '创建 MR',
         disabled: !repository.available || !repository.remoteUrl
       },
+      { type: 'divider' },
       {
-        key: 'create-branch',
-        icon: <BranchesOutlined />,
-        label: '新建分支',
+        key: 'delete-branch',
+        icon: <DeleteOutlined />,
+        label: '删除分支',
+        danger: true,
         disabled: !repository.available
       },
-      {
-        key: 'merge',
-        icon: <MergeCellsOutlined />,
-        label: '合并代码',
-        disabled: !repository.available || !repository.currentBranch
-      },
-      { type: 'divider' },
       {
         key: 'remove',
         icon: <DeleteOutlined />,
@@ -862,21 +1147,10 @@ export default function RepositorySettings({
     {
       title: '操作',
       key: 'actions',
-      width: 360,
+      width: 560,
       fixed: 'right',
       render: (_, repository) => (
         <div className="repository-actions">
-          <Button
-            type="text"
-            size="small"
-            className="repository-action-button"
-            icon={<CodeOutlined />}
-            disabled={!repository.available}
-            aria-label={`在 ${repository.name} 打开终端`}
-            onClick={() => handleOpenTerminal(repository)}
-          >
-            在终端打开
-          </Button>
           <Button
             type="text"
             size="small"
@@ -900,7 +1174,39 @@ export default function RepositorySettings({
           >
             切换分支
           </Button>
-          <span className="repository-action-divider" aria-hidden="true" />
+          <Button
+            type="text"
+            size="small"
+            className="repository-action-button"
+            icon={<BranchesOutlined />}
+            disabled={!repository.available}
+            aria-label={`为 ${repository.name} 新建分支`}
+            onClick={() => openCreateBranch(repository)}
+          >
+            新建分支
+          </Button>
+          <Button
+            type="text"
+            size="small"
+            className="repository-action-button"
+            icon={<MergeCellsOutlined />}
+            disabled={!repository.available || !repository.currentBranch}
+            aria-label={`合并 ${repository.name} 的分支`}
+            onClick={() => openMerge(repository)}
+          >
+            合并代码
+          </Button>
+          <Button
+            type="text"
+            size="small"
+            className="repository-action-button"
+            icon={<CodeOutlined />}
+            disabled={!repository.available}
+            aria-label={`在 ${repository.name} 打开终端`}
+            onClick={() => handleOpenTerminal(repository)}
+          >
+            在终端打开
+          </Button>
           <Dropdown
             trigger={['hover']}
             mouseEnterDelay={0.1}
@@ -952,7 +1258,9 @@ export default function RepositorySettings({
   )
 
   const mergeBranches = mergeRepository
-    ? repoBranches[mergeRepository.id] ?? []
+    ? (repoBranches[mergeRepository.id] ?? []).filter(
+        (branch) => branch !== mergeRepository.currentBranch
+      )
     : []
   const mergeSourceOptions = toBranchOptions(mergeBranches, mergeSource)
 
@@ -960,6 +1268,18 @@ export default function RepositorySettings({
     ? repoBranches[switchRepository.id] ?? []
     : []
   const switchTargetOptions = toBranchOptions(switchBranches, switchTarget)
+
+  const deleteBranchBranches = deleteBranchRepository
+    ? (repoBranches[deleteBranchRepository.id] ?? []).filter(
+        (branch) =>
+          branch !== deleteBranchRepository.currentBranch &&
+          branch !== deleteBranchRepository.defaultBranch
+      )
+    : []
+  const deleteBranchOptions = toBranchOptions(
+    deleteBranchBranches,
+    deleteBranchTarget
+  )
 
   if (loading) {
     return (
@@ -1031,14 +1351,47 @@ export default function RepositorySettings({
       {mode === 'list' ? (
         <>
           <div className="repository-toolbar">
-            <Input
-              className="repository-search"
-              prefix={<SearchOutlined />}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜索仓库名称或路径"
-              allowClear
-            />
+            <div className="repository-toolbar-filters">
+              <Input
+                className="repository-search"
+                prefix={<SearchOutlined />}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="搜索仓库名称或路径"
+                allowClear
+              />
+              <Select
+                className="repository-version-select"
+                allowClear
+                showSearch
+                value={selectedVersionKey ?? undefined}
+                options={versionOptions}
+                loading={versionLoading}
+                disabled={versionLoading || Boolean(versionError)}
+                placeholder={versionError ? '版本列表读取失败' : '全部版本'}
+                optionFilterProp="label"
+                onChange={(value: string | undefined) =>
+                  setSelectedVersionKey(value ?? null)
+                }
+              />
+              {productLineOptions.length > 1 ? (
+                <Select
+                  mode="multiple"
+                  allowClear
+                  showSearch
+                  maxTagCount="responsive"
+                  maxTagPlaceholder={(omitted) => `+${omitted.length}`}
+                  className="repository-product-line-select"
+                  value={productLineFilters}
+                  options={productLineOptions}
+                  placeholder={`全部产线（${productLineOptions.length}）`}
+                  aria-label="按产线筛选"
+                  optionFilterProp="label"
+                  disabled={versionLoading || Boolean(versionError)}
+                  onChange={(values: string[]) => setProductLineFilters(values)}
+                />
+              ) : null}
+            </div>
             <div className="repository-toolbar-actions">
               <Button
                 type="primary"
@@ -1058,6 +1411,7 @@ export default function RepositorySettings({
             size="small"
             columns={columns}
             dataSource={filteredRepositories}
+            loading={filterLoading}
             pagination={false}
             scroll={{ x: 'max-content' }}
             locale={{
@@ -1065,7 +1419,15 @@ export default function RepositorySettings({
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description={
-                    root ? '根目录下还没有扫描到仓库' : '还没有配置代码根目录'
+                    query.trim()
+                      ? '没有匹配的仓库'
+                      : hasRepositoryFilter
+                        ? filterLoading
+                          ? '正在读取筛选结果…'
+                          : '当前筛选没有匹配的本地仓库'
+                        : root
+                          ? '根目录下还没有扫描到仓库'
+                          : '还没有配置代码根目录'
                   }
                 >
                   {!root && onOpenSettings ? (
@@ -1300,9 +1662,16 @@ export default function RepositorySettings({
             cancelText="取消"
             confirmLoading={merging}
             destroyOnHidden
-            okButtonProps={{ disabled: !mergeSource }}
+            okButtonProps={{
+              disabled:
+                !mergeSource || mergeSourceMerged === true || mergeSourceChecking
+            }}
             onOk={() => handleMerge()}
-            onCancel={() => setMergeRepository(null)}
+            onCancel={() => {
+              setMergeRepository(null)
+              setMergeSourceMerged(null)
+              setMergeSourceChecking(false)
+            }}
           >
             <div className="requirement-branch-create-form">
               <p>
@@ -1317,8 +1686,17 @@ export default function RepositorySettings({
                 loading={branchLoadingId === mergeRepository?.id}
                 placeholder="选择要合并的分支"
                 optionFilterProp="label"
-                onChange={(value: string) => setMergeSource(value)}
+                onChange={(value: string) => void handleMergeSourceChange(value)}
               />
+              {mergeSourceMerged ? (
+                <Alert
+                  type="success"
+                  showIcon
+                  message={`${mergeSource} 已经合并到 ${
+                    mergeRepository?.currentBranch ?? '当前分支'
+                  }，无需重复合并`}
+                />
+              ) : null}
               <p>
                 合并前会拉取最新远程引用，优先使用最新远程分支，并检查未提交改动；合并成功后自动推送到远程，发生冲突时会保留冲突状态，可打开 IDE 解决。
               </p>
@@ -1352,6 +1730,42 @@ export default function RepositorySettings({
                 onChange={(value: string) => setSwitchTarget(value)}
               />
               <p>切换前会检查未提交和未推送的提交；切换成功后会自动 pull。</p>
+            </div>
+          </Modal>
+
+          <Modal
+            title="删除分支"
+            open={Boolean(deleteBranchRepository)}
+            okText="删除"
+            cancelText="取消"
+            confirmLoading={deleteBranchSaving}
+            closable={!deleteBranchSaving}
+            keyboard={!deleteBranchSaving}
+            maskClosable={!deleteBranchSaving}
+            destroyOnHidden
+            okButtonProps={{ danger: true, disabled: !deleteBranchTarget }}
+            onOk={() => handleDeleteBranch()}
+            onCancel={() => {
+              setDeleteBranchRepository(null)
+              setDeleteBranchTarget(null)
+            }}
+          >
+            <div className="requirement-branch-create-form">
+              <p>
+                会同时删除本地和远程分支，删除后无法恢复。当前分支和主分支不会显示在列表中。
+              </p>
+              <label>要删除的分支</label>
+              <Select
+                showSearch
+                value={deleteBranchTarget ?? undefined}
+                options={deleteBranchOptions}
+                loading={branchLoadingId === deleteBranchRepository?.id}
+                placeholder="选择要删除的分支"
+                optionFilterProp="label"
+                notFoundContent="当前分支和主分支不可删除"
+                onChange={(value: string) => setDeleteBranchTarget(value)}
+              />
+              <p>如果本地分支有未合并提交，也会一并删除本地分支。</p>
             </div>
           </Modal>
         </>

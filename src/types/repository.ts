@@ -67,6 +67,20 @@ export interface RepositoryBranchSwitchResult {
 }
 
 /**
+ * 删除仓库分支的结果。
+ */
+export interface RepositoryBranchDeleteResult {
+  /** 被删除的分支名。 */
+  branchName: string
+
+  /** 是否删除了本地分支。 */
+  localDeleted: boolean
+
+  /** 是否删除了远程分支。 */
+  remoteDeleted: boolean
+}
+
+/**
  * 合并分支的结果。
  */
 export interface RepositoryMergeResult {
@@ -84,6 +98,20 @@ export interface RepositoryMergeResult {
 
   /** 推送失败原因；成功、跳过或冲突时为空。 */
   pushError: string | null
+
+  /** 源分支的提交已经全部包含在当前分支中，无需重复合并。 */
+  alreadyMerged: boolean
+}
+
+/**
+ * 合并前的分支状态检查。
+ */
+export interface RepositoryBranchMergeStatus {
+  /** 源分支是否已经合并到当前分支。 */
+  merged: boolean
+
+  /** 当前分支名。 */
+  targetBranch: string
 }
 
 /**

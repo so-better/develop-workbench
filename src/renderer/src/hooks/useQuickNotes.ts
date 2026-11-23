@@ -22,6 +22,7 @@ interface QuickNotesController {
     recurrence: QuickNoteRecurrence
   ) => Promise<void>
   setDone: (id: string, done: boolean) => Promise<void>
+  updateText: (id: string, text: string) => Promise<void>
   remove: (id: string) => Promise<void>
   clearCompleted: () => Promise<void>
 }
@@ -103,6 +104,10 @@ export const useQuickNotes = (): QuickNotesController => {
     await mutate(() => window.electron.setQuickNoteDone(id, done))
   }, [mutate])
 
+  const updateText = useCallback(async (id: string, text: string): Promise<void> => {
+    await mutate(() => window.electron.updateQuickNoteText(id, text))
+  }, [mutate])
+
   const remove = useCallback(async (id: string): Promise<void> => {
     await mutate(() => window.electron.removeQuickNote(id))
   }, [mutate])
@@ -125,6 +130,7 @@ export const useQuickNotes = (): QuickNotesController => {
     add,
     setDueAt,
     setDone,
+    updateText,
     remove,
     clearCompleted
   }

@@ -102,6 +102,15 @@
   margin-bottom: 12px;
 }
 
+.repository-toolbar-filters {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
 .repository-toolbar-actions {
   display: flex;
   flex-wrap: wrap;
@@ -110,6 +119,11 @@
 
 .repository-search {
   width: 240px;
+}
+
+.repository-version-select,
+.repository-product-line-select {
+  width: 220px;
 }
 
 .repository-name-cell {

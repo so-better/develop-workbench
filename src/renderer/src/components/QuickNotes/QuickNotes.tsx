@@ -10,6 +10,7 @@ import {
   CloseOutlined,
   DeleteOutlined,
   DownOutlined,
+  EditOutlined,
   PlusOutlined,
   SyncOutlined
 } from '@ant-design/icons'
@@ -121,6 +122,7 @@ interface QuickNotesProps {
     recurrence: QuickNoteRecurrence
   ) => Promise<void>
   onSetDone: (id: string, done: boolean) => Promise<void>
+  onUpdateText: (id: string, text: string) => Promise<void>
   onRemove: (id: string) => Promise<void>
   onClearCompleted: () => Promise<void>
 }
@@ -140,6 +142,7 @@ export default function QuickNotes({
   onAdd,
   onSetDueAt,
   onSetDone,
+  onUpdateText,
   onRemove,
   onClearCompleted
 }: QuickNotesProps): JSX.Element | null {
@@ -157,6 +160,11 @@ export default function QuickNotes({
   const [editingDueRecurrence, setEditingDueRecurrence] =
     useState<QuickNoteRecurrence>('none')
   const [dueSaving, setDueSaving] = useState(false)
+  const [editingTextNoteId, setEditingTextNoteId] = useState<string | null>(
+    null
+  )
+  const [editingTextValue, setEditingTextValue] = useState('')
+  const [textSaving, setTextSaving] = useState(false)
   const [panelPosition, setPanelPosition] = useState<{
     left: number
     bottom: number
@@ -412,6 +420,40 @@ export default function QuickNotes({
     setEditingDueRecurrence('none')
   }
 
+  const openTextEditor = (note: QuickNote): void => {
+    setEditingTextNoteId(note.id)
+    setEditingTextValue(note.text)
+  }
+
+  const closeTextEditor = (): void => {
+    if (textSaving) return
+
+    setEditingTextNoteId(null)
+    setEditingTextValue('')
+  }
+
+  const handleSaveText = async (): Promise<void> => {
+    const id = editingTextNoteId
+    const text = editingTextValue.trim()
+
+    if (!id || !text) {
+      message.warning('待办内容不能为空')
+      return
+    }
+
+    setTextSaving(true)
+
+    try {
+      await onUpdateText(id, text)
+      setEditingTextNoteId(null)
+      setEditingTextValue('')
+    } catch (updateError) {
+      message.error(getErrorMessage(updateError, '保存待办失败'))
+    } finally {
+      setTextSaving(false)
+    }
+  }
+
   const handleSaveDue = async (): Promise<void> => {
     if (!editingDueNoteId || dueSaving) return
 
@@ -570,6 +612,7 @@ export default function QuickNotes({
             <MarkdownContent
               content={note.text}
               className="quick-note-markdown"
+              breaks
             />
           </div>
           {dueAt || recurrenceLabel ? (
@@ -594,6 +637,16 @@ export default function QuickNotes({
           ) : null}
         </div>
         <div className="quick-note-actions">
+          <Button
+            type="text"
+            size="small"
+            className="quick-note-action"
+            icon={<EditOutlined />}
+            aria-label={`编辑待办「${summary}」`}
+            title="编辑待办"
+            disabled={busy}
+            onClick={() => openTextEditor(note)}
+          />
           {!dueAt ? (
             <Button
               type="text"
@@ -854,6 +907,37 @@ export default function QuickNotes({
           </>
         )}
       </div>
+
+      <Modal
+        open={editingTextNoteId !== null}
+        title="编辑待办"
+        okText="保存"
+        cancelText="取消"
+        confirmLoading={textSaving}
+        zIndex={DUE_MODAL_Z_INDEX}
+        closable={!textSaving}
+        keyboard={!textSaving}
+        maskClosable={!textSaving}
+        destroyOnHidden
+        okButtonProps={{ disabled: !editingTextValue.trim() }}
+        onOk={() => void handleSaveText()}
+        onCancel={closeTextEditor}
+      >
+        <div className="quick-note-text-editor">
+          <Input.TextArea
+            className="quick-note-text-editor-input"
+            style={{ color: 'var(--app-text)' }}
+            value={editingTextValue}
+            maxLength={MAX_DRAFT_LENGTH}
+            showCount
+            autoSize={{ minRows: 4, maxRows: 10 }}
+            placeholder="输入待办内容，支持 Markdown，Shift+Enter 换行"
+            spellCheck={false}
+            onChange={(event) => setEditingTextValue(event.target.value)}
+          />
+          <span>保存后会保留换行和 Markdown 格式。</span>
+        </div>
+      </Modal>
 
       <Modal
         open={editingDueNoteId !== null}

@@ -466,6 +466,7 @@ export default function App(): JSX.Element {
         onAdd={quickNotes.add}
         onSetDueAt={quickNotes.setDueAt}
         onSetDone={quickNotes.setDone}
+        onUpdateText={quickNotes.updateText}
         onRemove={quickNotes.remove}
         onClearCompleted={quickNotes.clearCompleted}
       />
