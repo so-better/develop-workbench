@@ -136,7 +136,12 @@
 }
 
 .environment-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 2px;
+  padding-top: 14px;
+  border-top: 1px solid var(--workbench-divider);
+}
+
+.environment-actions .ant-btn {
+  height: 36px;
+  font-weight: 500;
+  border-radius: 9px;
 }

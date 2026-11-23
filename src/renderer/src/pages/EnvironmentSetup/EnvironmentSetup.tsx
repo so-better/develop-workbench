@@ -183,6 +183,7 @@ export default function EnvironmentSetup({
 
         <div className="environment-actions">
           <Button
+            block
             icon={<ReloadOutlined />}
             loading={refreshing}
             onClick={onRefresh}
