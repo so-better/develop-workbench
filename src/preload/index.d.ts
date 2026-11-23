@@ -110,7 +110,6 @@ import type {
   RepositoryBindingStatus,
   RepositoryBranchDeleteResult,
   RepositoryBranchList,
-  RepositoryBranchMergeStatus,
   RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
   RepositoryMergeResult,
@@ -672,11 +671,6 @@ export interface ElectronAPI {
     repositoryId: string,
     branchName: string
   ) => Promise<RepositoryBranchDeleteResult>
-  /** 检查源分支是否已经合并到当前分支。 */
-  getRepositoryBranchMergeStatus: (
-    repositoryId: string,
-    sourceBranch: string
-  ) => Promise<RepositoryBranchMergeStatus>
   /** 把指定分支合并到当前分支。 */
   mergeRepositoryBranch: (
     repositoryId: string,

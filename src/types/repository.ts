@@ -104,17 +104,6 @@ export interface RepositoryMergeResult {
 }
 
 /**
- * 合并前的分支状态检查。
- */
-export interface RepositoryBranchMergeStatus {
-  /** 源分支是否已经合并到当前分支。 */
-  merged: boolean
-
-  /** 当前分支名。 */
-  targetBranch: string
-}
-
-/**
  * 需求仓库绑定的实时状态。
  */
 export interface RepositoryBindingStatus {

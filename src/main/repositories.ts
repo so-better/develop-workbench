@@ -22,7 +22,6 @@ import type {
   Repository,
   RepositoryBindingStatus,
   RepositoryBranchDeleteResult,
-  RepositoryBranchMergeStatus,
   RepositoryBranchList,
   RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
@@ -1854,62 +1853,6 @@ export const mergeRepositoryBranch = async (
 }
 
 /**
- * 检查源分支是否已经合并到当前分支。
- * 只读取本地引用，调用方应先刷新远程分支。
- */
-export const getRepositoryBranchMergeStatus = async (
-  repositoryId: string,
-  sourceBranch: string
-): Promise<RepositoryBranchMergeStatus> => {
-  const normalized = sourceBranch.trim()
-
-  if (!normalized) throw new Error('请选择要合并的分支')
-
-  const repositories = await readStore()
-  const repository = repositories.find((item) => item.id === repositoryId)
-
-  if (!repository) throw new Error('仓库不存在')
-  if (!(await pathExists(repository.localPath))) throw new Error('仓库路径不存在')
-
-  const cwd = repository.localPath
-  const currentBranch = (
-    await runGit(['branch', '--show-current'], { cwd })
-  ).trim()
-
-  if (!currentBranch) throw new Error('当前处于分离 HEAD 状态，无法合并')
-  if (currentBranch === normalized) {
-    return { merged: true, targetBranch: currentBranch }
-  }
-
-  const hasRemoteSource = await runGit(
-    ['rev-parse', '--verify', `refs/remotes/origin/${normalized}`],
-    { cwd }
-  )
-    .then(() => true)
-    .catch(() => false)
-  const hasLocalSource = await runGit(
-    ['rev-parse', '--verify', `refs/heads/${normalized}`],
-    { cwd }
-  )
-    .then(() => true)
-    .catch(() => false)
-
-  if (!hasRemoteSource && !hasLocalSource) {
-    throw new Error('源分支没有可用的本地或远程引用')
-  }
-
-  const sourceRef = hasRemoteSource ? `origin/${normalized}` : normalized
-  const merged = await runGit(
-    ['merge-base', '--is-ancestor', sourceRef, 'HEAD'],
-    { cwd }
-  )
-    .then(() => true)
-    .catch(() => false)
-
-  return { merged, targetBranch: currentBranch }
-}
-
-/**
  * 读取需求仓库绑定的实时状态。
  */
 export const getRepositoryBindingStatus = async (
@@ -2711,21 +2654,6 @@ export const initializeRepositories = (): void => {
       }
 
       return deleteRepositoryBranch(repositoryId, branchName)
-    }
-  )
-
-  // 检查源分支是否已经合并到当前分支。
-  ipcMain.handle(
-    'repositories:branch-merge-status',
-    (_event, repositoryId: unknown, sourceBranch: unknown) => {
-      if (
-        typeof repositoryId !== 'string' ||
-        typeof sourceBranch !== 'string'
-      ) {
-        throw new Error('Invalid branch merge status input')
-      }
-
-      return getRepositoryBranchMergeStatus(repositoryId, sourceBranch)
     }
   )
 

@@ -112,7 +112,6 @@ import type {
   RepositoryBindingStatus,
   RepositoryBranchDeleteResult,
   RepositoryBranchList,
-  RepositoryBranchMergeStatus,
   RepositoryBranchSwitchResult,
   RepositoryCloneProgress,
   RepositoryMergeResult,
@@ -1413,19 +1412,6 @@ const electronAPI = {
     branchName: string
   ): Promise<RepositoryBranchDeleteResult> =>
     ipcRenderer.invoke('repositories:delete-branch', repositoryId, branchName),
-
-  /**
-   * 检查源分支是否已经合并到当前分支。
-   */
-  getRepositoryBranchMergeStatus: (
-    repositoryId: string,
-    sourceBranch: string
-  ): Promise<RepositoryBranchMergeStatus> =>
-    ipcRenderer.invoke(
-      'repositories:branch-merge-status',
-      repositoryId,
-      sourceBranch
-    ),
 
   /**
    * 把指定分支合并到当前分支。

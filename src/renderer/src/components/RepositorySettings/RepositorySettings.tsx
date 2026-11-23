@@ -126,11 +126,6 @@ export default function RepositorySettings({
     null
   )
   const [mergeSource, setMergeSource] = useState<string | null>(null)
-  const [mergeSourceMerged, setMergeSourceMerged] = useState<boolean | null>(
-    null
-  )
-  const [mergeSourceChecking, setMergeSourceChecking] = useState(false)
-  const mergeCheckRef = useRef(0)
   const [merging, setMerging] = useState(false)
   const [switchRepository, setSwitchRepository] = useState<Repository | null>(
     null
@@ -670,36 +665,7 @@ export default function RepositorySettings({
   const openMerge = async (repository: Repository): Promise<void> => {
     setMergeRepository(repository)
     setMergeSource(null)
-    setMergeSourceMerged(null)
-    setMergeSourceChecking(false)
-    mergeCheckRef.current += 1
     await loadBranches(repository.id, true)
-  }
-
-  const handleMergeSourceChange = async (value: string): Promise<void> => {
-    const repository = mergeRepository
-
-    setMergeSource(value)
-    setMergeSourceMerged(null)
-
-    if (!repository) return
-
-    const requestId = ++mergeCheckRef.current
-    setMergeSourceChecking(true)
-
-    try {
-      const status = await window.electron.getRepositoryBranchMergeStatus(
-        repository.id,
-        value
-      )
-
-      if (requestId !== mergeCheckRef.current) return
-      setMergeSourceMerged(status.merged)
-    } catch {
-      if (requestId === mergeCheckRef.current) setMergeSourceMerged(null)
-    } finally {
-      if (requestId === mergeCheckRef.current) setMergeSourceChecking(false)
-    }
   }
 
   const handleMerge = async (): Promise<void> => {
@@ -715,16 +681,6 @@ export default function RepositorySettings({
       return
     }
 
-    if (mergeSourceChecking) {
-      message.info('正在检查分支状态，请稍候')
-      return
-    }
-
-    if (mergeSourceMerged) {
-      message.info('该分支已经合并，无需重复合并')
-      return
-    }
-
     setMerging(true)
 
     try {
@@ -735,7 +691,6 @@ export default function RepositorySettings({
 
       if (result.conflicted) {
         setMergeRepository(null)
-        setMergeSourceMerged(null)
         await loadBranches(repository.id, true)
         await refreshRepositoryState(repository.id).catch(() => undefined)
 
@@ -775,10 +730,7 @@ export default function RepositorySettings({
 
       if (result.alreadyMerged) {
         setMergeRepository(null)
-        setMergeSourceMerged(null)
-        message.info(
-          `分支 ${mergeSource} 已经合并到 ${mergeTarget}，无需重复合并`
-        )
+        message.info('当前已经是最新的了，无需合并')
         await loadBranches(repository.id, true)
         await refreshRepositoryState(repository.id).catch(() =>
           message.warning('检查已完成，但刷新仓库信息失败')
@@ -806,7 +758,6 @@ export default function RepositorySettings({
       }
 
       setMergeRepository(null)
-      setMergeSourceMerged(null)
       await loadBranches(repository.id, true)
       await refreshRepositoryState(repository.id).catch(() =>
         message.warning('合并已完成，但刷新仓库信息失败')
@@ -1662,16 +1613,9 @@ export default function RepositorySettings({
             cancelText="取消"
             confirmLoading={merging}
             destroyOnHidden
-            okButtonProps={{
-              disabled:
-                !mergeSource || mergeSourceMerged === true || mergeSourceChecking
-            }}
+            okButtonProps={{ disabled: !mergeSource }}
             onOk={() => handleMerge()}
-            onCancel={() => {
-              setMergeRepository(null)
-              setMergeSourceMerged(null)
-              setMergeSourceChecking(false)
-            }}
+            onCancel={() => setMergeRepository(null)}
           >
             <div className="requirement-branch-create-form">
               <p>
@@ -1686,17 +1630,8 @@ export default function RepositorySettings({
                 loading={branchLoadingId === mergeRepository?.id}
                 placeholder="选择要合并的分支"
                 optionFilterProp="label"
-                onChange={(value: string) => void handleMergeSourceChange(value)}
+                onChange={(value: string) => setMergeSource(value)}
               />
-              {mergeSourceMerged ? (
-                <Alert
-                  type="success"
-                  showIcon
-                  message={`${mergeSource} 已经合并到 ${
-                    mergeRepository?.currentBranch ?? '当前分支'
-                  }，无需重复合并`}
-                />
-              ) : null}
               <p>
                 合并前会拉取最新远程引用，优先使用最新远程分支，并检查未提交改动；合并成功后自动推送到远程，发生冲突时会保留冲突状态，可打开 IDE 解决。
               </p>
