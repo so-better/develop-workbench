@@ -425,6 +425,48 @@ export default function App(): JSX.Element {
     setQuickNotesOpen(false)
   }, [])
 
+  // 有保留的浏览器页面时，支持快捷恢复面板。
+  useEffect(() => {
+    const isMac = window.electron.platform === 'darwin'
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented) return
+
+      const modifier = isMac ? event.metaKey : event.ctrlKey
+
+      if (!modifier || !event.shiftKey || event.altKey) return
+      if (event.key.toLowerCase() !== 'b') return
+      if (browserVisible || browserTabCount === 0) return
+      if (
+        settingsOpen ||
+        quickNotesOpen ||
+        guideOpen ||
+        changelogOpen ||
+        downloadsModalOpen ||
+        updateOpen
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      window.electron.showEmbeddedBrowser().catch(() => undefined)
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [
+    browserTabCount,
+    browserVisible,
+    changelogOpen,
+    downloadsModalOpen,
+    guideOpen,
+    quickNotesOpen,
+    settingsOpen,
+    updateOpen
+  ])
+
   return (
     <div className="app-shell">
       <AppTitleBar />

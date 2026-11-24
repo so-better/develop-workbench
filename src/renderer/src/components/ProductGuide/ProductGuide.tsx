@@ -362,6 +362,11 @@ export default function ProductGuide({
       label: '打开待办简记'
     },
     {
+      key: 'embedded-browser',
+      keys: isMac ? ['⌘', '⇧', 'B'] : ['Ctrl', 'Shift', 'B'],
+      label: '恢复已收起的浏览器'
+    },
+    {
       key: 'paste-picker',
       keys: isMac ? ['⌘', '⇧', 'V'] : ['Ctrl', 'Shift', 'V'],
       label: '打开粘贴选择（默认快捷键）'
