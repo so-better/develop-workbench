@@ -30,6 +30,7 @@ import {
   StopOutlined,
   VideoCameraOutlined
 } from '@ant-design/icons'
+import ErrorRecovery from '../../components/ErrorRecovery/ErrorRecovery'
 import type {
   AdbAppInfo,
   AdbCommandResult,
@@ -71,6 +72,8 @@ export default function AdbToolsPage({
   const { message } = App.useApp()
   const [info, setInfo] = useState<AdbInfo | null>(null)
   const [infoLoading, setInfoLoading] = useState(true)
+  const [infoError, setInfoError] = useState<string | null>(null)
+  const [lastInfoSuccessAt, setLastInfoSuccessAt] = useState<number | null>(null)
   const [infoRefreshing, setInfoRefreshing] = useState(false)
   const [devices, setDevices] = useState<AdbDevice[]>([])
   const [devicesLoading, setDevicesLoading] = useState(false)
@@ -301,6 +304,22 @@ export default function AdbToolsPage({
     }
   }, [inspectorTab, loadPageSpyRoom])
 
+  const loadInfo = useCallback(async (): Promise<void> => {
+    setInfoLoading(true)
+    setInfoError(null)
+
+    try {
+      const next = await window.electron.getAdbInfo()
+      setInfo(next)
+      setLastInfoSuccessAt(Date.now())
+    } catch (error) {
+      setInfo(null)
+      setInfoError(getErrorMessage(error, '检测 ADB 失败'))
+    } finally {
+      setInfoLoading(false)
+    }
+  }, [])
+
   const refreshAdb = useCallback(
     async (notify = false): Promise<void> => {
       setInfoRefreshing(true)
@@ -330,24 +349,8 @@ export default function AdbToolsPage({
   )
 
   useEffect(() => {
-    let cancelled = false
-
-    window.electron
-      .getAdbInfo()
-      .then((next) => {
-        if (!cancelled) setInfo(next)
-      })
-      .catch(() => {
-        if (!cancelled) setInfo(null)
-      })
-      .finally(() => {
-        if (!cancelled) setInfoLoading(false)
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
+    void loadInfo()
+  }, [loadInfo])
 
   useEffect(() => {
     if (!info?.available) return
@@ -728,6 +731,16 @@ export default function AdbToolsPage({
           <div className="adb-tools-loading">
             <Spin />
           </div>
+        ) : infoError ? (
+          <ErrorRecovery
+            title="无法检测 ADB"
+            error={infoError}
+            retrying={infoLoading}
+            onRetry={() => void loadInfo()}
+            settingsSection="adb"
+            onOpenSettings={onOpenSettings}
+            lastSuccessAt={lastInfoSuccessAt}
+          />
         ) : !info?.available ? (
           <Alert
             type="warning"

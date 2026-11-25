@@ -32,7 +32,6 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
-  Alert,
   App,
   Button,
   Form,
@@ -47,6 +46,7 @@ import {
 import type { InputRef } from 'antd'
 import type { SiteEnv, SiteInput, SiteLink } from '../../../../types/sites'
 import RobotMark from '../../components/RobotMark/RobotMark'
+import ErrorRecovery from '../../components/ErrorRecovery/ErrorRecovery'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import { getErrorMessage, normalizeHttpUrl } from '../../../../utils'
 import './SitesPage.css'
@@ -279,7 +279,12 @@ function SortableSiteCard({
  * 站点快捷入口。
  * 用户维护常用系统地址，点击后统一使用应用内浏览器打开。
  */
-export default function SitesPage(): JSX.Element {
+interface SitesPageProps {
+  /** 当前页面是否处于激活状态。 */
+  active: boolean
+}
+
+export default function SitesPage({ active }: SitesPageProps): JSX.Element {
   const { message } = App.useApp()
   const { openAiDialog } = useAiChatDialog()
   const [form] = Form.useForm<SiteFormValues>()
@@ -287,6 +292,7 @@ export default function SitesPage(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingSite, setEditingSite] = useState<SiteLink | null>(null)
   const [search, setSearch] = useState('')
@@ -318,6 +324,7 @@ export default function SitesPage(): JSX.Element {
       const state = await window.electron.getSiteState()
       if (version !== siteLoadVersion.current) return
       setSites(state.sites)
+      setLastSuccessAt(Date.now())
     } catch (loadError) {
       if (version !== siteLoadVersion.current) return
       setError(getErrorMessage(loadError, '站点加载失败'))
@@ -432,7 +439,7 @@ export default function SitesPage(): JSX.Element {
     [filteredSites]
   )
 
-  const openCreate = (): void => {
+  const openCreate = useCallback((): void => {
     setEditingSite(null)
     form.setFieldsValue({
       name: '',
@@ -442,7 +449,37 @@ export default function SitesPage(): JSX.Element {
       important: false
     })
     setModalOpen(true)
-  }
+  }, [form])
+
+  // 站点页快捷键：Cmd/Ctrl+Shift+N 新增站点。
+  useEffect(() => {
+    if (!active) return
+
+    const isMac = window.electron.platform === 'darwin'
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented) return
+
+      const modifier = isMac ? event.metaKey : event.ctrlKey
+
+      if (!modifier || !event.shiftKey || event.altKey) return
+      if (event.key.toLowerCase() !== 'n') return
+
+      const hasVisibleDialog = Array.from(
+        document.querySelectorAll<HTMLElement>('[role="dialog"]')
+      ).some((element) => element.offsetParent !== null)
+
+      if (hasVisibleDialog) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      openCreate()
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [active, openCreate])
 
   const openEdit = (site: SiteLink): void => {
     setEditingSite(site)
@@ -581,21 +618,18 @@ export default function SitesPage(): JSX.Element {
 
       <main className="sites-content">
         {error ? (
-          <Alert
+          <ErrorRecovery
             className="sites-error"
-            type={sites.length > 0 ? 'warning' : 'error'}
-            showIcon
-            message={
+            title={
               sites.length > 0
                 ? '刷新站点失败，当前展示上次同步结果'
                 : '无法读取站点配置'
             }
-            description={error}
-            action={
-              <Button size="small" onClick={() => loadSites()}>
-                重试
-              </Button>
-            }
+            error={error}
+            retrying={loading}
+            onRetry={() => void loadSites()}
+            lastSuccessAt={lastSuccessAt}
+            variant={sites.length > 0 ? 'warning' : 'error'}
           />
         ) : null}
 

@@ -36,6 +36,7 @@ import {
 import type { Repository, RepositoryState } from '../../../../types/repository'
 import type { SettingsSection } from '../../../../types/settings'
 import { getErrorMessage } from '../../../../utils'
+import ErrorRecovery from '../ErrorRecovery/ErrorRecovery'
 import {
   getMergeRequestUrl,
   getRemoteBranchesUrl
@@ -76,6 +77,8 @@ export default function RepositorySettings({
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null)
   const [allRequirements, setAllRequirements] = useState<
     VersionSummaryRequirement[]
   >([])
@@ -148,13 +151,15 @@ export default function RepositorySettings({
 
       try {
         setState(await window.electron.refreshRootRepositories())
-      } catch {
-        if (!silent) message.error('读取代码仓库配置失败')
+        setLoadError(null)
+        setLastSuccessAt(Date.now())
+      } catch (error) {
+        setLoadError(getErrorMessage(error, '读取代码仓库配置失败'))
       } finally {
         if (!silent) setLoading(false)
       }
     },
-    [message]
+    []
   )
 
   /** 读取仓库分支并缓存，供新建/合并/切换/MR 弹窗使用。 */
@@ -1354,6 +1359,24 @@ export default function RepositorySettings({
               </Button>
             </div>
           </div>
+
+          {loadError ? (
+            <ErrorRecovery
+              className="repository-load-error"
+              title={
+                state
+                  ? '刷新代码仓库失败，当前展示上次结果'
+                  : '无法读取代码仓库'
+              }
+              error={loadError}
+              retrying={loading}
+              onRetry={() => void loadState()}
+              settingsSection="repositories"
+              onOpenSettings={onOpenSettings}
+              lastSuccessAt={lastSuccessAt}
+              variant={state ? 'warning' : 'error'}
+            />
+          ) : null}
 
           <Table
             bordered

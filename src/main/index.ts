@@ -41,6 +41,7 @@ import { initializeSystem } from './system'
 import { initializeTheme } from './theme'
 import { initializeWeeklyReport } from './weekly-report'
 import { initializeWeeklyReportAutoSubmit } from './weekly-report-auto'
+import { initializeFeedback } from './feedback'
 import { createMainWindow, focusMainWindow, getMainWindow } from './window'
 
 // 保留原有数据路径，避免修改应用名后丢失偏好、站点、登录态和浏览器会话。
@@ -79,6 +80,7 @@ if (!hasSingleInstanceLock) {
     initializeAutoStart()
     initializePowerSettings()
     initializeProductGuide()
+    initializeFeedback()
     initializeQuickNotes()
     initializeRequirementLinks()
     initializeMigration()

@@ -229,6 +229,7 @@ const CAPABILITIES: GuideCapability[] = [
     title: '环境与设置',
     icon: <SettingOutlined />,
     items: [
+      '底部状态栏可提交反馈，支持粘贴截图/添加图片，卡片自动附带用户、客户端和本机诊断信息',
       '检测并登录本机 Lark CLI 和 Meegle CLI',
       '配置 Git、仓库根目录、IDE、终端、AI 模型和技能目录',
       '管理深浅主题、下载记录、缓存和临时数据',
@@ -365,6 +366,71 @@ export default function ProductGuide({
       key: 'embedded-browser',
       keys: isMac ? ['⌘', '⇧', 'B'] : ['Ctrl', 'Shift', 'B'],
       label: '恢复已收起的浏览器'
+    },
+    {
+      key: 'settings',
+      keys: isMac ? ['⌘', ','] : ['Ctrl', ','],
+      label: '打开设置'
+    },
+    {
+      key: 'ai-assistant',
+      keys: isMac ? ['⌘', '⇧', 'A'] : ['Ctrl', 'Shift', 'A'],
+      label: '打开 AI 助手'
+    },
+    {
+      key: 'downloads',
+      keys: isMac ? ['⌘', 'J'] : ['Ctrl', 'J'],
+      label: '打开下载管理'
+    },
+    {
+      key: 'page-switch',
+      keys: isMac ? ['⌘', '1~7'] : ['Ctrl', '1~7'],
+      label: '切换一级页面（需求~终端）'
+    },
+    {
+      key: 'help',
+      keys: ['F1'],
+      label: '打开使用手册'
+    },
+    {
+      key: 'changelog',
+      keys: isMac ? ['⌘', '⇧', 'U'] : ['Ctrl', 'Shift', 'U'],
+      label: '打开更新日志'
+    },
+    {
+      key: 'requirement-search',
+      keys: ['/'],
+      label: '需求页聚焦搜索'
+    },
+    {
+      key: 'new-requirement',
+      keys: isMac ? ['⌘', 'N'] : ['Ctrl', 'N'],
+      label: '需求页新建临时需求'
+    },
+    {
+      key: 'new-formal-requirement',
+      keys: isMac ? ['⌘', '⇧', 'N'] : ['Ctrl', 'Shift', 'N'],
+      label: '需求页新建正式需求'
+    },
+    {
+      key: 'new-site',
+      keys: isMac ? ['⌘', '⇧', 'N'] : ['Ctrl', 'Shift', 'N'],
+      label: '站点页新增站点'
+    },
+    {
+      key: 'terminal-new',
+      keys: isMac ? ['⌘', 'T'] : ['Ctrl', 'T'],
+      label: '终端新建标签'
+    },
+    {
+      key: 'terminal-close',
+      keys: isMac ? ['⌘', 'W'] : ['Ctrl', 'W'],
+      label: '终端关闭当前标签'
+    },
+    {
+      key: 'terminal-switch',
+      keys: isMac ? ['⌘', '1~9'] : ['Ctrl', '1~9'],
+      label: '终端切换标签'
     },
     {
       key: 'paste-picker',

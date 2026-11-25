@@ -13,6 +13,11 @@ import type {
   AiStoredMessage
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
+import type {
+  FeedbackSendResult,
+  FeedbackSubmission,
+  FeedbackSystemInfo
+} from '../types/feedback'
 import type { ProductGuideState } from '../types/product-guide'
 import type {
   QuickNoteRecurrence,
@@ -225,6 +230,14 @@ const electronAPI = {
    * 获取应用版本及 Electron、Chromium、Node.js 运行时信息。
    */
   getAppInfo: (): Promise<AppInfo> => ipcRenderer.invoke('app:get-info'),
+
+  /** 把反馈文本发送到团队飞书群。 */
+  sendFeedback: (submission: FeedbackSubmission): Promise<FeedbackSendResult> =>
+    ipcRenderer.invoke('feedback:send', submission),
+
+  /** 读取反馈附带的系统信息。 */
+  getFeedbackSystemInfo: (): Promise<FeedbackSystemInfo> =>
+    ipcRenderer.invoke('feedback:get-system-info'),
 
   /** 读取产品使用手册的当前版本和已读版本。 */
   getProductGuideState: (): Promise<ProductGuideState> =>

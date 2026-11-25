@@ -18,6 +18,7 @@ import AdbToolsPage from './pages/AdbToolsPage/AdbToolsPage'
 import TerminalPage from './pages/TerminalPage/TerminalPage'
 
 interface PageRenderContext {
+  active: boolean
   onOpenSettings: (section: SettingsSection) => void
   larkUser: LarkUser | null
   terminalRequest: { cwd: string; token: number } | null
@@ -39,8 +40,12 @@ export const APP_PAGES = [
     key: 'requirements',
     label: '需求',
     icon: <ProjectOutlined />,
-    render: ({ onOpenSettings, larkUser }) => (
-      <RequirementWorkbench onOpenSettings={onOpenSettings} larkUser={larkUser} />
+    render: ({ active, onOpenSettings, larkUser }) => (
+      <RequirementWorkbench
+        active={active}
+        onOpenSettings={onOpenSettings}
+        larkUser={larkUser}
+      />
     )
   },
   {
@@ -71,7 +76,7 @@ export const APP_PAGES = [
     key: 'sites',
     label: '站点',
     icon: <GlobalOutlined />,
-    render: () => <SitesPage />
+    render: ({ active }) => <SitesPage active={active} />
   },
   {
     key: 'weekly-report',
@@ -83,8 +88,9 @@ export const APP_PAGES = [
     key: 'terminal',
     label: '终端',
     icon: <CodeOutlined />,
-    render: ({ terminalRequest, onTerminalRequestHandled }) => (
+    render: ({ active, terminalRequest, onTerminalRequestHandled }) => (
       <TerminalPage
+        active={active}
         openRequest={terminalRequest}
         onOpenRequestHandled={onTerminalRequestHandled}
       />

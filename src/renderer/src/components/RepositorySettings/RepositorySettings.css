@@ -102,6 +102,10 @@
   margin-bottom: 12px;
 }
 
+.repository-load-error {
+  margin-bottom: 12px;
+}
+
 .repository-toolbar-filters {
   display: flex;
   flex: 1;

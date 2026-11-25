@@ -11,6 +11,11 @@ import type {
   AiStoredMessage
 } from '../types/ai'
 import type { AppInfo } from '../types/app'
+import type {
+  FeedbackSendResult,
+  FeedbackSubmission,
+  FeedbackSystemInfo
+} from '../types/feedback'
 import type { ProductGuideState } from '../types/product-guide'
 import type {
   QuickNoteRecurrence,
@@ -182,6 +187,10 @@ export interface ElectronAPI {
   platform: string
   /** 获取应用与运行时版本信息。 */
   getAppInfo: () => Promise<AppInfo>
+  /** 把反馈内容发送到团队飞书群。 */
+  sendFeedback: (submission: FeedbackSubmission) => Promise<FeedbackSendResult>
+  /** 读取反馈附带的系统信息。 */
+  getFeedbackSystemInfo: () => Promise<FeedbackSystemInfo>
   /** 读取产品使用手册的当前版本和已读版本。 */
   getProductGuideState: () => Promise<ProductGuideState>
   /** 将当前产品手册版本标记为已读。 */

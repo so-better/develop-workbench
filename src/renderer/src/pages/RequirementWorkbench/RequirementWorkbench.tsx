@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Empty, Skeleton } from 'antd'
 import type { LarkUser } from '../../../../types/lark'
 import type { SettingsSection } from '../../../../types/settings'
 import VersionRepositorySummary from '../../components/VersionRepositorySummary/VersionRepositorySummary'
+import ErrorRecovery from '../../components/ErrorRecovery/ErrorRecovery'
 import LocalRequirementModal from '../../components/LocalRequirementModal/LocalRequirementModal'
 import LocalRequirementDetail from '../../components/LocalRequirementDetail/LocalRequirementDetail'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
@@ -22,6 +23,8 @@ import { useRequirementRepositories } from './useRequirementRepositories'
 import { useLocalRequirementModal } from './useLocalRequirementModal'
 
 interface RequirementWorkbenchProps {
+  /** 当前页面是否处于激活状态。 */
+  active: boolean
   /** 打开设置弹窗，并定位到指定分类。 */
   onOpenSettings: (section: SettingsSection) => void
   /** 当前飞书用户，用于生成分支名首字母。 */
@@ -33,6 +36,7 @@ interface RequirementWorkbenchProps {
  * 页面只负责编排各业务 hook 和展示组件。
  */
 export default function RequirementWorkbench({
+  active,
   onOpenSettings,
   larkUser
 }: RequirementWorkbenchProps): JSX.Element {
@@ -88,6 +92,11 @@ export default function RequirementWorkbench({
     loadRequirements,
     clearSelectedRequirement
   } = useRequirementList()
+
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null)
+  useEffect(() => {
+    if (data && !error) setLastSuccessAt(Date.now())
+  }, [data, error])
 
   const {
     activity,
@@ -208,6 +217,70 @@ export default function RequirementWorkbench({
     clearSelectedRequirement
   })
 
+  const createRequirementMenuRef = useRef(handleCreateRequirementMenu)
+  useEffect(() => {
+    createRequirementMenuRef.current = handleCreateRequirementMenu
+  }, [handleCreateRequirementMenu])
+
+  // 需求页快捷键：/ 搜索，Cmd/Ctrl+N 新建临时需求，Cmd/Ctrl+Shift+N 新建正式需求。
+  useEffect(() => {
+    if (!active) return
+
+    const isMac = window.electron.platform === 'darwin'
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented) return
+
+      const hasVisibleDialog = Array.from(
+        document.querySelectorAll<HTMLElement>('[role="dialog"]')
+      ).some((element) => element.offsetParent !== null)
+
+      if (hasVisibleDialog) return
+
+      const modifier = isMac ? event.metaKey : event.ctrlKey
+
+      if (modifier && !event.altKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        event.stopPropagation()
+        createRequirementMenuRef.current(event.shiftKey ? 'formal' : 'local')
+        return
+      }
+
+      if (
+        !modifier &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.key === '/'
+      ) {
+        const target = event.target as HTMLElement | null
+
+        if (
+          target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable)
+        ) {
+          return
+        }
+
+        const input = document.querySelector<HTMLInputElement>(
+          '.workbench-requirement-search input'
+        )
+
+        if (!input) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        input.focus()
+        input.select()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [active])
+
   const { primary: primaryInfoGroups, more: moreInfoGroups } = selectedRequirement
     ? buildRequirementInfoGroups(selectedRequirement, selectedRequirementIsLocal)
     : { primary: [], more: [] }
@@ -304,18 +377,15 @@ export default function RequirementWorkbench({
         {error && !data ? (
           <div className="workbench-state">
             <div className="workbench-state-card">
-              <Alert
-                type="error"
-                showIcon
-                message="无法读取当前用户需求"
-                description={error}
+              <ErrorRecovery
+                title="无法读取当前用户需求"
+                error={error ?? ''}
+                retrying={loading}
+                onRetry={() => void loadRequirements()}
+                settingsSection="meegle"
+                onOpenSettings={onOpenSettings}
+                lastSuccessAt={lastSuccessAt}
               />
-              <div className="workbench-state-actions">
-                <Button type="primary" onClick={() => loadRequirements()}>
-                  重试
-                </Button>
-                <Button onClick={() => onOpenSettings('meegle')}>检查 Meegle 设置</Button>
-              </div>
             </div>
           </div>
         ) : loading && !data ? (

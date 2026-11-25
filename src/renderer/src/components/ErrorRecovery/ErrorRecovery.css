@@ -1,0 +1,23 @@
+.error-recovery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.error-recovery-description {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.error-recovery-last-success {
+  color: var(--app-muted);
+  font-size: 11px;
+}
+
+.error-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}

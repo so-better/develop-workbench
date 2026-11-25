@@ -1,6 +1,7 @@
 import {
   CheckSquareOutlined,
   CloudOutlined,
+  CommentOutlined,
   DownloadOutlined,
   GlobalOutlined,
   HistoryOutlined,
@@ -28,6 +29,7 @@ interface AppFooterProps {
   onOpenChangelog: () => void
   onOpenAi: () => void
   onOpenCloudDocs: () => void
+  onOpenFeedback: () => void
   onOpenQuickAccess: () => void
 }
 
@@ -48,6 +50,7 @@ export default function AppFooter({
   onOpenChangelog,
   onOpenAi,
   onOpenCloudDocs,
+  onOpenFeedback,
   onOpenQuickAccess
 }: AppFooterProps): JSX.Element {
   const isMac = window.electron.platform === 'darwin'
@@ -84,6 +87,15 @@ export default function AppFooter({
           onClick={onOpenCloudDocs}
         >
           <span className="footer-meta-label">飞书云文档</span>
+        </Button>
+        <Button
+          type="text"
+          size="small"
+          icon={<CommentOutlined />}
+          title="提交反馈"
+          onClick={onOpenFeedback}
+        >
+          <span className="footer-meta-label">提交反馈</span>
         </Button>
       </div>
 

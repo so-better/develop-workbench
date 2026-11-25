@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   App,
-  Button,
   Empty,
   Skeleton,
   Typography
@@ -30,6 +29,7 @@ import DefectStatusTag from '../../components/DefectStatusTag/DefectStatusTag'
 import DefectPeople from '../../components/DefectPeople/DefectPeople'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import '../RequirementWorkbench/RequirementWorkbench.css'
+import ErrorRecovery from '../../components/ErrorRecovery/ErrorRecovery'
 import {
   cleanDescription,
   formatDate,
@@ -57,12 +57,17 @@ export default function DefectWorkbench({
   const { openAiDialog } = useAiChatDialog()
   const [role, setRole] = useState<DefectRole | null>(null)
   const [data, setData] = useState<MeegleMyDefects | null>(null)
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [projects, setProjects] = useState<MeegleProject[]>([])
   const [projectsLoading, setProjectsLoading] = useState(false)
   const [projectSwitching, setProjectSwitching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (data && !error) setLastSuccessAt(Date.now())
+  }, [data, error])
   const [search, setSearch] = useState('')
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [productLineFilters, setProductLineFilters] = useState<string[]>([])
@@ -952,18 +957,15 @@ export default function DefectWorkbench({
         {error && !data ? (
           <div className="workbench-state">
             <div className="workbench-state-card">
-              <Alert
-                type="error"
-                showIcon
-                message="无法读取缺陷"
-                description={error}
+              <ErrorRecovery
+                title="无法读取缺陷"
+                error={error ?? ''}
+                retrying={loading}
+                onRetry={handleRefresh}
+                settingsSection="meegle"
+                onOpenSettings={onOpenSettings}
+                lastSuccessAt={lastSuccessAt}
               />
-              <div className="workbench-state-actions">
-                <Button type="primary" onClick={handleRefresh}>
-                  重试
-                </Button>
-                <Button onClick={() => onOpenSettings('meegle')}>检查 Meegle 设置</Button>
-              </div>
             </div>
           </div>
         ) : loading && !data ? (

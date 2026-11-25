@@ -255,6 +255,9 @@ const TERMINAL_THEME: ITheme = {
  * 每个标签对应主进程中的一个 PTY 会话，切换标签不会丢失进程状态。
  */
 interface TerminalPageProps {
+  /** 当前页面是否处于激活状态。 */
+  active: boolean
+
   /** 由代码仓库页发起的“在指定目录打开终端”请求。 */
   openRequest?: { cwd: string; token: number } | null
 
@@ -263,6 +266,7 @@ interface TerminalPageProps {
 }
 
 export default function TerminalPage({
+  active,
   openRequest,
   onOpenRequestHandled
 }: TerminalPageProps): JSX.Element {
@@ -1239,6 +1243,61 @@ export default function TerminalPage({
     },
     [handleCloseTabs]
   )
+
+  // 终端页快捷键：新建/关闭标签，以及 Cmd/Ctrl+1~9 切换标签。
+  useEffect(() => {
+    if (!active) return
+
+    const isMac = window.electron.platform === 'darwin'
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.defaultPrevented) return
+
+      const modifier = isMac ? event.metaKey : event.ctrlKey
+
+      if (!modifier || event.altKey || event.shiftKey) return
+
+      const hasVisibleDialog = Array.from(
+        document.querySelectorAll<HTMLElement>('[role="dialog"]')
+      ).some((element) => element.offsetParent !== null)
+
+      if (hasVisibleDialog) return
+
+      const key = event.key.toLowerCase()
+
+      if (key === 't') {
+        event.preventDefault()
+        event.stopPropagation()
+        void handleCreate()
+        return
+      }
+
+      if (key === 'w') {
+        const id = activeIdRef.current
+
+        if (!id) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        handleClose(id)
+        return
+      }
+
+      if (/^[1-9]$/.test(event.key)) {
+        const tab = tabsRef.current[Number(event.key) - 1]
+
+        if (!tab) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        setActiveId(tab.id)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true)
+
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
+  }, [active, handleClose, handleCreate])
 
   const startRename = useCallback((tab: TerminalTab): void => {
     renameCancelledRef.current = false

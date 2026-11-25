@@ -7,6 +7,7 @@ import AppNavigation from './components/AppNavigation/AppNavigation'
 import LinkContextMenu from './components/LinkContextMenu/LinkContextMenu'
 import ProductGuide from './components/ProductGuide/ProductGuide'
 import ChangelogModal from './components/ChangelogModal/ChangelogModal'
+import FeedbackModal from './components/FeedbackSettings/FeedbackModal'
 import QuickNotes from './components/QuickNotes/QuickNotes'
 import UpdatePrompt from './components/UpdatePrompt/UpdatePrompt'
 import { APP_PAGES } from './navigation'
@@ -73,6 +74,7 @@ export default function App(): JSX.Element {
   const [guideOpen, setGuideOpen] = useState(false)
   const [guideWelcome, setGuideWelcome] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [quickNotesOpen, setQuickNotesOpen] = useState(false)
   const quickNotes = useQuickNotes()
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null)
@@ -152,7 +154,7 @@ export default function App(): JSX.Element {
     openSettings,
     closeSettings
   } = useSettingsDialog()
-  const { openAiDialog } = useAiChatDialog()
+  const { openAiDialog, isOpen: aiDialogOpen } = useAiChatDialog()
 
   useEffect(() => {
     let mounted = true
@@ -294,14 +296,14 @@ export default function App(): JSX.Element {
     }
   }, [handlePageChange])
 
-  const handleOpenDownloads = (): void => {
+  const handleOpenDownloads = useCallback((): void => {
     if (browserVisible) {
       setDownloadsPanelOpen((value) => !value)
       return
     }
 
     setDownloadsModalOpen(true)
-  }
+  }, [browserVisible])
 
   const meegleAuthenticated = meegleState?.authenticated ?? false
   const larkAuthenticated = Boolean(larkUser)
@@ -354,7 +356,8 @@ export default function App(): JSX.Element {
       changelogOpen ||
       settingsOpen ||
       downloadsModalOpen ||
-      quickNotesOpen
+      quickNotesOpen ||
+      feedbackOpen
     ) {
       return
     }
@@ -397,6 +400,7 @@ export default function App(): JSX.Element {
     downloadsModalOpen,
     environmentLoading,
     environmentReady,
+    feedbackOpen,
     guideOpen,
     quickNotesOpen,
     settingsOpen,
@@ -425,7 +429,7 @@ export default function App(): JSX.Element {
     setQuickNotesOpen(false)
   }, [])
 
-  // 有保留的浏览器页面时，支持快捷恢复面板。
+  // 全局快捷键：设置、AI、下载、帮助、页面切换和浏览器恢复。
   useEffect(() => {
     const isMac = window.electron.platform === 'darwin'
 
@@ -433,38 +437,132 @@ export default function App(): JSX.Element {
       if (event.defaultPrevented) return
 
       const modifier = isMac ? event.metaKey : event.ctrlKey
-
-      if (!modifier || !event.shiftKey || event.altKey) return
-      if (event.key.toLowerCase() !== 'b') return
-      if (browserVisible || browserTabCount === 0) return
-      if (
+      const key = event.key.toLowerCase()
+      const hasOverlay =
         settingsOpen ||
         quickNotesOpen ||
         guideOpen ||
         changelogOpen ||
         downloadsModalOpen ||
-        updateOpen
-      ) {
+        updateOpen ||
+        aiDialogOpen ||
+        feedbackOpen
+
+      // F1：打开/关闭使用手册。
+      if (event.key === 'F1' && !modifier && !event.altKey) {
+        event.preventDefault()
+        event.stopPropagation()
+
+        if (guideOpen) {
+          closeGuide()
+        } else if (!hasOverlay) {
+          setGuideWelcome(false)
+          setGuideOpen(true)
+        }
+
         return
       }
 
-      event.preventDefault()
-      event.stopPropagation()
-      window.electron.showEmbeddedBrowser().catch(() => undefined)
+      if (!modifier || event.altKey) return
+
+      // 设置：Cmd/Ctrl + ,；再次按下关闭。
+      if (!event.shiftKey && event.key === ',') {
+        event.preventDefault()
+        event.stopPropagation()
+
+        if (settingsOpen) {
+          closeSettings()
+        } else if (!hasOverlay) {
+          openSettings()
+        }
+
+        return
+      }
+
+      if (hasOverlay) return
+
+      // AI 助手。
+      if (event.shiftKey && key === 'a') {
+        event.preventDefault()
+        event.stopPropagation()
+        openAiDialog({
+          title: 'AI 助手',
+          prompt: '',
+          autoStart: false,
+          persistSession: true
+        })
+        return
+      }
+
+      // 下载管理。
+      if (!event.shiftKey && key === 'j') {
+        event.preventDefault()
+        event.stopPropagation()
+        handleOpenDownloads()
+        return
+      }
+
+      // 更新日志。
+      if (event.shiftKey && key === 'u') {
+        event.preventDefault()
+        event.stopPropagation()
+        setChangelogOpen(true)
+        return
+      }
+
+      // 恢复已收起的浏览器。
+      if (event.shiftKey && key === 'b') {
+        if (browserVisible || browserTabCount === 0) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        window.electron.showEmbeddedBrowser().catch(() => undefined)
+        return
+      }
+
+      // 一级页面切换：Cmd/Ctrl + 1~7。
+      if (
+        environmentReady &&
+        !environmentLoading &&
+        !event.shiftKey &&
+        /^[1-7]$/.test(event.key)
+      ) {
+        // 终端页内数字键用于切换终端标签。
+        if (workspace === 'terminal') return
+
+        const page = APP_PAGES[Number(event.key) - 1]
+
+        if (page) {
+          event.preventDefault()
+          event.stopPropagation()
+          handlePageChange(page.key)
+        }
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown, true)
 
     return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [
+    aiDialogOpen,
     browserTabCount,
     browserVisible,
     changelogOpen,
+    closeGuide,
+    closeSettings,
     downloadsModalOpen,
+    environmentLoading,
+    environmentReady,
+    feedbackOpen,
     guideOpen,
+    handleOpenDownloads,
+    handlePageChange,
+    openAiDialog,
+    openSettings,
     quickNotesOpen,
     settingsOpen,
-    updateOpen
+    updateOpen,
+    workspace
   ])
 
   return (
@@ -491,6 +589,7 @@ export default function App(): JSX.Element {
                 aria-hidden={workspace !== page.key}
               >
                 {page.render({
+                  active: workspace === page.key,
                   onOpenSettings: openSettings,
                   larkUser,
                   terminalRequest,
@@ -550,6 +649,11 @@ export default function App(): JSX.Element {
         onClose={() => setChangelogOpen(false)}
       />
 
+      <FeedbackModal
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
+
       <UpdatePrompt
         update={updateInfo}
         open={updateOpen}
@@ -588,6 +692,7 @@ export default function App(): JSX.Element {
           setGuideOpen(true)
         }}
         onOpenChangelog={() => setChangelogOpen(true)}
+        onOpenFeedback={() => setFeedbackOpen(true)}
         onOpenQuickAccess={() => window.dispatchEvent(new Event('quick-access:open'))}
         onOpenAi={() =>
           openAiDialog({

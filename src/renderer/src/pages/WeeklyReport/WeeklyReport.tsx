@@ -15,6 +15,7 @@ import type {
 import { getErrorMessage, isRecord } from '../../../../utils'
 import RichTextEditor from '../../components/RichTextEditor/RichTextEditor'
 import RobotMark from '../../components/RobotMark/RobotMark'
+import ErrorRecovery from '../../components/ErrorRecovery/ErrorRecovery'
 import { useAiChatDialog } from '../../hooks/useAiChatDialog'
 import './WeeklyReport.css'
 
@@ -191,6 +192,7 @@ export default function WeeklyReport(): JSX.Element {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastSuccessAt, setLastSuccessAt] = useState<number | null>(null)
   const [autoStatus, setAutoStatus] = useState<WeeklyReportAutoStatus | null>(
     null
   )
@@ -208,6 +210,7 @@ export default function WeeklyReport(): JSX.Element {
       ])
       setState(next)
       setAutoStatus(auto)
+      setLastSuccessAt(Date.now())
       setDrafts(
         Object.fromEntries(
           next.fields
@@ -520,26 +523,16 @@ export default function WeeklyReport(): JSX.Element {
 
       <main className="weekly-report-content">
         {error ? (
-          <Alert
+          <ErrorRecovery
             className="weekly-report-error"
-            type={state ? 'warning' : 'error'}
-            showIcon
-            message={
+            title={
               state ? '刷新周报失败，当前展示上次同步结果' : '无法读取飞书周报'
             }
-            description={error}
-            action={
-              <Button
-                size="small"
-                onClick={() =>
-                  window.electron.openEmbeddedBrowser(
-                    'https://oa.feishu.cn/report/record/entry'
-                  )
-                }
-              >
-                打开飞书周报
-              </Button>
-            }
+            error={error}
+            retrying={loading}
+            onRetry={() => void load()}
+            lastSuccessAt={lastSuccessAt}
+            variant={state ? 'warning' : 'error'}
           />
         ) : null}
 
