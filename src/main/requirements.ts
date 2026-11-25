@@ -1867,6 +1867,41 @@ export const addRequirementComment = async (
 }
 
 /**
+ * 读取需求完整描述。
+ * MQL 列表里的需求描述会把图片替换成 [img]，这里通过详情接口获取带图片地址的 Markdown。
+ */
+export const getRequirementDescription = async (
+  workItemId: string
+): Promise<string> => {
+  if (!/^\d+$/.test(workItemId)) throw new Error('需求 ID 不合法')
+
+  const project = await getProject()
+  const result = await runMeegle(
+    [
+      'workitem',
+      'get',
+      '--project-key',
+      project.key,
+      '--work-item-id',
+      workItemId,
+      '--fields',
+      'description',
+      '--format',
+      'json'
+    ],
+    MEEGLE_QUERY_TIMEOUT_MS
+  )
+  const response = parseCommandJson<{
+    work_item_fields?: Array<{ key?: string; value?: unknown }>
+  }>(result, '读取需求描述')
+  const description = response.work_item_fields?.find(
+    (field) => field.key === 'description'
+  )?.value
+
+  return typeof description === 'string' ? description.trim() : ''
+}
+
+/**
  * 更新需求描述。
  */
 export const updateRequirementDescription = async (
@@ -2496,6 +2531,11 @@ export const initializeRequirements = (): void => {
   ipcMain.handle('requirements:search-users', (_event, keyword: unknown) => {
     if (typeof keyword !== 'string') throw new Error('搜索关键词不合法')
     return searchRequirementUsers(keyword)
+  })
+  ipcMain.handle('requirements:get-description', (_event, workItemId: unknown) => {
+    if (typeof workItemId !== 'string') throw new Error('需求 ID 不合法')
+
+    return getRequirementDescription(workItemId)
   })
   ipcMain.handle(
     'requirements:update-description',

@@ -98,6 +98,48 @@ export default function RequirementWorkbench({
     if (data && !error) setLastSuccessAt(Date.now())
   }, [data, error])
 
+  const [descriptionOverride, setDescriptionOverride] = useState<{
+    id: string
+    description: string
+  } | null>(null)
+
+  // MQL 列表会把图片替换成 [img]，选中需求后再通过详情接口补齐完整 Markdown。
+  useEffect(() => {
+    setDescriptionOverride(null)
+
+    if (
+      !selectedRequirement ||
+      selectedRequirementIsLocal ||
+      !selectedRequirement.description?.includes('[img]')
+    ) {
+      return
+    }
+
+    let cancelled = false
+
+    window.electron
+      .getRequirementDescription(selectedRequirement.id)
+      .then((description) => {
+        if (!cancelled && description) {
+          setDescriptionOverride({ id: selectedRequirement.id, description })
+        }
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedRequirement?.description, selectedRequirement?.id, selectedRequirementIsLocal])
+
+  const selectedDescription =
+    descriptionOverride && descriptionOverride.id === selectedRequirement?.id
+      ? descriptionOverride.description
+      : selectedRequirement?.description ?? null
+  const displayRequirement =
+    selectedRequirement && selectedDescription !== selectedRequirement.description
+      ? { ...selectedRequirement, description: selectedDescription }
+      : selectedRequirement
+
   const {
     activity,
     activityLoading,
@@ -173,7 +215,7 @@ export default function RequirementWorkbench({
   } = useRequirementComments({
     selectedRequirementId,
     projectKey: data?.project.projectKey,
-    selectedDescription: selectedRequirement?.description ?? null,
+    selectedDescription,
     loadRequirements,
     refreshActivity
   })
@@ -287,13 +329,13 @@ export default function RequirementWorkbench({
 
   /** 使用 AI 分析当前需求。 */
   const handleAnalyzeRequirement = (): void => {
-    if (!selectedRequirement) return
+    if (!displayRequirement) return
 
     openAiDialog({
       title: 'AI 需求分析',
       autoStart: true,
       prompt: buildRequirementAnalysisPrompt(
-        selectedRequirement,
+        displayRequirement,
         selectedRequirementIsLocal,
         requirementUrl,
         repositories.bindings,
@@ -485,7 +527,7 @@ export default function RequirementWorkbench({
                   key={JSON.stringify([data.project.projectKey, selectedRequirement.id])}
                   projectKey={data.project.projectKey}
                   requirementId={selectedRequirement.id}
-                  description={selectedRequirement.description}
+                  description={selectedDescription}
                   documentUrl={selectedRequirement.documentUrl}
                   requirementUrl={requirementUrl}
                 />
@@ -548,7 +590,7 @@ export default function RequirementWorkbench({
                   />
 
                   <RequirementInfoSection
-                    requirement={selectedRequirement}
+                    requirement={displayRequirement ?? selectedRequirement}
                     requirementUrl={requirementUrl}
                     primaryInfoGroups={primaryInfoGroups}
                     moreInfoGroups={moreInfoGroups}

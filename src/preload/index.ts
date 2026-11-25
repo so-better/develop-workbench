@@ -1233,6 +1233,12 @@ const electronAPI = {
     ipcRenderer.invoke('requirements:search-users', keyword),
 
   /**
+   * 读取需求完整描述。
+   */
+  getRequirementDescription: (workItemId: string): Promise<string> =>
+    ipcRenderer.invoke('requirements:get-description', workItemId),
+
+  /**
    * 更新需求描述。
    */
   updateRequirementDescription: (workItemId: string, content: string): Promise<void> =>

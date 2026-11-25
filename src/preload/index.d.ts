@@ -583,6 +583,8 @@ export interface ElectronAPI {
   setMeegleProject: (projectKey: string) => Promise<MeegleProject>
   /** 按姓名或邮箱搜索 Meegle 用户。 */
   searchRequirementUsers: (keyword: string) => Promise<MeegleRequirementOwner[]>
+  /** 读取需求完整描述。 */
+  getRequirementDescription: (workItemId: string) => Promise<string>
   /** 更新需求描述。 */
   updateRequirementDescription: (workItemId: string, content: string) => Promise<void>
   /** 读取需求的本地个人状态。 */
