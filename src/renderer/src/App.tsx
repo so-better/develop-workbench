@@ -26,6 +26,7 @@ import type { LarkCliInfo, LarkUser } from '../../types/lark'
 import type { MeegleState } from '../../types/meegle'
 import changelogContent from '../../../CHANGELOG.md?raw'
 import type { UpdateCheckResult } from '../../types/updates'
+import { getErrorMessage } from '../../utils'
 import './App.css'
 
 
@@ -40,7 +41,7 @@ interface EnvironmentStatus {
  * 应用本身没有登录态；Meegle Cli 和 Lark Cli 都完成授权后才能进入工作台。
  */
 export default function App(): JSX.Element {
-  const { message } = AntdApp.useApp()
+  const { message, modal } = AntdApp.useApp()
 
   // 应用版本及运行时信息，用于 Footer 和设置弹窗。
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null)
@@ -412,6 +413,53 @@ export default function App(): JSX.Element {
     setUpdateOpen(false)
   }, [])
 
+  const handleDownloadUpdate = useCallback(
+    async (next: UpdateCheckResult): Promise<void> => {
+      if (!next.package) return
+
+      sessionDismissedUpdateVersionRef.current = next.latestVersion
+      closeUpdatePrompt()
+
+      // 下载进入下载管理，用户可以先看到进度。
+      if (browserVisible) {
+        setDownloadsPanelOpen(true)
+      } else {
+        setDownloadsModalOpen(true)
+      }
+
+      try {
+        const result = await window.electron.downloadUpdatePackage(next.package)
+
+        modal.confirm({
+          title: '更新已下载',
+          content: `安装包 v${next.latestVersion} 已保存到下载目录：${result.name}。是否立即安装？`,
+          okText: '立即安装',
+          cancelText: '稍后自行安装',
+          onOk: async () => {
+            try {
+              await window.electron.installUpdateDownload(result.downloadId)
+            } catch (installError) {
+              message.error(
+                getErrorMessage(
+                  installError,
+                  '安装更新失败，请稍后自行安装'
+                )
+              )
+            }
+          },
+          onCancel: () => {
+            message.info(
+              `安装包已下载：${result.name}，可在下载管理中手动安装`
+            )
+          }
+        })
+      } catch (downloadError) {
+        message.error(getErrorMessage(downloadError, '下载更新失败'))
+      }
+    },
+    [browserVisible, closeUpdatePrompt, message, modal]
+  )
+
   const closeGuide = useCallback((): void => {
     setGuideOpen(false)
     window.electron.markProductGuideSeen().catch(() => undefined)
@@ -657,17 +705,14 @@ export default function App(): JSX.Element {
       <UpdatePrompt
         update={updateInfo}
         open={updateOpen}
-        onClose={closeUpdatePrompt}
         onLater={(version) => {
           sessionDismissedUpdateVersionRef.current = version
           window.electron.skipUpdateVersion(version).catch(() => {
-            message.error('保存“稍后更新”设置失败，下次启动可能再次提示')
+            message.error('保存“跳过此版本”设置失败，下次启动可能再次提示')
           })
           closeUpdatePrompt()
         }}
-        onStartUpdate={(version) => {
-          sessionDismissedUpdateVersionRef.current = version
-        }}
+        onDownload={handleDownloadUpdate}
       />
 
       <AppFooter

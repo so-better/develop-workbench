@@ -1,64 +1,29 @@
-import { useState } from 'react'
 import { DownloadOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Modal } from 'antd'
+import { Alert, Button, Modal } from 'antd'
 import type { UpdateCheckResult } from '../../../../types/updates'
-import { getErrorMessage } from '../../../../utils'
 import './UpdatePrompt.css'
 
 interface UpdatePromptProps {
   update: UpdateCheckResult | null
   open: boolean
-  onClose: () => void
   onLater: (version: string) => void
-  onStartUpdate: (version: string) => void
+  onDownload: (update: UpdateCheckResult) => void
 }
 
 /**
  * 新版本提示。
- * 立即更新会下载安装包并尝试自动打开安装程序。
+ * 点击下载后交给应用层处理，下载完成后再询问是否立即安装。
  */
 export default function UpdatePrompt({
   update,
   open,
-  onClose,
   onLater,
-  onStartUpdate
+  onDownload
 }: UpdatePromptProps): JSX.Element | null {
-  const { message } = App.useApp()
-  const [downloading, setDownloading] = useState(false)
-
   if (!update) return null
 
   const handleLater = (): void => {
     onLater(update.latestVersion)
-  }
-
-  const handleDownload = async (): Promise<void> => {
-    if (!update.package || downloading) return
-
-    setDownloading(true)
-    onStartUpdate(update.latestVersion)
-    onClose()
-    message.info('正在下载更新，完成后将自动打开安装程序')
-
-    try {
-      const result = await window.electron.downloadUpdatePackage(update.package)
-
-      try {
-        await window.electron.installUpdateDownload(result.downloadId)
-      } catch (installError) {
-        message.error(
-          getErrorMessage(
-            installError,
-            '安装更新失败，请在下载管理中手动安装'
-          )
-        )
-      }
-    } catch (downloadError) {
-      message.error(getErrorMessage(downloadError, '下载更新失败'))
-    } finally {
-      setDownloading(false)
-    }
   }
 
   return (
@@ -71,17 +36,16 @@ export default function UpdatePrompt({
       onCancel={handleLater}
       footer={[
         <Button key="later" onClick={handleLater}>
-          稍后更新
+          跳过此版本
         </Button>,
         <Button
           key="download"
           type="primary"
           icon={<DownloadOutlined />}
-          loading={downloading}
           disabled={!update.package}
-          onClick={() => handleDownload()}
+          onClick={() => onDownload(update)}
         >
-          立即更新
+          下载更新
         </Button>
       ]}
     >
@@ -109,7 +73,7 @@ export default function UpdatePrompt({
         )}
 
         <p className="update-prompt-hint">
-          立即更新会自动下载并打开安装程序，应用随后退出；如当前平台只有 zip 包，需要手动解压安装。选择“稍后更新”后，该版本不再自动弹出，可在设置 → 应用信息中手动检查。
+          下载会进入下载管理，完成后会先询问是否立即安装，不会直接退出应用。选择“跳过此版本”后，该版本不再自动提示，可在设置 → 应用信息中手动检查。
         </p>
       </div>
     </Modal>
