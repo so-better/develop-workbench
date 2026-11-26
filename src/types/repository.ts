@@ -115,6 +115,12 @@ export interface RepositoryBindingStatus {
 
   /** 轻舟迭代分支是否存在。 */
   iterationBranchExists: boolean
+
+  /** 需求分支是否已全部合入迭代分支；非轻舟或无法判断时为 null。 */
+  requirementMergedToIteration: boolean | null
+
+  /** 需求分支领先迭代分支的提交数；无法判断时为 null。 */
+  requirementAheadCommits: number | null
 }
 
 /**

@@ -6,6 +6,7 @@ import {
   DeleteOutlined,
   DeploymentUnitOutlined,
   EditOutlined,
+  ExclamationCircleFilled,
   FolderOpenOutlined,
   InfoCircleOutlined,
   LinkOutlined,
@@ -329,6 +330,18 @@ export default function RequirementRepositories({
                             }
                             onCopy={onCopyBranchName}
                           />
+                          {bindingStatus?.requirementMergedToIteration === false ? (
+                            <div className="requirement-repo-qingzhou-state is-warning">
+                              <ExclamationCircleFilled />
+                              <span
+                                title={`对比远程分支：origin/${binding.iterationBranch ?? ''}`}
+                              >
+                                需求分支还有{' '}
+                                {bindingStatus.requirementAheadCommits ?? '若干'}{' '}
+                                个提交未合入迭代分支
+                              </span>
+                            </div>
+                          ) : null}
                           {!binding.qingzhouTaskId ? (
                             <div className="requirement-repo-qingzhou-state is-pending">
                               <span>

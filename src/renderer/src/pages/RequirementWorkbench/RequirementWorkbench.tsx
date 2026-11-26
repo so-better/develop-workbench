@@ -228,6 +228,7 @@ export default function RequirementWorkbench({
       : null
 
   const repositories = useRequirementRepositories({
+    active,
     selectedRequirementId,
     selectedRequirement,
     selectedRequirementIsLocal,

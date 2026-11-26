@@ -307,6 +307,11 @@
   font-size: 11px;
 }
 
+.requirement-repo-qingzhou-state.is-warning {
+  color: #d97706;
+  font-weight: 500;
+}
+
 .requirement-repo-qingzhou-state.is-pending {
   color: #b54708;
 }

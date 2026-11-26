@@ -18,6 +18,7 @@ const IDE_SESSION_PROMPT_KEY = 'develop-workbench:ide-session-prompt'
 const IDE_SESSION_DESCRIPTION_LIMIT = 2_000
 
 interface UseRequirementRepositoriesOptions {
+  active: boolean
   selectedRequirementId: string | null
   selectedRequirement: MeegleRequirement | null
   selectedRequirementIsLocal: boolean
@@ -30,6 +31,7 @@ interface UseRequirementRepositoriesOptions {
  * 需求关联仓库、分支、IDE 和合并请求状态。
  */
 export const useRequirementRepositories = ({
+  active,
   selectedRequirementId,
   selectedRequirement,
   selectedRequirementIsLocal,
@@ -174,6 +176,16 @@ export const useRequirementRepositories = ({
     return unsubscribe
   }, [])
 
+  useEffect(() => {
+    const handleWindowFocus = (): void => {
+      setBindingStatusVersion((value) => value + 1)
+    }
+
+    window.addEventListener('focus', handleWindowFocus)
+
+    return () => window.removeEventListener('focus', handleWindowFocus)
+  }, [])
+
   /**
    * 读取仓库分支并缓存。
    */
@@ -281,13 +293,14 @@ export const useRequirementRepositories = ({
    * 读取每个绑定的目标分支是否存在。
    */
   useEffect(() => {
+    if (!active) return
+
     if (bindings.length === 0) {
       setBindingStatuses({})
       return
     }
 
     let cancelled = false
-    setBindingStatuses({})
 
     Promise.all(
       bindings.map(async (binding) => {
@@ -316,18 +329,27 @@ export const useRequirementRepositories = ({
       if (cancelled) return
 
       const next: Record<string, RepositoryBindingStatus> = {}
+      const bindingIds = new Set(bindings.map((binding) => binding.id))
 
       for (const result of results) {
         if (result) next[result[0]] = result[1]
       }
 
-      setBindingStatuses(next)
+      setBindingStatuses((current) => {
+        const merged: Record<string, RepositoryBindingStatus> = {}
+
+        for (const [id, status] of Object.entries(current)) {
+          if (bindingIds.has(id)) merged[id] = status
+        }
+
+        return { ...merged, ...next }
+      })
     })
 
     return () => {
       cancelled = true
     }
-  }, [bindingStatusVersion, bindings])
+  }, [active, bindingStatusVersion, bindings])
 
   /**
    * 新增仓库绑定。

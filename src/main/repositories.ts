@@ -1867,7 +1867,9 @@ export const getRepositoryBindingStatus = async (
     return {
       available: false,
       branchExists: false,
-      iterationBranchExists: false
+      iterationBranchExists: false,
+      requirementMergedToIteration: null,
+      requirementAheadCommits: null
     }
   }
 
@@ -1875,16 +1877,72 @@ export const getRepositoryBindingStatus = async (
     return {
       available: false,
       branchExists: false,
-      iterationBranchExists: false
+      iterationBranchExists: false,
+      requirementMergedToIteration: null,
+      requirementAheadCommits: null
     }
   }
 
-  const { branches } = await listRepositoryBranches(repositoryId)
+  const shouldFetch = Boolean(iterationBranch) && Boolean(repository.remoteUrl)
+  const { branches } = await listRepositoryBranches(repositoryId, shouldFetch)
+  const branchExists = Boolean(branchName) && branches.includes(branchName)
+  const iterationBranchExists =
+    Boolean(iterationBranch) && branches.includes(iterationBranch as string)
 
-  return {
-    available: true,
-    branchExists: Boolean(branchName) && branches.includes(branchName),
-    iterationBranchExists: Boolean(iterationBranch) && branches.includes(iterationBranch as string)
+  if (!branchExists || !iterationBranchExists || !iterationBranch) {
+    return {
+      available: true,
+      branchExists,
+      iterationBranchExists,
+      requirementMergedToIteration: null,
+      requirementAheadCommits: null
+    }
+  }
+
+  const cwd = repository.localPath
+  const resolveRemoteRef = async (branch: string): Promise<string | null> => {
+    const remoteRef = `refs/remotes/origin/${branch}`
+
+    return runGit(['show-ref', '--verify', '--quiet', remoteRef], { cwd })
+      .then(() => `origin/${branch}`)
+      .catch(() => null)
+  }
+
+  const requirementRef = await resolveRemoteRef(branchName)
+  const iterationRef = await resolveRemoteRef(iterationBranch)
+
+  if (!requirementRef || !iterationRef) {
+    return {
+      available: true,
+      branchExists,
+      iterationBranchExists,
+      requirementMergedToIteration: null,
+      requirementAheadCommits: null
+    }
+  }
+
+  try {
+    const output = await runGit(
+      ['rev-list', '--count', `${iterationRef}..${requirementRef}`],
+      { cwd }
+    )
+    const ahead = Number(output.trim())
+
+    return {
+      available: true,
+      branchExists,
+      iterationBranchExists,
+      requirementMergedToIteration: Number.isFinite(ahead) ? ahead === 0 : null,
+      requirementAheadCommits: Number.isFinite(ahead) ? ahead : null
+    }
+  } catch {
+    return {
+      available: true,
+      branchExists,
+      iterationBranchExists,
+      requirementMergedToIteration: null,
+      requirementAheadCommits: null
+    }
   }
 }
 
